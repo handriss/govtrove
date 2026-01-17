@@ -44,3 +44,7 @@ terraform/*_override.tf.json
 
 # Local development
 postgres_data/
+
+# Reference code
+reference/
+*.zip
