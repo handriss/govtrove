@@ -1,0 +1,18 @@
+# Copy this file to terraform.tfvars and fill in the values
+
+aws_region  = "us-east-1"
+aws_profile = "opscout"
+environment = "prod"
+
+# Neon PostgreSQL connection string
+# Format: postgres://user:password@host/database?sslmode=require
+database_url = "postgres://..."
+
+# SAM.gov API key
+sam_api_key = "your-sam-api-key"
+
+# Email for notifications
+notification_email = "your-email@example.com"
+
+# Schedule: 6 AM ET daily (11 AM UTC)
+schedule_expression = "cron(0 11 * * ? *)"
