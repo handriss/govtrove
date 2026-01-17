@@ -1,13 +1,12 @@
-.PHONY: help dev-up dev-down dev-logs migrate-up migrate-down migrate-create run run-neon build test clean tf-init tf-plan tf-apply docker-build docker-push
+.PHONY: help dev-up dev-down migrate-up migrate-down migrate-create run run-neon build test clean tf-init tf-plan tf-apply docker-build docker-push
 
 # Default target
 help:
 	@echo "OpScout Development Commands"
 	@echo ""
 	@echo "Local Development:"
-	@echo "  make dev-up        - Start local PostgreSQL"
-	@echo "  make dev-down      - Stop local PostgreSQL"
-	@echo "  make dev-logs      - Show PostgreSQL logs"
+	@echo "  make dev-up        - Start local PostgreSQL + Adminer (foreground)"
+	@echo "  make dev-down      - Stop local services"
 	@echo "  make run           - Run ingestion service locally (local DB)"
 	@echo "  make run-neon      - Run ingestion service locally (Neon DB)"
 	@echo ""
@@ -33,25 +32,14 @@ help:
 # Local database URL
 LOCAL_DB_URL := postgres://opscout:localdev@localhost:5432/opscout?sslmode=disable
 
-# Start local PostgreSQL
 dev-up:
-	docker compose up -d db
-	@echo "Waiting for PostgreSQL to be ready..."
-	@sleep 3
-	@echo "PostgreSQL is ready at localhost:5432"
-	@echo "Run 'make migrate-up' to apply migrations"
+	docker compose up
 
-# Stop local PostgreSQL
 dev-down:
 	docker compose down
 
-# Stop and remove volumes
 dev-clean:
 	docker compose down -v
-
-# Show PostgreSQL logs
-dev-logs:
-	docker compose logs -f db
 
 # ============================================================================
 # Migrations (using golang-migrate)
