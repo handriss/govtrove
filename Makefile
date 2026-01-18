@@ -1,4 +1,4 @@
-.PHONY: help dev-up dev-down migrate-up migrate-down migrate-create run run-neon build test clean tf-init tf-plan tf-apply docker-build docker-push
+.PHONY: help dev-up dev-down migrate-up migrate-down migrate-create run run-neon run-mock run-csv-only mock-server build test clean tf-init tf-plan tf-apply docker-build docker-push
 
 # Default target
 help:
@@ -9,6 +9,9 @@ help:
 	@echo "  make dev-down      - Stop local services"
 	@echo "  make run           - Run ingestion service locally (local DB)"
 	@echo "  make run-neon      - Run ingestion service locally (Neon DB)"
+	@echo "  make run-mock      - Run ingestion against mock SAM.gov server"
+	@echo "  make run-csv-only  - Run CSV-only ingestion (skip API)"
+	@echo "  make mock-server   - Start mock SAM.gov API server"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up    - Run migrations (local DB)"
@@ -97,6 +100,30 @@ run-neon:
 	SAM_API_KEY="$(SAM_API_KEY)" \
 	LOG_LEVEL=debug \
 	go run ./cmd/ingest
+
+# Run ingestion against mock SAM.gov server (start mock-server first)
+run-mock:
+	cd ingestion && \
+	DATABASE_URL="$(LOCAL_DB_URL)" \
+	SAM_API_KEY="mock-key" \
+	MOCK_API_URL="http://localhost:8080" \
+	LOG_LEVEL=debug \
+	RECORD_LIMIT=$(or $(RECORD_LIMIT),100) \
+	go run ./cmd/ingest
+
+# Run CSV-only ingestion (skip API and descriptions)
+run-csv-only:
+	cd ingestion && \
+	DATABASE_URL="$(LOCAL_DB_URL)" \
+	SAM_API_KEY="dummy-key" \
+	SKIP_API=true \
+	SKIP_DESCRIPTIONS=true \
+	LOG_LEVEL=debug \
+	go run ./cmd/ingest
+
+# Start mock SAM.gov API server
+mock-server:
+	cd ingestion && go run ./cmd/mockserver -port=8080 -count=$(or $(MOCK_COUNT),500)
 
 # ============================================================================
 # Build
