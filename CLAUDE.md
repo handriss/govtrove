@@ -1,5 +1,14 @@
 # Claude Code Guidelines for OpScout
 
+## Protected Files
+
+**Never delete, overwrite, or modify these files:**
+- `.env` - contains secrets and API keys
+- `.env.local`, `.env.production`, or any `.env.*` files (except `.env.example`)
+- Any file containing credentials or secrets
+
+These files should only be created or edited by the user directly.
+
 ## Deployment Policy
 
 **Never deploy automatically.** All deployments must be done by the user after review.
