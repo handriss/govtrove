@@ -1,0 +1,6 @@
+ALTER TABLE api_key_usage RENAME TO samgov_requests;
+
+ALTER INDEX idx_api_key_usage_timestamp RENAME TO idx_samgov_requests_timestamp;
+ALTER INDEX idx_api_key_usage_ingestion_run RENAME TO idx_samgov_requests_ingestion_run;
+ALTER INDEX idx_api_key_usage_success RENAME TO idx_samgov_requests_success;
+ALTER INDEX idx_api_key_usage_status_code RENAME TO idx_samgov_requests_status_code;
