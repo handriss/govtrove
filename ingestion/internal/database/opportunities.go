@@ -326,3 +326,28 @@ func (db *DB) GetOpportunityByNoticeID(ctx context.Context, noticeID string) (*O
 	}
 	return opp, nil
 }
+
+func (db *DB) GetNoticeIDsWithoutDescription(ctx context.Context, limit int) ([]string, error) {
+	query := `
+		SELECT notice_id
+		FROM opportunities
+		WHERE description IS NULL AND active = true
+		ORDER BY posted_date DESC
+		LIMIT $1
+	`
+	rows, err := db.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query opportunities without descriptions: %w", err)
+	}
+	defer rows.Close()
+
+	var noticeIDs []string
+	for rows.Next() {
+		var noticeID string
+		if err := rows.Scan(&noticeID); err != nil {
+			return nil, fmt.Errorf("failed to scan notice_id: %w", err)
+		}
+		noticeIDs = append(noticeIDs, noticeID)
+	}
+	return noticeIDs, rows.Err()
+}
