@@ -36,6 +36,7 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 			&opp.ID,
 			&opp.NoticeID,
 			&opp.Title,
+			&opp.Description,
 			&opp.SolicitationNumber,
 			&opp.Type,
 			&opp.Department,
@@ -142,7 +143,7 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 
 	query := fmt.Sprintf(`
 		SELECT
-			id, notice_id, title, solicitation_number, type,
+			id, notice_id, title, description, solicitation_number, type,
 			full_parent_path_name, posted_date, response_deadline,
 			set_aside_code, set_aside_description, naics_code,
 			pop_state_code, active,
@@ -183,7 +184,7 @@ func (r *OpportunityRepository) buildOrderClause(sort, order string, hasSearch b
 func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Opportunity, error) {
 	query := `
 		SELECT
-			id, notice_id, title, solicitation_number, type, base_type,
+			id, notice_id, title, description, solicitation_number, type, base_type,
 			full_parent_path_name, posted_date, response_deadline,
 			archive_date, set_aside_code, set_aside_description,
 			naics_code, naics_codes, classification_code,
@@ -200,6 +201,7 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		&opp.ID,
 		&opp.NoticeID,
 		&opp.Title,
+		&opp.Description,
 		&opp.SolicitationNumber,
 		&opp.Type,
 		&opp.BaseType,
@@ -235,7 +237,7 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		return nil, fmt.Errorf("querying opportunity: %w", err)
 	}
 
-	resources, err := r.getResourceLinks(ctx, opp.NoticeID)
+	resources, err := r.getResourceLinks(ctx, opp.ID)
 	if err != nil {
 		return nil, fmt.Errorf("getting resource links: %w", err)
 	}
@@ -244,9 +246,9 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 	return &opp, nil
 }
 
-func (r *OpportunityRepository) getResourceLinks(ctx context.Context, noticeID string) ([]string, error) {
-	query := `SELECT url FROM opportunity_resources WHERE notice_id = $1`
-	rows, err := r.pool.Query(ctx, query, noticeID)
+func (r *OpportunityRepository) getResourceLinks(ctx context.Context, opportunityID int) ([]string, error) {
+	query := `SELECT url FROM opportunity_resources WHERE opportunity_id = $1`
+	rows, err := r.pool.Query(ctx, query, opportunityID)
 	if err != nil {
 		return nil, err
 	}
