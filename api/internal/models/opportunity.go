@@ -8,6 +8,7 @@ type Opportunity struct {
 	ID                 int        `json:"id"`
 	NoticeID           string     `json:"notice_id"`
 	Title              string     `json:"title"`
+	Description        *string    `json:"description,omitempty"`
 	SolicitationNumber *string    `json:"solicitation_number,omitempty"`
 	Type               *string    `json:"type,omitempty"`
 	BaseType           *string    `json:"base_type,omitempty"`
@@ -42,6 +43,7 @@ type OpportunityListItem struct {
 	ID                 int        `json:"id"`
 	NoticeID           string     `json:"notice_id"`
 	Title              string     `json:"title"`
+	Description        *string    `json:"description,omitempty"`
 	SolicitationNumber *string    `json:"solicitation_number,omitempty"`
 	Type               *string    `json:"type,omitempty"`
 	Department         *string    `json:"department,omitempty"`
