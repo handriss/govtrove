@@ -1,1 +1,220 @@
 @import "tailwindcss";
+
+@theme {
+  --color-dark-50: #f8fafc;
+  --color-dark-100: #f1f5f9;
+  --color-dark-200: #e2e8f0;
+  --color-dark-300: #cbd5e1;
+  --color-dark-400: #94a3b8;
+  --color-dark-500: #64748b;
+  --color-dark-600: #475569;
+  --color-dark-700: #334155;
+  --color-dark-800: #1e293b;
+  --color-dark-850: #172033;
+  --color-dark-900: #0f172a;
+  --color-dark-950: #0a0f1a;
+
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', Consolas, monospace;
+}
+
+html {
+  font-family: var(--font-family-sans);
+}
+
+body {
+  background-color: var(--color-dark-950);
+  color: var(--color-dark-100);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background-color: var(--color-dark-900);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-dark-700);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-dark-600);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+  transition: all 150ms;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+  transition: all 150ms;
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+  transition: all 150ms;
+  background-color: var(--color-dark-800);
+  color: var(--color-dark-100);
+  border: 1px solid var(--color-dark-700);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-dark-700);
+  border-color: var(--color-dark-600);
+}
+
+.btn-ghost {
+  color: var(--color-dark-400);
+  padding: 0.5rem 0.75rem;
+  transition: color 150ms;
+}
+
+.btn-ghost:hover {
+  color: var(--color-dark-100);
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-dark-900);
+  border: 1px solid var(--color-dark-700);
+  border-radius: 0.25rem;
+  color: var(--color-dark-100);
+  transition: all 150ms;
+}
+
+.input::placeholder {
+  color: var(--color-dark-500);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.card {
+  background-color: var(--color-dark-900);
+  border: 1px solid var(--color-dark-800);
+  border-radius: 0.5rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+}
+
+.badge-blue {
+  background-color: rgb(59 130 246 / 0.2);
+  color: rgb(96 165 250);
+  border: 1px solid rgb(59 130 246 / 0.3);
+}
+
+.badge-green {
+  background-color: rgb(16 185 129 / 0.2);
+  color: rgb(52 211 153);
+  border: 1px solid rgb(16 185 129 / 0.3);
+}
+
+.badge-purple {
+  background-color: rgb(168 85 247 / 0.2);
+  color: rgb(192 132 252);
+  border: 1px solid rgb(168 85 247 / 0.3);
+}
+
+.badge-pink {
+  background-color: rgb(236 72 153 / 0.2);
+  color: rgb(244 114 182);
+  border: 1px solid rgb(236 72 153 / 0.3);
+}
+
+.badge-orange {
+  background-color: rgb(249 115 22 / 0.2);
+  color: rgb(251 146 60);
+  border: 1px solid rgb(249 115 22 / 0.3);
+}
+
+.badge-gray {
+  background-color: var(--color-dark-700);
+  color: var(--color-dark-300);
+  border: 1px solid var(--color-dark-600);
+}
+
+.badge-red {
+  background-color: rgb(239 68 68 / 0.2);
+  color: rgb(248 113 113);
+  border: 1px solid rgb(239 68 68 / 0.3);
+}
+
+.badge-amber {
+  background-color: rgb(245 158 11 / 0.2);
+  color: rgb(251 191 36);
+  border: 1px solid rgb(245 158 11 / 0.3);
+}
+
+.stat-card {
+  background-color: var(--color-dark-900);
+  border: 1px solid var(--color-dark-800);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-dark-50);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-dark-400);
+}
+
+.table-row {
+  border-bottom: 1px solid var(--color-dark-800);
+  transition: background-color 150ms;
+}
+
+.table-row:hover {
+  background-color: var(--color-dark-850);
+}
