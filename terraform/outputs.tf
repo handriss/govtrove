@@ -37,3 +37,35 @@ output "security_group_id" {
   description = "Security group ID for ECS tasks"
   value       = aws_security_group.ecs_tasks.id
 }
+
+# API outputs
+output "ecr_api_repository_url" {
+  description = "ECR repository URL for API service"
+  value       = aws_ecr_repository.api.repository_url
+}
+
+output "apprunner_service_url" {
+  description = "App Runner service URL for API"
+  value       = aws_apprunner_service.api.service_url
+}
+
+output "apprunner_service_arn" {
+  description = "App Runner service ARN (for deployments)"
+  value       = aws_apprunner_service.api.arn
+}
+
+# Frontend outputs
+output "frontend_bucket_name" {
+  description = "S3 bucket name for frontend static files"
+  value       = aws_s3_bucket.frontend.id
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID"
+  value       = aws_cloudfront_distribution.frontend.id
+}
+
+output "cloudfront_distribution_url" {
+  description = "CloudFront distribution URL for frontend"
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
