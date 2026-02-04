@@ -28,9 +28,9 @@ output "sns_topic_arn" {
   value       = aws_sns_topic.notifications.arn
 }
 
-output "private_subnet_ids" {
-  description = "Private subnet IDs (for running tasks)"
-  value       = aws_subnet.private[*].id
+output "public_subnet_ids" {
+  description = "Public subnet IDs (for running tasks)"
+  value       = aws_subnet.public[*].id
 }
 
 output "security_group_id" {

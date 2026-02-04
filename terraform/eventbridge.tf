@@ -19,9 +19,9 @@ resource "aws_scheduler_schedule" "ingestion" {
       task_count          = 1
 
       network_configuration {
-        subnets          = aws_subnet.private[*].id
+        subnets          = aws_subnet.public[*].id
         security_groups  = [aws_security_group.ecs_tasks.id]
-        assign_public_ip = false
+        assign_public_ip = true
       }
     }
   }
