@@ -73,3 +73,17 @@ variable "schedule_expression" {
   type        = string
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
+
+# API
+variable "api_port" {
+  description = "Port the API service listens on"
+  type        = number
+  default     = 8080
+}
+
+# Domain (optional, for future custom domain support)
+variable "domain_name" {
+  description = "Custom domain name for the application (optional)"
+  type        = string
+  default     = ""
+}

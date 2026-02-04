@@ -1,6 +1,6 @@
 import type { SearchResult, Opportunity, FilterOptions, SearchParams } from '../types/api';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export async function searchOpportunities(params: SearchParams = {}): Promise<SearchResult> {
   const searchParams = new URLSearchParams();
