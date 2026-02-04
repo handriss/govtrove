@@ -333,13 +333,13 @@ run-ingestion-aws:
 	@echo "Triggering ECS ingestion task..."
 	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
 	TASK_DEF=$$(cd terraform && terraform output -raw ecs_task_definition_arn) && \
-	SUBNETS=$$(cd terraform && terraform output -json private_subnet_ids | jq -r 'join(",")') && \
+	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
 	SG=$$(cd terraform && terraform output -raw security_group_id) && \
 	aws ecs run-task \
 		--cluster $$CLUSTER \
 		--task-definition $$TASK_DEF \
 		--launch-type FARGATE \
-		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=DISABLED}" \
+		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
 	echo "Ingestion task triggered! Check logs with 'make logs-ingestion'"
 
