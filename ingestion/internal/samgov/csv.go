@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/opscout/ingestion/internal/database"
+	"golang.org/x/text/encoding/charmap"
 )
 
 const (
@@ -121,7 +122,7 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 func (c *CSVClient) mapRowToOpportunity(record []string, headerIndex map[string]int) (*database.Opportunity, error) {
 	getValue := func(columnName string) string {
 		if idx, ok := headerIndex[columnName]; ok && idx < len(record) {
-			return strings.TrimSpace(record[idx])
+			return sanitizeToUTF8(strings.TrimSpace(record[idx]))
 		}
 		return ""
 	}
@@ -213,13 +214,30 @@ func (c *CSVClient) mapRowToOpportunity(record []string, headerIndex map[string]
 	rawData := make(map[string]string)
 	for header, idx := range headerIndex {
 		if idx < len(record) && record[idx] != "" {
-			rawData[header] = record[idx]
+			rawData[header] = sanitizeToUTF8(record[idx])
 		}
 	}
 	rawJSON, _ := json.Marshal(rawData)
 	opp.RawJSON = rawJSON
 
 	return opp, nil
+}
+
+// sanitizeToUTF8 converts Windows-1252 encoded text to valid UTF-8.
+// SAM.gov CSV files often contain Windows-1252 characters (smart quotes, etc.)
+// that are invalid in UTF-8 and cause PostgreSQL insertion failures.
+func sanitizeToUTF8(s string) string {
+	if s == "" {
+		return s
+	}
+	// Try to decode as Windows-1252 and convert to UTF-8
+	decoder := charmap.Windows1252.NewDecoder()
+	result, err := decoder.String(s)
+	if err != nil {
+		// Fallback: strip any remaining invalid UTF-8 bytes
+		return strings.ToValidUTF8(s, "")
+	}
+	return result
 }
 
 func parseDate(s string) *time.Time {
