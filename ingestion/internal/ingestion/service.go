@@ -259,9 +259,13 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 	}
 
 	stats.CSVFetched = result.ParsedRows
-	s.logger.Info("CSV download complete", "parsed", result.ParsedRows, "total_rows", result.TotalRows)
+	total := len(result.Opportunities)
+	s.logger.Info("CSV download complete, starting database upserts", "parsed", result.ParsedRows, "total_rows", result.TotalRows)
 
-	for _, opp := range result.Opportunities {
+	startTime := time.Now()
+	const progressInterval = 10000
+
+	for i, opp := range result.Opportunities {
 		opp.DataSource = "csv"
 		opp.IngestionRunID = &runID
 
@@ -277,6 +281,23 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 		} else {
 			stats.Updated++
 			s.logger.Debug("updated CSV opportunity", "notice_id", opp.NoticeID)
+		}
+
+		// Log progress every N records
+		processed := i + 1
+		if processed%progressInterval == 0 || processed == total {
+			elapsed := time.Since(startTime)
+			rate := float64(processed) / elapsed.Seconds()
+			pct := float64(processed) / float64(total) * 100
+			remaining := time.Duration(float64(total-processed)/rate) * time.Second
+			s.logger.Info("database upsert progress",
+				"progress", fmt.Sprintf("%d/%d (%.1f%%)", processed, total, pct),
+				"inserted", stats.Inserted,
+				"updated", stats.Updated,
+				"failed", stats.Failed,
+				"rate", fmt.Sprintf("%.0f/sec", rate),
+				"eta", remaining.Round(time.Second),
+			)
 		}
 	}
 

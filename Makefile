@@ -13,6 +13,12 @@
 # Configuration
 # ============================================================================
 
+# Auto-load .env file if it exists
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 AWS_PROFILE := opscout
 AWS_REGION := us-east-1
 LOCAL_DB_URL := postgres://opscout:localdev@localhost:5432/opscout?sslmode=disable
