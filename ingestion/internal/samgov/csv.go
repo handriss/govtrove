@@ -80,6 +80,10 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 		Opportunities: make([]*database.Opportunity, 0, limit),
 	}
 
+	startTime := time.Now()
+	lastProgress := time.Now()
+	const progressInterval = 10000
+
 	for {
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -104,11 +108,27 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 		result.Opportunities = append(result.Opportunities, opp)
 		result.ParsedRows++
 
+		// Log progress every N records
+		if result.ParsedRows%progressInterval == 0 {
+			elapsed := time.Since(startTime)
+			rate := float64(result.ParsedRows) / elapsed.Seconds()
+			c.logger.Info("CSV parsing progress",
+				"parsed", result.ParsedRows,
+				"errors", result.Errors,
+				"elapsed", elapsed.Round(time.Second),
+				"rate", fmt.Sprintf("%.0f/sec", rate),
+			)
+			lastProgress = time.Now()
+		}
+
 		if limit > 0 && result.ParsedRows >= limit {
 			c.logger.Info("reached record limit", "limit", limit)
 			break
 		}
 	}
+
+	// Avoid unused variable warning
+	_ = lastProgress
 
 	c.logger.Info("CSV parsing complete",
 		"total_rows", result.TotalRows,
