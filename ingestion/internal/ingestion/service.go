@@ -59,14 +59,14 @@ func New(cfg *config.Config, db *database.DB, snsClient *sns.Client, logger *slo
 
 func (s *Service) Run(ctx context.Context) error {
 	startTime := time.Now()
-	s.logger.Info("starting ingestion")
+	s.logger.Info("starting ingestion", "mode", s.cfg.IngestionMode)
 
-	runID, err := s.db.CreateIngestionRun(ctx)
+	runID, err := s.db.CreateIngestionRunWithMode(ctx, string(s.cfg.IngestionMode), s.cfg.LookbackDays)
 	if err != nil {
 		s.logger.Error("failed to create ingestion run", "error", err)
 		return err
 	}
-	s.logger.Info("created ingestion run", "run_id", runID)
+	s.logger.Info("created ingestion run", "run_id", runID, "mode", s.cfg.IngestionMode)
 
 	s.csvClient.SetIngestionRunID(runID)
 	s.apiClient.SetIngestionRunID(runID)
@@ -74,6 +74,118 @@ func (s *Service) Run(ctx context.Context) error {
 
 	stats := &IngestionStats{}
 
+	// API disabled until we get higher rate limits (currently 1000 requests/day).
+	// Once approved, remove this block and uncomment the switch below.
+	const apiEnabled = false
+	if !apiEnabled {
+		s.logger.Info("API disabled, using CSV-only mode")
+		err = s.runCSVOnly(ctx, runID, startTime, stats)
+	} else {
+		switch s.cfg.IngestionMode {
+		case config.ModeCSVOnly:
+			err = s.runCSVOnly(ctx, runID, startTime, stats)
+		case config.ModeIncremental:
+			err = s.runIncremental(ctx, runID, startTime, stats)
+		default:
+			err = s.runFull(ctx, runID, startTime, stats)
+		}
+	}
+
+	if err != nil {
+		return err
+	}
+
+	total, err := s.db.CountOpportunities(ctx)
+	if err != nil {
+		s.logger.Warn("failed to count opportunities", "error", err)
+	} else {
+		s.logger.Info("total opportunities in database", "count", total)
+	}
+
+	return nil
+}
+
+func (s *Service) runCSVOnly(ctx context.Context, runID int, startTime time.Time, stats *IngestionStats) error {
+	s.logger.Info("running CSV-only mode (fast backfill)")
+
+	_, err := s.fetchAndSaveCSV(ctx, runID, stats)
+	if err != nil {
+		s.failRun(ctx, runID, startTime, err)
+		return err
+	}
+
+	durationMs := int(time.Since(startTime).Milliseconds())
+	if err := s.db.CompleteIngestionRun(ctx, runID, stats.CSVFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
+		s.logger.Error("failed to complete ingestion run", "error", err)
+		return err
+	}
+
+	s.logFinalStats(runID, stats, durationMs)
+
+	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
+		s.logger.Warn("failed to send notification", "error", err)
+	}
+
+	return nil
+}
+
+func (s *Service) runIncremental(ctx context.Context, runID int, startTime time.Time, stats *IngestionStats) error {
+	s.logger.Info("running incremental mode", "lookback_days", s.cfg.LookbackDays)
+
+	since := time.Now().AddDate(0, 0, -s.cfg.LookbackDays)
+	result, err := s.apiClient.FetchOpportunitiesSince(ctx, since, s.cfg.RecordLimit)
+	if err != nil {
+		s.failRun(ctx, runID, startTime, err)
+		return err
+	}
+
+	stats.APIFetched = len(result.Opportunities)
+	s.logger.Info("API incremental fetch complete",
+		"fetched", stats.APIFetched,
+		"since", since.Format("2006-01-02"),
+	)
+
+	for _, opp := range result.Opportunities {
+		opp.DataSource = "api"
+		opp.IngestionRunID = &runID
+
+		wasInserted, err := s.db.UpsertOpportunity(ctx, opp)
+		if err != nil {
+			s.logger.Error("failed to upsert API opportunity", "notice_id", opp.NoticeID, "error", err)
+			stats.Failed++
+			continue
+		}
+		if wasInserted {
+			stats.Inserted++
+		} else {
+			stats.Updated++
+		}
+	}
+
+	if !s.cfg.SkipDescriptions && len(result.Opportunities) > 0 {
+		noticeIDs := make([]string, 0, len(result.Opportunities))
+		for _, opp := range result.Opportunities {
+			noticeIDs = append(noticeIDs, opp.NoticeID)
+		}
+		s.fetchDescriptions(ctx, noticeIDs, stats)
+	}
+
+	durationMs := int(time.Since(startTime).Milliseconds())
+	if err := s.db.CompleteIngestionRun(ctx, runID, stats.APIFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
+		s.logger.Error("failed to complete ingestion run", "error", err)
+		return err
+	}
+
+	s.logFinalStats(runID, stats, durationMs)
+
+	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
+		s.logger.Warn("failed to send notification", "error", err)
+	}
+
+	return nil
+}
+
+func (s *Service) runFull(ctx context.Context, runID int, startTime time.Time, stats *IngestionStats) error {
 	// PHASE 1: Download and save ALL CSV data
 	s.logger.Info("PHASE 1: Fetching CSV data")
 	csvOpps, err := s.fetchAndSaveCSV(ctx, runID, stats)
@@ -135,13 +247,6 @@ func (s *Service) Run(ctx context.Context) error {
 
 	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
 		s.logger.Warn("failed to send notification", "error", err)
-	}
-
-	total, err := s.db.CountOpportunities(ctx)
-	if err != nil {
-		s.logger.Warn("failed to count opportunities", "error", err)
-	} else {
-		s.logger.Info("total opportunities in database", "count", total)
 	}
 
 	return nil

@@ -119,6 +119,18 @@ func (c *APIClient) SetIngestionRunID(runID int) {
 }
 
 func (c *APIClient) FetchAllOpportunities(ctx context.Context, limit int) (*APIFetchResult, error) {
+	return c.fetchWithParams(ctx, nil, limit)
+}
+
+func (c *APIClient) FetchOpportunitiesSince(ctx context.Context, since time.Time, limit int) (*APIFetchResult, error) {
+	params := map[string]string{
+		"postedFrom": since.Format("01/02/2006"),
+	}
+	c.logger.Info("fetching opportunities since", "date", since.Format("2006-01-02"))
+	return c.fetchWithParams(ctx, params, limit)
+}
+
+func (c *APIClient) fetchWithParams(ctx context.Context, extraParams map[string]string, limit int) (*APIFetchResult, error) {
 	result := &APIFetchResult{
 		Opportunities: make([]*database.Opportunity, 0),
 	}
@@ -133,7 +145,7 @@ func (c *APIClient) FetchAllOpportunities(ctx context.Context, limit int) (*APIF
 		default:
 		}
 
-		pageResult, totalRecords, err := c.fetchPage(ctx, offset)
+		pageResult, totalRecords, err := c.fetchPage(ctx, offset, extraParams)
 		if err != nil {
 			c.logger.Error("failed to fetch page", "offset", offset, "error", err)
 			result.Errors++
@@ -179,7 +191,7 @@ func (c *APIClient) FetchAllOpportunities(ctx context.Context, limit int) (*APIF
 	return result, nil
 }
 
-func (c *APIClient) fetchPage(ctx context.Context, offset int) ([]*database.Opportunity, int, error) {
+func (c *APIClient) fetchPage(ctx context.Context, offset int, extraParams map[string]string) ([]*database.Opportunity, int, error) {
 	u, err := url.Parse(c.baseURL)
 	if err != nil {
 		return nil, 0, fmt.Errorf("invalid base URL: %w", err)
@@ -189,6 +201,9 @@ func (c *APIClient) fetchPage(ctx context.Context, offset int) ([]*database.Oppo
 	q.Set("api_key", c.apiKey)
 	q.Set("limit", fmt.Sprintf("%d", DefaultPageLimit))
 	q.Set("offset", fmt.Sprintf("%d", offset))
+	for k, v := range extraParams {
+		q.Set(k, v)
+	}
 	u.RawQuery = q.Encode()
 
 	resp, err := c.httpClient.Get(ctx, u.String())

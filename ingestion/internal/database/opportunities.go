@@ -95,6 +95,18 @@ func (db *DB) CreateIngestionRun(ctx context.Context) (int, error) {
 	return id, nil
 }
 
+func (db *DB) CreateIngestionRunWithMode(ctx context.Context, mode string, lookbackDays int) (int, error) {
+	var id int
+	err := db.pool.QueryRow(ctx,
+		`INSERT INTO ingestion_runs (status, ingestion_mode, lookback_days) VALUES ('running', $1, $2) RETURNING id`,
+		mode, lookbackDays,
+	).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create ingestion run: %w", err)
+	}
+	return id, nil
+}
+
 func (db *DB) CompleteIngestionRun(ctx context.Context, id int, fetched, inserted, updated, failed int, durationMs int) error {
 	_, err := db.pool.Exec(ctx, `
 		UPDATE ingestion_runs
