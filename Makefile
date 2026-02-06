@@ -2,7 +2,7 @@
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	run run-neon run-mock run-csv-only mock-server \
+	run run-neon run-backfill run-backfill-neon run-mock mock-server \
 	build test ingestion-docker-build \
 	ecr-login deploy-frontend deploy-api deploy-ingestion deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
@@ -46,10 +46,11 @@ help:
 	@echo "  make frontend-build   - Build frontend for production"
 	@echo ""
 	@echo "Ingestion Service:"
-	@echo "  make run              - Run ingestion service locally (local DB)"
-	@echo "  make run-neon         - Run ingestion service locally (Neon DB)"
-	@echo "  make run-mock         - Run ingestion against mock SAM.gov server"
-	@echo "  make run-csv-only     - Run CSV-only ingestion (skip API)"
+	@echo "  make run              - Daily update (local DB)"
+	@echo "  make run-neon         - Daily update (Neon DB)"
+	@echo "  make run-backfill     - Full CSV backfill (local DB)"
+	@echo "  make run-backfill-neon - Full CSV backfill (Neon DB)"
+	@echo "  make run-mock         - Run against mock SAM.gov server"
 	@echo "  make mock-server      - Start mock SAM.gov API server"
 	@echo ""
 	@echo "Database:"
@@ -179,7 +180,7 @@ api-build:
 	cd api && go build -o ../bin/api ./cmd/api
 
 api-docker-build:
-	docker build -t opscout-api:latest ./api
+	docker build --platform linux/amd64 -t opscout-api:latest ./api
 
 # ============================================================================
 # Frontend
@@ -239,6 +240,30 @@ run-neon:
 	LOG_LEVEL=debug \
 	go run ./cmd/ingest
 
+run-backfill:
+	cd ingestion && \
+	DATABASE_URL="$(LOCAL_DB_URL)" \
+	SAM_API_KEY="dummy-key" \
+	INGESTION_MODE=csv-only \
+	LOG_LEVEL=debug \
+	go run ./cmd/ingest
+
+run-backfill-neon:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(SAM_API_KEY)" ]; then \
+		echo "Error: SAM_API_KEY environment variable is not set"; \
+		exit 1; \
+	fi
+	cd ingestion && \
+	DATABASE_URL="$(NEON_DATABASE_URL)" \
+	SAM_API_KEY="$(SAM_API_KEY)" \
+	INGESTION_MODE=csv-only \
+	LOG_LEVEL=info \
+	go run ./cmd/ingest
+
 run-mock:
 	cd ingestion && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
@@ -246,15 +271,6 @@ run-mock:
 	MOCK_API_URL="http://localhost:8080" \
 	LOG_LEVEL=debug \
 	RECORD_LIMIT=$(or $(RECORD_LIMIT),100) \
-	go run ./cmd/ingest
-
-run-csv-only:
-	cd ingestion && \
-	DATABASE_URL="$(LOCAL_DB_URL)" \
-	SAM_API_KEY="dummy-key" \
-	SKIP_API=true \
-	SKIP_DESCRIPTIONS=true \
-	LOG_LEVEL=debug \
 	go run ./cmd/ingest
 
 mock-server:
@@ -272,7 +288,7 @@ test:
 	cd api && go test -v ./...
 
 ingestion-docker-build:
-	docker build -t opscout-ingestion:latest ./ingestion
+	docker build --platform linux/amd64 -t opscout-ingestion:latest ./ingestion
 
 # ============================================================================
 # Deploy
