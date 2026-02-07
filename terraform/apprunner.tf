@@ -93,6 +93,7 @@ resource "aws_apprunner_service" "api" {
         }
 
         runtime_environment_variables = {
+          PORT            = tostring(var.api_port)
           LOG_LEVEL       = "info"
           ALLOWED_ORIGINS = "https://${aws_cloudfront_distribution.frontend.domain_name}"
         }

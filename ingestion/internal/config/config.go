@@ -26,7 +26,8 @@ type Config struct {
 
 	// Development/testing options
 	MockAPIURL       string `envconfig:"MOCK_API_URL"`
-	RecordLimit      int    `envconfig:"RECORD_LIMIT" default:"0"`
+	RecordLimit      int    `envconfig:"RECORD_LIMIT" default:"0"`      // Limit CSV parsing (0 = no limit)
+	MaxRecords       int    `envconfig:"MAX_RECORDS" default:"0"`       // Max records to insert after sorting by date (0 = no limit)
 	SkipAPI          bool   `envconfig:"SKIP_API" default:"false"`
 	SkipDescriptions bool   `envconfig:"SKIP_DESCRIPTIONS" default:"false"`
 	VerboseLogging   bool   `envconfig:"VERBOSE_LOGGING" default:"false"`

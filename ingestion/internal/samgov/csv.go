@@ -41,16 +41,43 @@ type FetchResult struct {
 	TotalRows     int
 	ParsedRows    int
 	Errors        int
+	NotModified   bool   // true if server returned 304 Not Modified
+	ETag          string // ETag header from response
+	LastModified  string // Last-Modified header from response
 }
 
 func (c *CSVClient) FetchOpportunities(ctx context.Context, limit int) (*FetchResult, error) {
-	c.logger.Info("starting CSV download", "url", FullCSVURL)
+	return c.FetchOpportunitiesConditional(ctx, limit, "", "")
+}
 
-	resp, err := c.httpClient.Get(ctx, FullCSVURL)
+// FetchOpportunitiesConditional fetches the CSV with optional conditional headers.
+// If etag or lastModified are provided, the request includes If-None-Match and/or
+// If-Modified-Since headers. Returns NotModified=true if server returns 304.
+func (c *CSVClient) FetchOpportunitiesConditional(ctx context.Context, limit int, etag, lastModified string) (*FetchResult, error) {
+	c.logger.Info("starting CSV download", "url", FullCSVURL, "has_etag", etag != "", "has_last_modified", lastModified != "")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, FullCSVURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
+	if lastModified != "" {
+		req.Header.Set("If-Modified-Since", lastModified)
+	}
+
+	resp, err := c.httpClient.Do(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch CSV: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotModified {
+		c.logger.Info("CSV not modified (304), skipping download")
+		return &FetchResult{NotModified: true}, nil
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -58,7 +85,16 @@ func (c *CSVClient) FetchOpportunities(ctx context.Context, limit int) (*FetchRe
 
 	c.logger.Info("CSV download started, parsing stream", "response_time_ms", resp.ResponseTimeMs)
 
-	return c.parseCSV(resp.Body, limit)
+	result, err := c.parseCSV(resp.Body, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Capture response headers for caching
+	result.ETag = resp.Header.Get("ETag")
+	result.LastModified = resp.Header.Get("Last-Modified")
+
+	return result, nil
 }
 
 func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
@@ -266,12 +302,22 @@ func parseDate(s string) *time.Time {
 	}
 
 	formats := []string{
-		"0102/2006",
-		"01/02/2006",
-		"2006-01-02",
-		"01/02/2006 15:04",
+		// SAM.gov CSV format with milliseconds and timezone (e.g., "2026-01-23 12:59:11.178-05")
+		"2006-01-02 15:04:05.000-07",
+		"2006-01-02 15:04:05.00-07",
+		"2006-01-02 15:04:05.0-07",
+		"2006-01-02 15:04:05-07",
+		"2006-01-02 15:04:05.000-0700",
+		"2006-01-02 15:04:05-0700",
+		// Other common formats
+		"2006-01-02T15:04:05.000-07:00",
+		"2006-01-02T15:04:05-07:00",
 		"2006-01-02T15:04:05Z",
 		"2006-01-02 15:04:05",
+		"2006-01-02",
+		"01/02/2006 15:04",
+		"01/02/2006",
+		"0102/2006",
 	}
 
 	for _, format := range formats {
