@@ -1,5 +1,7 @@
 # Binaries
 bin/
+api/api
+ingestion/ingest
 *.exe
 *.exe~
 *.dll
@@ -34,6 +36,7 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfvars
 terraform/crash.log
+terraform/tfplan
 terraform/override.tf
 terraform/override.tf.json
 terraform/*_override.tf
@@ -41,6 +44,14 @@ terraform/*_override.tf.json
 
 # macOS
 .DS_Store
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Test/temp data
+opportunities.json
 
 # Local development
 postgres_data/
