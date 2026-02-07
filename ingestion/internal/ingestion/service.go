@@ -262,43 +262,53 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 	total := len(result.Opportunities)
 	s.logger.Info("CSV download complete, starting database upserts", "parsed", result.ParsedRows, "total_rows", result.TotalRows)
 
-	startTime := time.Now()
-	const progressInterval = 10000
-
-	for i, opp := range result.Opportunities {
+	// Prepare all opportunities with metadata
+	for _, opp := range result.Opportunities {
 		opp.DataSource = "csv"
 		opp.IngestionRunID = &runID
+	}
 
-		wasInserted, err := s.db.UpsertOpportunity(ctx, opp)
+	// Batch upsert for much faster performance
+	const batchSize = 500
+	startTime := time.Now()
+
+	for i := 0; i < total; i += batchSize {
+		end := i + batchSize
+		if end > total {
+			end = total
+		}
+
+		batch := result.Opportunities[i:end]
+		batchResult, err := s.db.BatchUpsertOpportunities(ctx, batch)
 		if err != nil {
-			s.logger.Error("failed to upsert CSV opportunity", "notice_id", opp.NoticeID, "error", err)
-			stats.Failed++
+			s.logger.Error("batch upsert failed", "batch_start", i, "error", err)
+			stats.Failed += len(batch)
 			continue
 		}
-		if wasInserted {
-			stats.Inserted++
-			s.logger.Debug("inserted CSV opportunity", "notice_id", opp.NoticeID)
-		} else {
-			stats.Updated++
-			s.logger.Debug("updated CSV opportunity", "notice_id", opp.NoticeID)
+
+		stats.Inserted += batchResult.Inserted
+		stats.Updated += batchResult.Updated
+		stats.Failed += batchResult.Failed
+
+		// Log errors from the batch
+		for _, e := range batchResult.Errors {
+			s.logger.Error("failed to upsert CSV opportunity", "error", e)
 		}
 
-		// Log progress every N records
-		processed := i + 1
-		if processed%progressInterval == 0 || processed == total {
-			elapsed := time.Since(startTime)
-			rate := float64(processed) / elapsed.Seconds()
-			pct := float64(processed) / float64(total) * 100
-			remaining := time.Duration(float64(total-processed)/rate) * time.Second
-			s.logger.Info("database upsert progress",
-				"progress", fmt.Sprintf("%d/%d (%.1f%%)", processed, total, pct),
-				"inserted", stats.Inserted,
-				"updated", stats.Updated,
-				"failed", stats.Failed,
-				"rate", fmt.Sprintf("%.0f/sec", rate),
-				"eta", remaining.Round(time.Second),
-			)
-		}
+		// Log progress after each batch
+		processed := end
+		elapsed := time.Since(startTime)
+		rate := float64(processed) / elapsed.Seconds()
+		pct := float64(processed) / float64(total) * 100
+		remaining := time.Duration(float64(total-processed)/rate) * time.Second
+		s.logger.Info("database upsert progress",
+			"progress", fmt.Sprintf("%d/%d (%.1f%%)", processed, total, pct),
+			"inserted", stats.Inserted,
+			"updated", stats.Updated,
+			"failed", stats.Failed,
+			"rate", fmt.Sprintf("%.0f/sec", rate),
+			"eta", remaining.Round(time.Second),
+		)
 	}
 
 	s.logger.Info("CSV phase complete",
