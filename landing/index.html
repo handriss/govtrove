@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpScout — Government Contract Search That Actually Works</title>
+    <meta name="description" content="Stop wrestling with SAM.gov. Search 100,000+ federal contract opportunities with filters that work, boolean search, and a UI built for how contractors actually screen opportunities.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="OpScout — Government Contract Search That Actually Works">
+    <meta property="og:description" content="Find federal contracts in seconds. Boolean search, smart filters, and deadline tracking — everything SAM.gov should have been.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://opscout.com">
+    <meta property="og:image" content="https://opscout.com/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="OpScout — Government Contract Search That Actually Works">
+    <meta name="twitter:description" content="Find federal contracts in seconds. Boolean search, smart filters, and deadline tracking.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+    <style>
+        /* ===== CSS Custom Properties ===== */
+        :root {
+            /* Backgrounds - matching frontend slate palette */
+            --bg-page: #0a0f1a;
+            --bg-card: #0f172a;
+            --bg-elevated: #1e293b;
+            --bg-hover: #334155;
+
+            /* Borders */
+            --border-subtle: rgba(148, 163, 184, 0.1);
+            --border-default: rgba(148, 163, 184, 0.15);
+            --border-strong: rgba(148, 163, 184, 0.25);
+
+            /* Text - matching frontend */
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+
+            /* Accent - matching frontend blue */
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-subtle: rgba(59, 130, 246, 0.15);
+
+            /* Set-aside badges - with borders like frontend */
+            --badge-small-business-bg: rgba(59, 130, 246, 0.2);
+            --badge-small-business-text: #60a5fa;
+            --badge-small-business-border: rgba(59, 130, 246, 0.3);
+            --badge-8a-bg: rgba(168, 85, 247, 0.2);
+            --badge-8a-text: #c084fc;
+            --badge-8a-border: rgba(168, 85, 247, 0.3);
+            --badge-sdvosb-bg: rgba(16, 185, 129, 0.2);
+            --badge-sdvosb-text: #34d399;
+            --badge-sdvosb-border: rgba(16, 185, 129, 0.3);
+            --badge-wosb-bg: rgba(236, 72, 153, 0.2);
+            --badge-wosb-text: #f472b6;
+            --badge-wosb-border: rgba(236, 72, 153, 0.3);
+            --badge-hubzone-bg: rgba(249, 115, 22, 0.2);
+            --badge-hubzone-text: #fb923c;
+            --badge-hubzone-border: rgba(249, 115, 22, 0.3);
+
+            /* Deadline colors - matching frontend */
+            --deadline-urgent: #f87171;
+            --deadline-warning: #fbbf24;
+            --deadline-safe: #34d399;
+
+            /* Typography */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Consolas, monospace;
+
+            /* Spacing */
+            --section-padding: 6rem;
+            --container-max: 1200px;
+
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-base: 250ms ease;
+        }
+
+        /* ===== Reset & Base ===== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background-color: var(--bg-page);
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button {
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+
+        /* ===== Utility Classes ===== */
+        .container {
+            max-width: var(--container-max);
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* ===== Buttons ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.75rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-default);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-strong);
+        }
+
+        .btn-large {
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+        }
+
+        /* ===== Navigation ===== */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1rem 0;
+            transition: background var(--transition-base), backdrop-filter var(--transition-base);
+        }
+
+        .nav.scrolled {
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .nav-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-logo svg {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: color var(--transition-fast);
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-cta {
+            margin-left: 1rem;
+        }
+
+        .nav-mobile-toggle {
+            display: none;
+            padding: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .nav-mobile-menu {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-page);
+            padding: 5rem 1.5rem 2rem;
+            z-index: 99;
+        }
+
+        .nav-mobile-menu.open {
+            display: block;
+        }
+
+        .nav-mobile-menu ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .nav-mobile-menu a {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .nav-mobile-menu .btn {
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links, .nav-cta {
+                display: none;
+            }
+
+            .nav-mobile-toggle {
+                display: block;
+            }
+        }
+
+        /* ===== Hero Section ===== */
+        .hero {
+            padding: calc(var(--section-padding) + 4rem) 0 var(--section-padding);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150%;
+            height: 600px;
+            background: radial-gradient(ellipse at center top, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.125rem, 2vw, 1.25rem);
+            color: var(--text-secondary);
+            max-width: 680px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.7;
+        }
+
+        .hero-cta {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .hero-cta-subtext {
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+        }
+
+        .hero-stats {
+            margin-top: 3rem;
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+        }
+
+        .hero-stats strong {
+            color: var(--text-primary);
+        }
+
+        /* ===== Hero Mockup ===== */
+        .hero-mockup {
+            margin-top: 4rem;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .mockup-window {
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .mockup-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1rem;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .mockup-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .mockup-dot:nth-child(1) { background: #ef4444; }
+        .mockup-dot:nth-child(2) { background: #f59e0b; }
+        .mockup-dot:nth-child(3) { background: #22c55e; }
+
+        .mockup-body {
+            padding: 1.5rem;
+        }
+
+        .mockup-search {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .mockup-search-input {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border-strong);
+            border-radius: 0.25rem;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+        }
+
+        .mockup-search-btn {
+            background: var(--accent);
+            color: #fff;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.25rem;
+            font-weight: 500;
+            font-size: 0.9375rem;
+        }
+
+        .mockup-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .mockup-filter {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 0.25rem;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .mockup-filter.active {
+            background: var(--accent-subtle);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: var(--accent);
+        }
+
+        .mockup-results {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .mockup-result {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: left;
+            transition: background-color var(--transition-fast);
+        }
+
+        .mockup-result:hover {
+            background: var(--bg-elevated);
+        }
+
+        .mockup-result-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .mockup-result-title {
+            font-weight: 600;
+            font-size: 0.9375rem;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+
+        .mockup-result-deadline {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        .mockup-result-deadline.urgent {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--deadline-urgent);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .mockup-result-deadline.warning {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--deadline-warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .mockup-result-deadline.safe {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--deadline-safe);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .mockup-result-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .mockup-result-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .badge-sdvosb {
+            background: var(--badge-sdvosb-bg);
+            color: var(--badge-sdvosb-text);
+            border: 1px solid var(--badge-sdvosb-border);
+        }
+
+        .badge-small-business {
+            background: var(--badge-small-business-bg);
+            color: var(--badge-small-business-text);
+            border: 1px solid var(--badge-small-business-border);
+        }
+
+        .badge-8a {
+            background: var(--badge-8a-bg);
+            color: var(--badge-8a-text);
+            border: 1px solid var(--badge-8a-border);
+        }
+
+        .badge-hubzone {
+            background: var(--badge-hubzone-bg);
+            color: var(--badge-hubzone-text);
+            border: 1px solid var(--badge-hubzone-border);
+        }
+
+        .mockup-result-sol {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 640px) {
+            .mockup-search {
+                flex-direction: column;
+            }
+
+            .mockup-result-header {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .mockup-filters {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                padding-bottom: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .mockup-filter {
+                flex-shrink: 0;
+            }
+        }
+
+        /* ===== Section Styles ===== */
+        section {
+            padding: var(--section-padding) 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-header p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ===== Problem Section ===== */
+        .problem {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .problem-card {
+            padding: 1.5rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.5rem;
+        }
+
+        .problem-card-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(239, 68, 68, 0.15);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            color: #f87171;
+        }
+
+        .problem-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .problem-card p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+        }
+
+        .problem-card .solution {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            color: var(--accent);
+            font-size: 0.875rem;
+        }
+
+        .problem-card .solution svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        /* ===== Features Section ===== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.5rem;
+            transition: border-color var(--transition-fast);
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-default);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-subtle);
+            border-radius: 0.5rem;
+            margin-bottom: 1.25rem;
+            color: var(--accent);
+        }
+
+        .feature-card h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--accent-subtle);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.75rem;
+        }
+
+        /* ===== How It Works ===== */
+        .how-it-works {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 3rem;
+            position: relative;
+        }
+
+        .step {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
+            border-radius: 50%;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 auto 1.5rem;
+        }
+
+        .step h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .step p {
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        /* ===== Manifesto Section ===== */
+        .manifesto {
+            text-align: center;
+            padding: calc(var(--section-padding) * 1.25) 0;
+        }
+
+        .manifesto-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .manifesto-content p {
+            font-size: clamp(1.125rem, 2.5vw, 1.375rem);
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .manifesto-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .manifesto-content strong {
+            color: var(--text-primary);
+        }
+
+        /* ===== Product Demo Section ===== */
+        .demo {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .demo-mockup {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .demo-mockup .mockup-body {
+            padding: 1.5rem 2rem 2rem;
+        }
+
+        .demo-mockup .mockup-results {
+            gap: 1rem;
+        }
+
+        .demo-mockup .mockup-result {
+            padding: 1.25rem;
+        }
+
+        /* ===== Pricing Section ===== */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-default);
+            border-radius: 0.5rem;
+            padding: 2.5rem 2rem;
+            position: relative;
+        }
+
+        .pricing-card.featured {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent), 0 25px 50px -12px rgba(59, 130, 246, 0.2);
+        }
+
+        .pricing-card.featured::before {
+            content: 'Most Popular';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.375rem 1rem;
+            border-radius: 20px;
+        }
+
+        .pricing-tier {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .pricing-price {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .pricing-price span {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+        }
+
+        .pricing-annual {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .pricing-annual strong {
+            color: var(--accent);
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .pricing-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+        }
+
+        .pricing-features li svg {
+            flex-shrink: 0;
+            color: var(--accent);
+            margin-top: 2px;
+        }
+
+        .pricing-card .btn {
+            width: 100%;
+        }
+
+        .pricing-note {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.9375rem;
+            color: var(--text-muted);
+        }
+
+        /* ===== Trust Section ===== */
+        .trust {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .trust-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .trust-tagline {
+            font-size: clamp(1.25rem, 3vw, 1.5rem);
+            font-weight: 600;
+            margin-bottom: 3rem;
+            color: var(--text-primary);
+        }
+
+        .trust-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 2rem;
+            text-align: left;
+        }
+
+        .trust-item {
+            padding: 1.5rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.5rem;
+        }
+
+        .trust-item-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-subtle);
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+
+        .trust-item h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .trust-item p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .trust-callout {
+            margin-top: 3rem;
+            padding: 1.5rem;
+            background: rgba(249, 115, 22, 0.1);
+            border: 1px solid rgba(249, 115, 22, 0.25);
+            border-radius: 0.5rem;
+            text-align: left;
+        }
+
+        .trust-callout-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            color: #fb923c;
+            font-weight: 600;
+        }
+
+        .trust-callout p {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .trust-callout a {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .trust-callout a:hover {
+            color: var(--accent-hover);
+        }
+
+        /* ===== FAQ Section ===== */
+        .faq-list {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .faq-question {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.5rem 0;
+            text-align: left;
+            font-size: 1.0625rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .faq-question:hover {
+            color: var(--accent);
+        }
+
+        .faq-question svg {
+            flex-shrink: 0;
+            transition: transform var(--transition-fast);
+        }
+
+        .faq-item.open .faq-question svg {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height var(--transition-base);
+        }
+
+        .faq-answer-inner {
+            padding-bottom: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .faq-item.open .faq-answer {
+            max-height: 500px;
+        }
+
+        /* ===== Footer ===== */
+        .footer {
+            padding: 4rem 0 2rem;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .footer-content {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .footer-brand {
+            max-width: 280px;
+        }
+
+        .footer-logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-logo svg {
+            color: var(--accent);
+        }
+
+        .footer-brand p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3rem;
+        }
+
+        .footer-links-group h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .footer-links-group ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .footer-links-group a {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            transition: color var(--transition-fast);
+        }
+
+        .footer-links-group a:hover {
+            color: var(--text-primary);
+        }
+
+        .footer-bottom {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-subtle);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .footer-data-source {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 640px) {
+            .footer-content {
+                flex-direction: column;
+            }
+
+            .footer-links {
+                flex-direction: column;
+                gap: 2rem;
+            }
+
+            .footer-bottom {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        /* ===== Animations ===== */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            :root {
+                --section-padding: 4rem;
+            }
+
+            .hero {
+                padding-top: calc(var(--section-padding) + 3rem);
+            }
+
+            .section-header {
+                margin-bottom: 3rem;
+            }
+
+            .steps {
+                gap: 2rem;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="container nav-inner">
+            <a href="#" class="nav-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                OpScout
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+            <a href="#" class="btn btn-primary nav-cta">Start Searching</a>
+            <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Toggle menu">
+                <i data-lucide="menu" width="24" height="24"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="nav-mobile-menu" id="mobile-menu">
+        <ul>
+            <li><a href="#features" class="mobile-link">Features</a></li>
+            <li><a href="#pricing" class="mobile-link">Pricing</a></li>
+            <li><a href="#faq" class="mobile-link">FAQ</a></li>
+        </ul>
+        <a href="#" class="btn btn-primary">Start Searching</a>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container hero-content">
+            <h1>Stop Wrestling with SAM.gov</h1>
+            <p class="hero-subtitle">
+                Search 100,000+ federal contract opportunities with filters that actually work.
+                Boolean search, deadline tracking, and a UI built for how contractors really screen opportunities.
+            </p>
+            <div class="hero-cta">
+                <a href="#" class="btn btn-primary btn-large">
+                    Start Searching
+                    <i data-lucide="arrow-right" width="20" height="20"></i>
+                </a>
+                <p class="hero-cta-subtext">No credit card. No sales calls. No catch.</p>
+            </div>
+            <p class="hero-stats">
+                <strong>100,000+ active opportunities</strong> from SAM.gov, updated daily
+            </p>
+
+            <!-- Hero Mockup -->
+            <div class="hero-mockup fade-in">
+                <div class="mockup-window">
+                    <div class="mockup-header">
+                        <span class="mockup-dot"></span>
+                        <span class="mockup-dot"></span>
+                        <span class="mockup-dot"></span>
+                    </div>
+                    <div class="mockup-body">
+                        <div class="mockup-search">
+                            <input type="text" class="mockup-search-input" value="cybersecurity AND (assessment OR penetration)" readonly>
+                            <button class="mockup-search-btn">Search</button>
+                        </div>
+                        <div class="mockup-filters">
+                            <span class="mockup-filter active">
+                                <i data-lucide="building-2" width="14" height="14"></i>
+                                DoD
+                            </span>
+                            <span class="mockup-filter active">
+                                <i data-lucide="shield-check" width="14" height="14"></i>
+                                SDVOSB
+                            </span>
+                            <span class="mockup-filter">NAICS: 541512</span>
+                            <span class="mockup-filter">Active Only</span>
+                        </div>
+                        <div class="mockup-results">
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Cybersecurity Assessment and Penetration Testing Services</span>
+                                    <span class="mockup-result-deadline safe">12 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-sdvosb">SDVOSB</span>
+                                    <span>Department of the Army</span>
+                                    <span>NAICS 541512</span>
+                                    <span class="mockup-result-sol">W911NF-26-R-0042</span>
+                                </div>
+                            </div>
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Cloud Migration and Infrastructure Modernization</span>
+                                    <span class="mockup-result-deadline urgent">5 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-small-business">Small Business</span>
+                                    <span>Defense Information Systems Agency</span>
+                                    <span>NAICS 541519</span>
+                                    <span class="mockup-result-sol">HC1028-26-R-0015</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem" id="problem">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>SAM.gov Is Broken</h2>
+                <p>The government's own accountability office has documented these failures. You've lived them.</p>
+            </div>
+            <div class="problem-grid">
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="search-x" width="24" height="24"></i>
+                    </div>
+                    <h3>Search That Doesn't Search</h3>
+                    <p>No boolean operators, no exact-match, keyword search returns irrelevant results. The Professional Services Council formally complained to GSA about this.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>OpScout: Full boolean search with AND, OR, NOT operators and exact-phrase matching</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="filter-x" width="24" height="24"></i>
+                    </div>
+                    <h3>Filters That Don't Filter</h3>
+                    <p>Important fields are missing entirely. Existing filters are buggy, reset unexpectedly, and don't remember your preferences.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>OpScout: Every filter contractors actually need — NAICS, set-aside, agency, location, dates</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="bell-off" width="24" height="24"></i>
+                    </div>
+                    <h3>Alerts That Miss Everything</h3>
+                    <p>Email notifications deliver irrelevant results or nothing at all. Contractors miss real opportunities while wading through noise.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>OpScout: Saved searches with smart alerts (coming soon with Pro)</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="smartphone" width="24" height="24"></i>
+                    </div>
+                    <h3>Unusable on Mobile</h3>
+                    <p>No responsive design. BD professionals checking opportunities between meetings or at industry days can't use it on a phone.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>OpScout: Built mobile-first for how you actually work</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>Built for How Contractors Actually Work</h2>
+                <p>Metadata-first screening. See what matters — title, agency, set-aside, deadline — without digging through 50-page SOWs.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="search" width="24" height="24"></i>
+                    </div>
+                    <h3>Smart Search</h3>
+                    <p>Full-text search that understands what you're looking for. Boolean operators (AND, OR, NOT) and exact-phrase matching included.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="sliders-horizontal" width="24" height="24"></i>
+                    </div>
+                    <h3>Filters That Work</h3>
+                    <p>NAICS, PSC, agency, set-aside type, notice type, place of performance, date ranges. Every filter you actually need, none of the clutter.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="clock" width="24" height="24"></i>
+                    </div>
+                    <h3>Deadline Intelligence</h3>
+                    <p>Color-coded urgency indicators. See at a glance which opportunities need attention now versus next week versus next month.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="badge-check" width="24" height="24"></i>
+                    </div>
+                    <h3>Set-Aside Matching</h3>
+                    <p>Instantly filter to your eligibility: 8(a), SDVOSB, WOSB, HUBZone, small business. Stop scrolling past opportunities you can't bid on.</p>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="bell-ring" width="24" height="24"></i>
+                    </div>
+                    <h3>Email Alerts</h3>
+                    <p>Saved search profiles that notify you when matching opportunities appear. Daily digests or real-time — you choose.</p>
+                    <span class="feature-tag">Coming Soon</span>
+                </div>
+                <div class="feature-card fade-in">
+                    <div class="feature-icon">
+                        <i data-lucide="smartphone" width="24" height="24"></i>
+                    </div>
+                    <h3>Mobile-First Design</h3>
+                    <p>Built for how you actually work. Check opportunities on your phone between meetings, at industry days, on the go.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>How It Works</h2>
+                <p>Three steps. No training required.</p>
+            </div>
+            <div class="steps">
+                <div class="step fade-in">
+                    <div class="step-number">1</div>
+                    <h3>Search</h3>
+                    <p>Type what you're looking for. Use boolean operators or plain language — OpScout understands both.</p>
+                </div>
+                <div class="step fade-in">
+                    <div class="step-number">2</div>
+                    <h3>Filter</h3>
+                    <p>Narrow by agency, set-aside, NAICS, location, deadline, and more. Filters that actually remember your preferences.</p>
+                </div>
+                <div class="step fade-in">
+                    <div class="step-number">3</div>
+                    <h3>Act</h3>
+                    <p>Save opportunities, set up alerts, and link directly to SAM.gov to respond through official channels.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Manifesto -->
+    <section class="manifesto">
+        <div class="container">
+            <div class="manifesto-content fade-in">
+                <p>
+                    For years, finding government contracts meant fighting SAM.gov's broken search or paying
+                    <strong>$6,000–$50,000/year</strong> for an enterprise tool. We think that's absurd.
+                </p>
+                <p>
+                    Public contracts are public data. Searching them shouldn't require a training course or a procurement budget.
+                </p>
+                <p>
+                    We built OpScout around a simple observation: <strong>contractors don't read 50-page Statements of Work to decide if an opportunity is worth pursuing.</strong> The first pass is always the metadata — title, agency, set-aside, deadline. So we built the best metadata search tool we could, and made it accessible to everyone.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Demo -->
+    <section class="demo">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>See Opportunities Clearly</h2>
+                <p>Everything you need to screen an opportunity, at a glance.</p>
+            </div>
+            <div class="demo-mockup fade-in">
+                <div class="mockup-window">
+                    <div class="mockup-header">
+                        <span class="mockup-dot"></span>
+                        <span class="mockup-dot"></span>
+                        <span class="mockup-dot"></span>
+                    </div>
+                    <div class="mockup-body">
+                        <div class="mockup-search">
+                            <input type="text" class="mockup-search-input" value="aircraft maintenance" readonly>
+                            <button class="mockup-search-btn">Search</button>
+                        </div>
+                        <div class="mockup-filters">
+                            <span class="mockup-filter">All Agencies</span>
+                            <span class="mockup-filter active">
+                                <i data-lucide="shield-check" width="14" height="14"></i>
+                                Set-Aside: Any
+                            </span>
+                            <span class="mockup-filter">NAICS: All</span>
+                            <span class="mockup-filter active">Active Only</span>
+                            <span class="mockup-filter">Due in 30 days</span>
+                        </div>
+                        <div class="mockup-results">
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Cybersecurity Assessment and Penetration Testing Services</span>
+                                    <span class="mockup-result-deadline safe">12 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-sdvosb">SDVOSB</span>
+                                    <span>Department of the Army</span>
+                                    <span>Aberdeen, MD</span>
+                                    <span>NAICS 541512</span>
+                                    <span class="mockup-result-sol">W911NF-26-R-0042</span>
+                                </div>
+                            </div>
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Cloud Migration and Infrastructure Modernization</span>
+                                    <span class="mockup-result-deadline urgent">5 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-small-business">Small Business</span>
+                                    <span>Defense Information Systems Agency</span>
+                                    <span>Fort Meade, MD</span>
+                                    <span>NAICS 541519</span>
+                                    <span class="mockup-result-sol">HC1028-26-R-0015</span>
+                                </div>
+                            </div>
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Aircraft Maintenance Support Services — F-35 Lightning II</span>
+                                    <span class="mockup-result-deadline safe">23 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-8a">8(a)</span>
+                                    <span>Department of the Air Force</span>
+                                    <span>Hill AFB, UT</span>
+                                    <span>NAICS 488190</span>
+                                    <span class="mockup-result-sol">FA8615-26-R-0088</span>
+                                </div>
+                            </div>
+                            <div class="mockup-result">
+                                <div class="mockup-result-header">
+                                    <span class="mockup-result-title">Tactical Communications Equipment Repair</span>
+                                    <span class="mockup-result-deadline warning">8 days</span>
+                                </div>
+                                <div class="mockup-result-meta">
+                                    <span class="mockup-result-badge badge-hubzone">HUBZone</span>
+                                    <span>Defense Logistics Agency</span>
+                                    <span>Columbus, OH</span>
+                                    <span>NAICS 811210</span>
+                                    <span class="mockup-result-sol">SP4701-26-R-0203</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>Simple, Transparent Pricing</h2>
+                <p>No enterprise tier. No "contact sales." No surprises.</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card fade-in">
+                    <div class="pricing-tier">Free</div>
+                    <div class="pricing-price">$0</div>
+                    <div class="pricing-annual">Free forever</div>
+                    <ul class="pricing-features">
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Full search (text + semantic)</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>All filters</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>10 saved opportunities</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Direct links to SAM.gov</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Mobile access</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="btn btn-secondary">Start Searching</a>
+                </div>
+                <div class="pricing-card featured fade-in">
+                    <div class="pricing-tier">Pro</div>
+                    <div class="pricing-price">$9<span>/month</span></div>
+                    <div class="pricing-annual">or <strong>$79/year</strong> (save 27%)</div>
+                    <ul class="pricing-features">
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Everything in Free</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Unlimited saved opportunities</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Email alerts (daily digest)</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>CSV export</span>
+                        </li>
+                        <li>
+                            <i data-lucide="check" width="18" height="18"></i>
+                            <span>Priority support</span>
+                        </li>
+                    </ul>
+                    <a href="#" class="btn btn-primary">Get Started</a>
+                </div>
+            </div>
+            <p class="pricing-note fade-in">All prices transparent. No enterprise tier, no "contact sales," no surprises.</p>
+        </div>
+    </section>
+
+    <!-- Trust Section -->
+    <section class="trust">
+        <div class="container">
+            <div class="trust-content">
+                <p class="trust-tagline fade-in">Built by a contractor who got tired of SAM.gov. You probably know the feeling.</p>
+                <div class="trust-items">
+                    <div class="trust-item fade-in">
+                        <div class="trust-item-icon">
+                            <i data-lucide="database" width="20" height="20"></i>
+                        </div>
+                        <h3>Official Data Source</h3>
+                        <p>Powered by official SAM.gov public data — updated daily. We use only public APIs and data extracts.</p>
+                    </div>
+                    <div class="trust-item fade-in">
+                        <div class="trust-item-icon">
+                            <i data-lucide="shield" width="20" height="20"></i>
+                        </div>
+                        <h3>Compliant by Design</h3>
+                        <p>We never scrape, and we always link back to the source. OpScout helps you find opportunities — you respond through SAM.gov.</p>
+                    </div>
+                    <div class="trust-item fade-in">
+                        <div class="trust-item-icon">
+                            <i data-lucide="heart-handshake" width="20" height="20"></i>
+                        </div>
+                        <h3>Small Tech, Big Impact</h3>
+                        <p>No investor board. No enterprise sales team. Just a better search tool for contractors who need one.</p>
+                    </div>
+                </div>
+                <div class="trust-callout fade-in">
+                    <div class="trust-callout-header">
+                        <i data-lucide="alert-triangle" width="20" height="20"></i>
+                        <span>PSA: SAM.gov Registration Scams</span>
+                    </div>
+                    <p>
+                        SAM.gov registration is <strong>free</strong>. If someone is charging you hundreds of dollars to register, that's a scam.
+                        GSA has identified 400+ fraud attempts targeting small businesses since 2021.
+                        Need legitimate help registering? Find your local <a href="https://www.apexaccelerators.us/" target="_blank" rel="noopener">APEX Accelerator</a> — they provide free assistance.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>Frequently Asked Questions</h2>
+            </div>
+            <div class="faq-list">
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        Is OpScout free?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Pro features like unlimited saves and email alerts are $9/month or $79/year.
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        Where does the data come from?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            All opportunity data comes directly from SAM.gov's official public APIs and data extracts. We update daily to ensure you're seeing current opportunities.
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        Does OpScout replace SAM.gov?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            No. OpScout helps you find and filter opportunities faster, but you still respond to solicitations through SAM.gov. We always link directly to the original listing so you can take action through official channels.
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        What's the difference between OpScout and GovWin/Deltek/Bloomberg Gov?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            Those tools cost $6,000–$50,000/year and target large enterprises with extensive intelligence features. OpScout is built for small businesses at a fraction of the cost, focused specifically on the search and discovery workflow — finding opportunities efficiently without the enterprise complexity.
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        Do I need an account to search?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            No. You can search immediately without creating an account. An account is only needed if you want to save opportunities or set up email alerts.
+                        </div>
+                    </div>
+                </div>
+                <div class="faq-item fade-in">
+                    <button class="faq-question" aria-expanded="false">
+                        Is my data secure?
+                        <i data-lucide="chevron-down" width="20" height="20"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <div class="faq-answer-inner">
+                            We don't store sensitive business data. Your search queries and saved opportunities are protected with industry-standard encryption. We never sell or share your data with third parties.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="#" class="footer-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        OpScout
+                    </a>
+                    <p>Government contract search that actually works. Find federal opportunities in seconds, not hours.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-links-group">
+                        <h4>Product</h4>
+                        <ul>
+                            <li><a href="#features">Features</a></li>
+                            <li><a href="#pricing">Pricing</a></li>
+                            <li><a href="#faq">FAQ</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links-group">
+                        <h4>Legal</h4>
+                        <ul>
+                            <li><a href="#">Terms of Service</a></li>
+                            <li><a href="#">Privacy Policy</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="footer-data-source">
+                    <i data-lucide="database" width="16" height="16"></i>
+                    <span>Data sourced from SAM.gov</span>
+                </div>
+                <span>&copy; 2024 OpScout. All rights reserved.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Navigation scroll effect
+        const nav = document.getElementById('nav');
+        let lastScrollY = window.scrollY;
+
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+            lastScrollY = window.scrollY;
+        });
+
+        // Mobile menu toggle
+        const navToggle = document.getElementById('nav-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        let menuOpen = false;
+
+        navToggle.addEventListener('click', () => {
+            menuOpen = !menuOpen;
+            mobileMenu.classList.toggle('open', menuOpen);
+            navToggle.innerHTML = menuOpen
+                ? '<i data-lucide="x" width="24" height="24"></i>'
+                : '<i data-lucide="menu" width="24" height="24"></i>';
+            lucide.createIcons();
+            document.body.style.overflow = menuOpen ? 'hidden' : '';
+        });
+
+        // Close mobile menu on link click
+        document.querySelectorAll('.mobile-link').forEach(link => {
+            link.addEventListener('click', () => {
+                menuOpen = false;
+                mobileMenu.classList.remove('open');
+                navToggle.innerHTML = '<i data-lucide="menu" width="24" height="24"></i>';
+                lucide.createIcons();
+                document.body.style.overflow = '';
+            });
+        });
+
+        // FAQ accordion
+        document.querySelectorAll('.faq-question').forEach(button => {
+            button.addEventListener('click', () => {
+                const item = button.parentElement;
+                const isOpen = item.classList.contains('open');
+
+                // Close all other items
+                document.querySelectorAll('.faq-item').forEach(faqItem => {
+                    faqItem.classList.remove('open');
+                    faqItem.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+                });
+
+                // Toggle current item
+                if (!isOpen) {
+                    item.classList.add('open');
+                    button.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in').forEach(el => {
+            observer.observe(el);
+        });
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (href === '#') return;
+
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    const navHeight = nav.offsetHeight;
+                    const targetPosition = target.getBoundingClientRect().top + window.scrollY - navHeight;
+                    window.scrollTo({
+                        top: targetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
