@@ -302,25 +302,6 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 		return nil, nil
 	}
 
-	// Save new headers for future conditional requests
-	if result.ETag != "" || result.LastModified != "" {
-		now := time.Now()
-		cacheHeaders := &database.CSVCacheHeaders{
-			URL:              samgov.FullCSVURL,
-			ETag:             result.ETag,
-			LastModified:     result.LastModified,
-			LastDownloadedAt: &now,
-		}
-		if err := s.db.UpsertCSVCacheHeaders(ctx, cacheHeaders); err != nil {
-			s.logger.Warn("failed to save CSV cache headers", "error", err)
-		} else {
-			s.logger.Info("saved CSV cache headers",
-				"etag", result.ETag,
-				"last_modified", result.LastModified,
-			)
-		}
-	}
-
 	stats.CSVFetched = result.ParsedRows
 	opportunities := result.Opportunities
 
@@ -403,6 +384,31 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 		"updated", stats.Updated,
 		"failed", stats.Failed,
 	)
+
+	// Save cache headers only after successful database upserts
+	// Skip if too many failures (>50%) to avoid caching after catastrophic failure
+	successRate := float64(stats.Inserted+stats.Updated) / float64(total)
+	if (result.ETag != "" || result.LastModified != "") && successRate > 0.5 {
+		now := time.Now()
+		cacheHeaders := &database.CSVCacheHeaders{
+			URL:              samgov.FullCSVURL,
+			ETag:             result.ETag,
+			LastModified:     result.LastModified,
+			LastDownloadedAt: &now,
+		}
+		if err := s.db.UpsertCSVCacheHeaders(ctx, cacheHeaders); err != nil {
+			s.logger.Warn("failed to save CSV cache headers", "error", err)
+		} else {
+			s.logger.Info("saved CSV cache headers",
+				"etag", result.ETag,
+				"last_modified", result.LastModified,
+			)
+		}
+	} else if successRate <= 0.5 {
+		s.logger.Warn("skipping cache header save due to high failure rate",
+			"success_rate", fmt.Sprintf("%.1f%%", successRate*100),
+		)
+	}
 
 	return result.Opportunities, nil
 }
