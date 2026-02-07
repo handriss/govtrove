@@ -43,17 +43,37 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	// Log that we're starting (helps debug container startup issues)
+	logger.Info("starting database connection", "url_length", len(cfg.DatabaseURL))
+
+	// Retry database connection with exponential backoff
+	var pool *pgxpool.Pool
+	for attempt := 1; attempt <= 5; attempt++ {
+		connCtx, connCancel := context.WithTimeout(ctx, 30*time.Second)
+		pool, err = pgxpool.New(connCtx, cfg.DatabaseURL)
+		connCancel()
+		if err != nil {
+			logger.Error("failed to create pool", "error", err, "attempt", attempt)
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			continue
+		}
+
+		pingCtx, pingCancel := context.WithTimeout(ctx, 10*time.Second)
+		err = pool.Ping(pingCtx)
+		pingCancel()
+		if err != nil {
+			logger.Error("failed to ping database", "error", err, "attempt", attempt)
+			pool.Close()
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+			continue
+		}
+		break
+	}
 	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
+		logger.Error("all database connection attempts failed", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
-
-	if err := pool.Ping(ctx); err != nil {
-		logger.Error("failed to ping database", "error", err)
-		os.Exit(1)
-	}
 	logger.Info("connected to database")
 
 	oppRepo := repository.NewOpportunityRepository(pool)

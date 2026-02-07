@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,6 +35,7 @@ type IngestionStats struct {
 	Failed              int
 	DescriptionsFetched int
 	DataMismatches      int
+	CSVNotModified      bool // true if CSV was not modified (304)
 }
 
 func New(cfg *config.Config, db *database.DB, snsClient *sns.Client, logger *slog.Logger) *Service {
@@ -115,6 +117,20 @@ func (s *Service) runCSVOnly(ctx context.Context, runID int, startTime time.Time
 	}
 
 	durationMs := int(time.Since(startTime).Milliseconds())
+
+	// Handle 304 Not Modified case
+	if stats.CSVNotModified {
+		s.logger.Info("ingestion completed - CSV not modified",
+			"run_id", runID,
+			"duration_ms", durationMs,
+		)
+		if err := s.db.CompleteIngestionRun(ctx, runID, 0, 0, 0, 0, durationMs); err != nil {
+			s.logger.Error("failed to complete ingestion run", "error", err)
+			return err
+		}
+		return nil
+	}
+
 	if err := s.db.CompleteIngestionRun(ctx, runID, stats.CSVFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
 		s.logger.Error("failed to complete ingestion run", "error", err)
 		return err
@@ -193,6 +209,11 @@ func (s *Service) runFull(ctx context.Context, runID int, startTime time.Time, s
 		s.failRun(ctx, runID, startTime, err)
 		return err
 	}
+
+	// If CSV was not modified, log it but continue with API phase
+	if stats.CSVNotModified {
+		s.logger.Info("PHASE 1: CSV not modified (304), skipping to API phase")
+	}
 	csvNoticeIDs := s.buildNoticeIDSet(csvOpps)
 
 	// PHASE 2: Fetch ALL opportunities from API
@@ -253,17 +274,82 @@ func (s *Service) runFull(ctx context.Context, runID int, startTime time.Time, s
 }
 
 func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *IngestionStats) ([]*database.Opportunity, error) {
-	result, err := s.csvClient.FetchOpportunities(ctx, s.cfg.RecordLimit)
+	// Load cached headers for conditional request
+	var etag, lastModified string
+	cached, err := s.db.GetCSVCacheHeaders(ctx, samgov.FullCSVURL)
+	if err == nil && cached != nil {
+		etag = cached.ETag
+		lastModified = cached.LastModified
+		s.logger.Debug("using cached headers for conditional request",
+			"etag", etag,
+			"last_modified", lastModified,
+		)
+	}
+
+	result, err := s.csvClient.FetchOpportunitiesConditional(ctx, s.cfg.RecordLimit, etag, lastModified)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch CSV: %w", err)
 	}
 
+	// Handle 304 Not Modified
+	if result.NotModified {
+		stats.CSVNotModified = true
+		s.logger.Info("CSV not modified, skipping download and database updates")
+		// Update last_checked_at to track when we verified it
+		if err := s.db.UpdateCSVCacheLastChecked(ctx, samgov.FullCSVURL); err != nil {
+			s.logger.Warn("failed to update cache last_checked_at", "error", err)
+		}
+		return nil, nil
+	}
+
+	// Save new headers for future conditional requests
+	if result.ETag != "" || result.LastModified != "" {
+		now := time.Now()
+		cacheHeaders := &database.CSVCacheHeaders{
+			URL:              samgov.FullCSVURL,
+			ETag:             result.ETag,
+			LastModified:     result.LastModified,
+			LastDownloadedAt: &now,
+		}
+		if err := s.db.UpsertCSVCacheHeaders(ctx, cacheHeaders); err != nil {
+			s.logger.Warn("failed to save CSV cache headers", "error", err)
+		} else {
+			s.logger.Info("saved CSV cache headers",
+				"etag", result.ETag,
+				"last_modified", result.LastModified,
+			)
+		}
+	}
+
 	stats.CSVFetched = result.ParsedRows
-	total := len(result.Opportunities)
-	s.logger.Info("CSV download complete, starting database upserts", "parsed", result.ParsedRows, "total_rows", result.TotalRows)
+	opportunities := result.Opportunities
+
+	// Sort by posted_date descending (newest first) so we keep the most recent records
+	sort.Slice(opportunities, func(i, j int) bool {
+		if opportunities[i].PostedDate == nil {
+			return false
+		}
+		if opportunities[j].PostedDate == nil {
+			return true
+		}
+		return opportunities[i].PostedDate.After(*opportunities[j].PostedDate)
+	})
+
+	// Apply MAX_RECORDS limit after sorting (keeps most recent records)
+	if s.cfg.MaxRecords > 0 && len(opportunities) > s.cfg.MaxRecords {
+		s.logger.Info("applying MAX_RECORDS limit",
+			"parsed", len(opportunities),
+			"max_records", s.cfg.MaxRecords,
+			"oldest_kept", opportunities[s.cfg.MaxRecords-1].PostedDate,
+		)
+		opportunities = opportunities[:s.cfg.MaxRecords]
+	}
+
+	total := len(opportunities)
+	s.logger.Info("CSV download complete, starting database upserts", "parsed", result.ParsedRows, "to_insert", total)
 
 	// Prepare all opportunities with metadata
-	for _, opp := range result.Opportunities {
+	for _, opp := range opportunities {
 		opp.DataSource = "csv"
 		opp.IngestionRunID = &runID
 	}
@@ -278,7 +364,7 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 			end = total
 		}
 
-		batch := result.Opportunities[i:end]
+		batch := opportunities[i:end]
 		batchResult, err := s.db.BatchUpsertOpportunities(ctx, batch)
 		if err != nil {
 			s.logger.Error("batch upsert failed", "batch_start", i, "error", err)
