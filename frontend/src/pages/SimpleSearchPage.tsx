@@ -71,7 +71,7 @@ export default function SimpleSearchPage() {
         {/* Logo */}
         <Link to="/" className={`mb-8 transition-all duration-500 ${showResults ? 'mb-6' : 'mb-10'}`}>
           <h1 className={`font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-200 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
-            OpScout
+            GovTrove
           </h1>
           {!showResults && (
             <p className="text-center text-dark-400 text-sm mt-2 tracking-wide">

@@ -1,7 +1,7 @@
 # Copy this file to terraform.tfvars and fill in the values
 
 aws_region  = "us-east-1"
-aws_profile = "opscout"
+aws_profile = "govtrove"
 environment = "prod"
 
 # Neon PostgreSQL connection string

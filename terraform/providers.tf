@@ -4,7 +4,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "opscout"
+      Project     = "govtrove"
       Environment = var.environment
       ManagedBy   = "terraform"
     }

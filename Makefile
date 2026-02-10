@@ -19,16 +19,16 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-AWS_PROFILE := opscout
+AWS_PROFILE := govtrove
 AWS_REGION := us-east-1
-LOCAL_DB_URL := postgres://opscout:localdev@localhost:5432/opscout?sslmode=disable
+LOCAL_DB_URL := postgres://govtrove:localdev@localhost:5432/govtrove?sslmode=disable
 
 # ============================================================================
 # Help
 # ============================================================================
 
 help:
-	@echo "OpScout Development Commands"
+	@echo "GovTrove Development Commands"
 	@echo ""
 	@echo "Local Development:"
 	@echo "  make dev              - Start everything (db + api + frontend) in background"
@@ -186,7 +186,7 @@ api-build:
 	cd api && go build -o ../bin/api ./cmd/api
 
 api-docker-build:
-	docker build --platform linux/amd64 -t opscout-api:latest ./api
+	docker build --platform linux/amd64 -t govtrove-api:latest ./api
 
 # ============================================================================
 # Frontend
@@ -294,7 +294,7 @@ test:
 	cd api && go test -v ./...
 
 ingestion-docker-build:
-	docker build --platform linux/amd64 -t opscout-ingestion:latest ./ingestion
+	docker build --platform linux/amd64 -t govtrove-ingestion:latest ./ingestion
 
 # ============================================================================
 # Deploy
@@ -322,7 +322,7 @@ deploy-api: api-docker-build ecr-login
 	@echo "Deploying API to App Runner..."
 	@ECR_URL=$$(cd terraform && terraform output -raw ecr_api_repository_url) && \
 	ARN=$$(cd terraform && terraform output -raw apprunner_service_arn) && \
-	docker tag opscout-api:latest $$ECR_URL:latest && \
+	docker tag govtrove-api:latest $$ECR_URL:latest && \
 	docker push $$ECR_URL:latest && \
 	echo "Triggering App Runner deployment..." && \
 	aws apprunner start-deployment --service-arn $$ARN --profile $(AWS_PROFILE) --region $(AWS_REGION) && \
@@ -331,7 +331,7 @@ deploy-api: api-docker-build ecr-login
 deploy-ingestion: ingestion-docker-build ecr-login
 	@echo "Deploying ingestion image to ECR..."
 	@ECR_URL=$$(cd terraform && terraform output -raw ecr_repository_url) && \
-	docker tag opscout-ingestion:latest $$ECR_URL:latest && \
+	docker tag govtrove-ingestion:latest $$ECR_URL:latest && \
 	docker push $$ECR_URL:latest && \
 	echo "Ingestion image pushed successfully!"
 
@@ -344,12 +344,12 @@ deploy-all: deploy-api deploy-ingestion deploy-frontend
 # ============================================================================
 
 logs-ingestion:
-	aws logs tail /opscout/ingestion --follow --profile $(AWS_PROFILE)
+	aws logs tail /govtrove/ingestion --follow --profile $(AWS_PROFILE)
 
 logs-api:
 	@SERVICE_ARN=$$(cd terraform && terraform output -raw apprunner_service_arn) && \
 	SERVICE_ID=$$(echo $$SERVICE_ARN | rev | cut -d'/' -f1 | rev) && \
-	aws logs tail /aws/apprunner/opscout-api/$$SERVICE_ID/application --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
+	aws logs tail /aws/apprunner/govtrove-api/$$SERVICE_ID/application --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
 
 run-ingestion-aws:
 	@echo "Triggering ECS ingestion task..."
@@ -390,7 +390,7 @@ status:
 	CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name 2>/dev/null) && \
 	if [ -n "$$CLUSTER" ]; then \
 		aws ecs list-tasks --cluster $$CLUSTER \
-			--family opscout-ingestion --desired-status STOPPED --max-items 5 \
+			--family govtrove-ingestion --desired-status STOPPED --max-items 5 \
 			--query 'taskArns' --output table --profile $(AWS_PROFILE) --region $(AWS_REGION) 2>/dev/null || \
 			echo "No recent tasks"; \
 	else \
