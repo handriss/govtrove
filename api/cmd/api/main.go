@@ -16,9 +16,9 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/opscout/api/internal/config"
-	"github.com/opscout/api/internal/handlers"
-	"github.com/opscout/api/internal/repository"
+	"github.com/handriss/govtrove/api/internal/config"
+	"github.com/handriss/govtrove/api/internal/handlers"
+	"github.com/handriss/govtrove/api/internal/repository"
 )
 
 func main() {

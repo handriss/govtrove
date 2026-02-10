@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/opscout/api/internal/models"
+	"github.com/handriss/govtrove/api/internal/models"
 )
 
 type OpportunityRepository struct {
