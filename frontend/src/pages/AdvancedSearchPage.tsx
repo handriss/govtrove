@@ -7,7 +7,7 @@ import ResultsList from '../components/ResultsList';
 import { useSearch } from '../hooks/useSearch';
 import type { QueryGroup, AdvancedFilters, SearchParams } from '../types/api';
 
-const SAVED_SEARCHES_KEY = 'opscout_saved_searches';
+const SAVED_SEARCHES_KEY = 'govtrove_saved_searches';
 
 interface SavedSearch {
   id: string;
@@ -347,7 +347,7 @@ export default function AdvancedSearchPage() {
               <ArrowLeft size={20} strokeWidth={1.5} />
             </Link>
             <Link to="/" className="text-xl font-semibold tracking-tight text-dark-50">
-              OpScout
+              GovTrove
             </Link>
           </div>
           <div className="flex items-center gap-4">

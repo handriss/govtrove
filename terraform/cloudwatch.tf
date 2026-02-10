@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_log_group" "ingestion" {
-  name              = "/opscout/ingestion"
+  name              = "/govtrove/ingestion"
   retention_in_days = 30
 
   tags = {
@@ -14,7 +14,7 @@ resource "aws_cloudwatch_log_metric_filter" "ingestion_completed" {
 
   metric_transformation {
     name      = "IngestionCompleted"
-    namespace = "OpScout"
+    namespace = "GovTrove"
     value     = "1"
   }
 }
@@ -26,7 +26,7 @@ resource "aws_cloudwatch_log_metric_filter" "ingestion_failed" {
 
   metric_transformation {
     name      = "IngestionErrors"
-    namespace = "OpScout"
+    namespace = "GovTrove"
     value     = "1"
   }
 }
@@ -36,7 +36,7 @@ resource "aws_cloudwatch_metric_alarm" "ingestion_errors" {
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "IngestionErrors"
-  namespace           = "OpScout"
+  namespace           = "GovTrove"
   period              = 300
   statistic           = "Sum"
   threshold           = 0

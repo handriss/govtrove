@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "aws_profile" {
   description = "AWS CLI profile to use"
   type        = string
-  default     = "opscout"
+  default     = "govtrove"
 }
 
 variable "environment" {
@@ -19,7 +19,7 @@ variable "environment" {
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string
-  default     = "opscout"
+  default     = "govtrove"
 }
 
 # Networking

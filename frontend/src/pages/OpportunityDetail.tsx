@@ -222,7 +222,7 @@ export default function OpportunityDetail() {
             <ArrowLeft size={20} strokeWidth={1.5} />
           </Link>
           <Link to="/" className="text-xl font-semibold tracking-tight text-dark-50">
-            OpScout
+            GovTrove
           </Link>
         </div>
       </header>

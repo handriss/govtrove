@@ -1,4 +1,4 @@
-# Claude Code Guidelines for OpScout
+# Claude Code Guidelines for GovTrove
 
 ## Compliance-First Principle
 
@@ -60,7 +60,7 @@ Being clever about circumventing restrictions is not the same as finding a compl
 
 ## Technical Context
 
-- **App name**: OpScout
+- **App name**: GovTrove
 - **Stack**: Go backend, React frontend, Neon PostgreSQL, AWS (Fargate, EventBridge, S3, CloudFront), Terraform
 - **Data source**: SAM.gov public API (contract opportunities)
 - **Business model**: Freemium SaaS ($9/mo or $79/year paid tier)
@@ -82,13 +82,13 @@ Being clever about circumventing restrictions is not the same as finding a compl
 
 ## AWS Profile
 
-**Always use the `opscout` AWS profile** for all AWS CLI and Terraform commands in this project.
+**Always use the `govtrove` AWS profile** for all AWS CLI and Terraform commands in this project.
 
 ```bash
---profile opscout
+--profile govtrove
 ```
 
-The Makefile already has `AWS_PROFILE := opscout` configured.
+The Makefile already has `AWS_PROFILE := govtrove` configured.
 
 ## Protected Files
 

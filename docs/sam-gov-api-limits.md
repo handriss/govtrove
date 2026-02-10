@@ -37,7 +37,7 @@ Every API response includes:
 - Handled case-by-case based on business justification
 - Can be revoked if straining IAE systems or underutilized
 
-## Implications for OpScout
+## Implications for GovTrove
 
 With a standard personal API key (1,000/day):
 - **Search API**: At 1,000 records/page, can fetch ~1M opportunities in 1,000 requests

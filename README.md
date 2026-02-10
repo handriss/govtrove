@@ -1,6 +1,6 @@
-# OpScout
+# GovTrove
 
-OpScout is a federal contracting opportunity search platform that aggregates data from SAM.gov and provides a fast, searchable interface for government contractors.
+GovTrove is a federal contracting opportunity search platform that aggregates data from SAM.gov and provides a fast, searchable interface for government contractors.
 
 ## Architecture
 
@@ -41,10 +41,10 @@ OpScout is a federal contracting opportunity search platform that aggregates dat
 **AWS Setup:**
 ```bash
 # Configure AWS profile
-aws configure --profile opscout
+aws configure --profile govtrove
 
 # Verify access
-aws sts get-caller-identity --profile opscout
+aws sts get-caller-identity --profile govtrove
 ```
 
 ## Local Development
@@ -270,7 +270,7 @@ export SAM_API_KEY="your-sam-api-key"
 ## Project Structure
 
 ```
-opscout/
+govtrove/
 ├── api/                  # Go API service
 │   ├── cmd/api/          # Main entrypoint
 │   └── internal/         # Handlers, repository, config
