@@ -9,9 +9,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	"github.com/opscout/ingestion/internal/config"
-	"github.com/opscout/ingestion/internal/database"
-	"github.com/opscout/ingestion/internal/samgov"
+	"github.com/handriss/govtrove/ingestion/internal/config"
+	"github.com/handriss/govtrove/ingestion/internal/database"
+	"github.com/handriss/govtrove/ingestion/internal/samgov"
 )
 
 type Service struct {
@@ -588,8 +588,8 @@ func (s *Service) sendNotification(ctx context.Context, runID int, stats *Ingest
 		status = "PARTIAL_FAILURE"
 	}
 
-	message := fmt.Sprintf(`OpScout Ingestion Report
-========================
+	message := fmt.Sprintf(`GovTrove Ingestion Report
+=========================
 Status: %s
 Run ID: %d
 
@@ -616,7 +616,7 @@ Duration: %dms
 
 	_, err := s.sns.Publish(ctx, &sns.PublishInput{
 		TopicArn: aws.String(s.cfg.SNSTopicARN),
-		Subject:  aws.String(fmt.Sprintf("OpScout Ingestion: %s", status)),
+		Subject:  aws.String(fmt.Sprintf("GovTrove Ingestion: %s", status)),
 		Message:  aws.String(message),
 	})
 	return err

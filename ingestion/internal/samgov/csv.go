@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/opscout/ingestion/internal/database"
+	"github.com/handriss/govtrove/ingestion/internal/database"
 	"golang.org/x/text/encoding/charmap"
 )
 

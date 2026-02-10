@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/opscout/ingestion/internal/database"
-	"github.com/opscout/ingestion/internal/samgov"
+	"github.com/handriss/govtrove/ingestion/internal/database"
+	"github.com/handriss/govtrove/ingestion/internal/samgov"
 )
 
 func main() {

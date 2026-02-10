@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/opscout/api/internal/models"
-	"github.com/opscout/api/internal/repository"
+	"github.com/handriss/govtrove/api/internal/models"
+	"github.com/handriss/govtrove/api/internal/repository"
 )
 
 type EventHandler struct {

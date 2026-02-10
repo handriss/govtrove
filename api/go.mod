@@ -1,4 +1,4 @@
-module github.com/opscout/api
+module github.com/handriss/govtrove/api
 
 go 1.22
 

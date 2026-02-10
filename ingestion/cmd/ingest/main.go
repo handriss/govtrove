@@ -9,9 +9,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	appconfig "github.com/opscout/ingestion/internal/config"
-	"github.com/opscout/ingestion/internal/database"
-	"github.com/opscout/ingestion/internal/ingestion"
+	appconfig "github.com/handriss/govtrove/ingestion/internal/config"
+	"github.com/handriss/govtrove/ingestion/internal/database"
+	"github.com/handriss/govtrove/ingestion/internal/ingestion"
 )
 
 func main() {

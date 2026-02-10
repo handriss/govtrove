@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/opscout/ingestion/internal/database"
+	"github.com/handriss/govtrove/ingestion/internal/database"
 )
 
 // TrackedHTTPClient wraps HTTP requests to SAM.gov and logs all requests

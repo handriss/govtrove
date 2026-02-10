@@ -1,4 +1,4 @@
-module github.com/opscout/ingestion
+module github.com/handriss/govtrove/ingestion
 
 go 1.22
 
