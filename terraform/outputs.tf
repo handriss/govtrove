@@ -69,3 +69,48 @@ output "cloudfront_distribution_url" {
   description = "CloudFront distribution URL for frontend"
   value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
 }
+
+# Custom domain outputs
+output "frontend_url" {
+  description = "Frontend URL (custom domain or CloudFront)"
+  value       = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "api_url" {
+  description = "API URL (custom domain or App Runner)"
+  value       = var.domain_name != "" ? "https://api.${var.domain_name}" : "https://${aws_apprunner_service.api.service_url}"
+}
+
+output "acm_validation_records" {
+  description = "CNAME records to add in Cloudflare for ACM certificate validation"
+  value = var.domain_name != "" ? {
+    for dvo in aws_acm_certificate.main[0].domain_validation_options : dvo.domain_name => {
+      type  = "CNAME"
+      name  = dvo.resource_record_name
+      value = dvo.resource_record_value
+      note  = "Add in Cloudflare with proxy OFF (DNS only)"
+    }
+  } : {}
+}
+
+output "apprunner_custom_domain_records" {
+  description = "CNAME records to add in Cloudflare for App Runner custom domain validation"
+  value = var.domain_name != "" ? {
+    for record in aws_apprunner_custom_domain_association.api[0].certificate_validation_records : record.name => {
+      type  = "CNAME"
+      name  = record.name
+      value = record.value
+      note  = "Add in Cloudflare with proxy OFF (DNS only)"
+    }
+  } : {}
+}
+
+output "apprunner_custom_domain_target" {
+  description = "CNAME target for api.<domain> — add this in Cloudflare after validation"
+  value       = var.domain_name != "" ? aws_apprunner_custom_domain_association.api[0].dns_target : ""
+}
+
+output "cloudfront_domain_name" {
+  description = "CNAME target for <domain> — add this in Cloudflare after validation"
+  value       = aws_cloudfront_distribution.frontend.domain_name
+}

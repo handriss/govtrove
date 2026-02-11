@@ -307,8 +307,8 @@ ecr-login:
 
 deploy-frontend: frontend-build
 	@echo "Deploying frontend to S3/CloudFront..."
-	@API_URL=$$(cd terraform && terraform output -raw apprunner_service_url) && \
-	echo "VITE_API_URL=https://$$API_URL/api" > frontend/.env.production && \
+	@API_URL=$$(cd terraform && terraform output -raw api_url) && \
+	echo "VITE_API_URL=$$API_URL/api" > frontend/.env.production && \
 	cd frontend && npm run build && \
 	BUCKET=$$(cd ../terraform && terraform output -raw frontend_bucket_name) && \
 	DIST_ID=$$(cd ../terraform && terraform output -raw cloudfront_distribution_id) && \
