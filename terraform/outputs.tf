@@ -73,7 +73,7 @@ output "cloudfront_distribution_url" {
 # Custom domain outputs
 output "frontend_url" {
   description = "Frontend URL (custom domain or CloudFront)"
-  value       = var.domain_name != "" ? "https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
+  value       = var.domain_name != "" ? "https://app.${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
 }
 
 output "api_url" {
@@ -111,6 +111,22 @@ output "apprunner_custom_domain_target" {
 }
 
 output "cloudfront_domain_name" {
-  description = "CNAME target for <domain> — add this in Cloudflare after validation"
+  description = "CNAME target for app.<domain> — add this in Cloudflare after validation"
   value       = aws_cloudfront_distribution.frontend.domain_name
+}
+
+# Landing page outputs
+output "landing_bucket_name" {
+  description = "S3 bucket name for landing page"
+  value       = var.domain_name != "" ? aws_s3_bucket.landing[0].id : ""
+}
+
+output "landing_distribution_id" {
+  description = "CloudFront distribution ID for landing page"
+  value       = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].id : ""
+}
+
+output "landing_domain_name" {
+  description = "CNAME target for <domain> — the landing page CloudFront distribution"
+  value       = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].domain_name : ""
 }

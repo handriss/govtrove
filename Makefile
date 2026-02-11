@@ -4,7 +4,7 @@
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	run run-neon run-backfill run-backfill-neon run-mock mock-server \
 	build test ingestion-docker-build \
-	ecr-login deploy-frontend deploy-api deploy-ingestion deploy-all \
+	ecr-login deploy-frontend deploy-landing deploy-api deploy-ingestion deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
 	clean
@@ -71,7 +71,8 @@ help:
 	@echo ""
 	@echo "Deploy:"
 	@echo "  make ecr-login        - Login to AWS ECR"
-	@echo "  make deploy-frontend  - Build & deploy frontend to S3/CloudFront"
+	@echo "  make deploy-landing   - Deploy landing page to S3/CloudFront"
+	@echo "  make deploy-frontend  - Build & deploy frontend app to S3/CloudFront"
 	@echo "  make deploy-api       - Build & deploy API to App Runner"
 	@echo "  make deploy-ingestion - Build & push ingestion image to ECR"
 	@echo "  make deploy-all       - Deploy everything"
@@ -335,7 +336,16 @@ deploy-ingestion: ingestion-docker-build ecr-login
 	docker push $$ECR_URL:latest && \
 	echo "Ingestion image pushed successfully!"
 
-deploy-all: deploy-api deploy-ingestion deploy-frontend
+deploy-landing:
+	@echo "Deploying landing page to S3/CloudFront..."
+	@BUCKET=$$(cd terraform && terraform output -raw landing_bucket_name) && \
+	DIST_ID=$$(cd terraform && terraform output -raw landing_distribution_id) && \
+	aws s3 sync landing s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
+	echo "Invalidating CloudFront cache..." && \
+	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
+	echo "Landing page deployed successfully!"
+
+deploy-all: deploy-api deploy-ingestion deploy-frontend deploy-landing
 	@echo ""
 	@echo "All services deployed!"
 
