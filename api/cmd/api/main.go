@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/handriss/govtrove/api/internal/config"
@@ -82,7 +83,7 @@ func main() {
 
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
-	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
+	_ = handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -109,11 +110,12 @@ func main() {
 
 	r.Get("/health", healthHandler.Check)
 	r.Route("/api", func(r chi.Router) {
+		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Get("/opportunities", oppHandler.Search)
 		r.Get("/opportunities/{id}", oppHandler.GetByID)
 		r.Get("/filters", oppHandler.GetFilters)
 		r.Post("/events", eventHandler.Create)
-		r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
+		// r.Get("/admin/analytics", analyticsHandler.GetAnalytics) // TODO: re-enable behind auth for admin dashboard
 		r.Get("/status", statusHandler.GetStatus)
 	})
 
