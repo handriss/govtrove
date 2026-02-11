@@ -17,6 +17,10 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="GovTrove — Government Contract Search That Actually Works">
     <meta name="twitter:description" content="Find federal contracts in seconds. Boolean search, smart filters, and deadline tracking.">
+    <meta name="twitter:image" content="https://govtrove.com/og-image.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,6 +31,41 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
     <style>
+        /* ===== Preview Banner ===== */
+        .preview-banner {
+            background: rgba(59, 130, 246, 0.1);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.5rem 1rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            position: relative;
+            z-index: 101;
+        }
+
+        .preview-banner strong {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .preview-banner-dismiss {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0.25rem;
+            line-height: 1;
+            font-size: 1.125rem;
+        }
+
+        .preview-banner-dismiss:hover {
+            color: #e2e8f0;
+        }
+
         /* ===== CSS Custom Properties ===== */
         :root {
             /* Backgrounds - matching frontend slate palette */
@@ -184,7 +223,7 @@
         /* ===== Navigation ===== */
         .nav {
             position: fixed;
-            top: 0;
+            top: var(--banner-height, 0px);
             left: 0;
             right: 0;
             z-index: 100;
@@ -1184,10 +1223,16 @@
     </style>
 </head>
 <body>
+    <!-- Preview Banner -->
+    <div class="preview-banner" id="preview-banner">
+        <strong>Preview</strong> &mdash; GovTrove is in early preview. Features and data may change.
+        <button class="preview-banner-dismiss" id="dismiss-banner" aria-label="Dismiss banner">&times;</button>
+    </div>
+
     <!-- Navigation -->
     <nav class="nav" id="nav">
         <div class="container nav-inner">
-            <a href="#" class="nav-logo">
+            <a href="/" class="nav-logo">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                 GovTrove
             </a>
@@ -1196,7 +1241,7 @@
                 <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#faq">FAQ</a></li>
             </ul>
-            <a href="#" class="btn btn-primary nav-cta">Start Searching</a>
+            <a href="https://app.govtrove.com" class="btn btn-primary nav-cta">Start Searching</a>
             <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Toggle menu">
                 <i data-lucide="menu" width="24" height="24"></i>
             </button>
@@ -1210,7 +1255,7 @@
             <li><a href="#pricing" class="mobile-link">Pricing</a></li>
             <li><a href="#faq" class="mobile-link">FAQ</a></li>
         </ul>
-        <a href="#" class="btn btn-primary">Start Searching</a>
+        <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
     </div>
 
     <!-- Hero Section -->
@@ -1222,7 +1267,7 @@
                 Boolean search, deadline tracking, and a UI built for how contractors really screen opportunities.
             </p>
             <div class="hero-cta">
-                <a href="#" class="btn btn-primary btn-large">
+                <a href="https://app.govtrove.com" class="btn btn-primary btn-large">
                     Start Searching
                     <i data-lucide="arrow-right" width="20" height="20"></i>
                 </a>
@@ -1568,7 +1613,7 @@
                             <span>Mobile access</span>
                         </li>
                     </ul>
-                    <a href="#" class="btn btn-secondary">Start Searching</a>
+                    <a href="https://app.govtrove.com" class="btn btn-secondary">Start Searching</a>
                 </div>
                 <div class="pricing-card featured fade-in">
                     <div class="pricing-tier">Pro</div>
@@ -1596,7 +1641,7 @@
                             <span>Priority support</span>
                         </li>
                     </ul>
-                    <a href="#" class="btn btn-primary">Get Started</a>
+                    <a href="https://app.govtrove.com" class="btn btn-primary">Get Started</a>
                 </div>
             </div>
             <p class="pricing-note fade-in">All prices transparent. No enterprise tier, no "contact sales," no surprises.</p>
@@ -1728,7 +1773,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <a href="#" class="footer-logo">
+                    <a href="/" class="footer-logo">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
                         GovTrove
                     </a>
@@ -1746,8 +1791,8 @@
                     <div class="footer-links-group">
                         <h4>Legal</h4>
                         <ul>
-                            <li><a href="#">Terms of Service</a></li>
-                            <li><a href="#">Privacy Policy</a></li>
+                            <li><a href="/terms.html">Terms of Service</a></li>
+                            <li><a href="/privacy.html">Privacy Policy</a></li>
                         </ul>
                     </div>
                 </div>
@@ -1757,7 +1802,7 @@
                     <i data-lucide="database" width="16" height="16"></i>
                     <span>Data sourced from SAM.gov</span>
                 </div>
-                <span>&copy; 2024 GovTrove. All rights reserved.</span>
+                <span>&copy; 2025 GovTrove. All rights reserved.</span>
             </div>
         </div>
     </footer>
@@ -1765,6 +1810,22 @@
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
+
+        // Preview banner
+        const banner = document.getElementById('preview-banner');
+        const dismissBtn = document.getElementById('dismiss-banner');
+
+        function updateBannerHeight() {
+            if (banner) {
+                document.documentElement.style.setProperty('--banner-height', banner.offsetHeight + 'px');
+            }
+        }
+        updateBannerHeight();
+
+        dismissBtn.addEventListener('click', () => {
+            banner.remove();
+            document.documentElement.style.setProperty('--banner-height', '0px');
+        });
 
         // Navigation scroll effect
         const nav = document.getElementById('nav');
