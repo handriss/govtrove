@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -41,6 +41,14 @@ export async function getFilters(): Promise<FilterOptions> {
   const response = await fetch(`${API_BASE}/filters`);
   if (!response.ok) {
     throw new Error(`Failed to fetch filters: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getStatus(): Promise<StatusResponse> {
+  const response = await fetch(`${API_BASE}/status`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch status: ${response.statusText}`);
   }
   return response.json();
 }

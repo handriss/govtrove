@@ -86,6 +86,10 @@ export interface SearchParams {
   limit?: number;
 }
 
+export interface StatusResponse {
+  last_synced_at: string | null;
+}
+
 export interface QueryTerm {
   id: string;
   value: string;
