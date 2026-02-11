@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { searchOpportunities } from '../services/api';
+import { searchOpportunities, trackEvent } from '../services/api';
 import type { SearchParams, SearchResult, OpportunityListItem } from '../types/api';
 
 interface UseSearchState {
@@ -33,6 +33,12 @@ export function useSearch() {
         totalPages: data.total_pages,
         loading: false,
         error: null,
+      });
+      trackEvent({
+        event_type: 'search',
+        query: params.q,
+        total_results: data.total,
+        page: params.page,
       });
     } catch (err) {
       setState((prev) => ({
