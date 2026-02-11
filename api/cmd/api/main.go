@@ -84,6 +84,7 @@ func main() {
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
+	statusHandler := handlers.NewStatusHandler(pool)
 
 	r := chi.NewRouter()
 
@@ -113,6 +114,7 @@ func main() {
 		r.Get("/filters", oppHandler.GetFilters)
 		r.Post("/events", eventHandler.Create)
 		r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
+		r.Get("/status", statusHandler.GetStatus)
 	})
 
 	server := &http.Server{
