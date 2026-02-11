@@ -14,7 +14,7 @@ import {
   FileText,
   AlertCircle,
 } from 'lucide-react';
-import { getOpportunity } from '../services/api';
+import { getOpportunity, trackEvent } from '../services/api';
 import type { Opportunity } from '../types/api';
 
 const typeLabels: Record<string, string> = {
@@ -152,6 +152,12 @@ export default function OpportunityDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (opportunity) {
+      trackEvent({ event_type: 'page', opportunity_id: opportunity.id });
+    }
+  }, [opportunity?.id]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
