@@ -52,8 +52,8 @@ export default function ResultsList({
             </tr>
           </thead>
           <tbody className="divide-y divide-dark-800/30">
-            {results.map((opp) => (
-              <ResultRow key={opp.id} opportunity={opp} />
+            {results.map((opp, index) => (
+              <ResultRow key={opp.id} opportunity={opp} index={index} />
             ))}
           </tbody>
         </table>
