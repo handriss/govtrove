@@ -41,7 +41,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   default_root_object = "index.html"
   comment             = "${var.project_name} frontend distribution"
   price_class         = "PriceClass_100" # US, Canada, Europe only (cheapest)
-  aliases             = var.domain_name != "" ? [var.domain_name] : []
+  aliases             = var.domain_name != "" ? ["app.${var.domain_name}"] : []
 
   origin {
     domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
