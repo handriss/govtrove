@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import SimpleSearchPage from './pages/SimpleSearchPage';
 import AdvancedSearchPage from './pages/AdvancedSearchPage';
 import OpportunityDetail from './pages/OpportunityDetail';
+import ProfilePage from './pages/ProfilePage';
 import PreviewBanner from './components/PreviewBanner';
 import Footer from './components/Footer';
 
@@ -26,6 +27,7 @@ function AppRoutes() {
         <Route path="/" element={<SimpleSearchPage />} />
         <Route path="/advanced" element={<AdvancedSearchPage />} />
         <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/callback" element={<SimpleSearchPage />} />
         <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
         <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
