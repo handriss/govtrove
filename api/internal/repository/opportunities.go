@@ -191,6 +191,10 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 			pop_street_address, pop_city_name, pop_state_code, pop_zip, pop_country_code,
 			award_number, award_amount, awardee_name,
 			awardee_uei, award_date, active, ui_link, data_source,
+			primary_contact_title, primary_contact_fullname, primary_contact_email,
+			primary_contact_phone, primary_contact_fax,
+			secondary_contact_title, secondary_contact_fullname, secondary_contact_email,
+			secondary_contact_phone, secondary_contact_fax,
 			created_at, updated_at
 		FROM opportunities
 		WHERE id = $1
@@ -227,6 +231,16 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		&opp.Active,
 		&opp.UILink,
 		&opp.DataSource,
+		&opp.PrimaryContactTitle,
+		&opp.PrimaryContactFullname,
+		&opp.PrimaryContactEmail,
+		&opp.PrimaryContactPhone,
+		&opp.PrimaryContactFax,
+		&opp.SecondaryContactTitle,
+		&opp.SecondaryContactFullname,
+		&opp.SecondaryContactEmail,
+		&opp.SecondaryContactPhone,
+		&opp.SecondaryContactFax,
 		&opp.CreatedAt,
 		&opp.UpdatedAt,
 	)

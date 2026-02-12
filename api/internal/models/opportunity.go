@@ -31,12 +31,22 @@ type Opportunity struct {
 	AwardeeName        *string    `json:"awardee_name,omitempty"`
 	AwardeeUEI         *string    `json:"awardee_uei,omitempty"`
 	AwardDate          *time.Time `json:"award_date,omitempty"`
-	Active             bool       `json:"active"`
-	UILink             *string    `json:"ui_link,omitempty"`
-	ResourceLinks      []string   `json:"resource_links,omitempty"`
-	DataSource         *string    `json:"data_source,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	Active                  bool       `json:"active"`
+	UILink                  *string    `json:"ui_link,omitempty"`
+	ResourceLinks           []string   `json:"resource_links,omitempty"`
+	DataSource              *string    `json:"data_source,omitempty"`
+	PrimaryContactTitle     *string    `json:"primary_contact_title,omitempty"`
+	PrimaryContactFullname  *string    `json:"primary_contact_fullname,omitempty"`
+	PrimaryContactEmail     *string    `json:"primary_contact_email,omitempty"`
+	PrimaryContactPhone     *string    `json:"primary_contact_phone,omitempty"`
+	PrimaryContactFax       *string    `json:"primary_contact_fax,omitempty"`
+	SecondaryContactTitle    *string    `json:"secondary_contact_title,omitempty"`
+	SecondaryContactFullname *string    `json:"secondary_contact_fullname,omitempty"`
+	SecondaryContactEmail    *string    `json:"secondary_contact_email,omitempty"`
+	SecondaryContactPhone    *string    `json:"secondary_contact_phone,omitempty"`
+	SecondaryContactFax      *string    `json:"secondary_contact_fax,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 type OpportunityListItem struct {

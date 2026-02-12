@@ -13,6 +13,9 @@ import {
   Award,
   FileText,
   AlertCircle,
+  Users,
+  Mail,
+  Phone,
 } from 'lucide-react';
 import { getOpportunity, trackEvent } from '../services/api';
 import type { Opportunity } from '../types/api';
@@ -134,6 +137,56 @@ function Section({
   );
 }
 
+function ContactCard({
+  label,
+  name,
+  title,
+  email,
+  phone,
+  fax,
+}: {
+  label: string;
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  fax?: string;
+}) {
+  return (
+    <div className="p-4 rounded-lg bg-dark-800/30 border border-dark-700/30">
+      <p className="text-xs text-dark-500 uppercase tracking-wider mb-2">{label}</p>
+      {name && <p className="text-sm text-dark-100 font-medium">{name}</p>}
+      {title && <p className="text-sm text-dark-400">{title}</p>}
+      <div className="mt-2 space-y-1">
+        {email && (
+          <a
+            href={`mailto:${email}`}
+            className="flex items-center gap-2 text-sm text-accent hover:text-accent-hover transition-colors"
+          >
+            <Mail size={14} strokeWidth={1.5} className="flex-shrink-0" />
+            {email}
+          </a>
+        )}
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            className="flex items-center gap-2 text-sm text-dark-300 hover:text-dark-100 transition-colors"
+          >
+            <Phone size={14} strokeWidth={1.5} className="flex-shrink-0" />
+            {phone}
+          </a>
+        )}
+        {fax && (
+          <p className="flex items-center gap-2 text-sm text-dark-400">
+            <Phone size={14} strokeWidth={1.5} className="flex-shrink-0" />
+            {fax} (fax)
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function OpportunityDetail() {
   const { id } = useParams();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
@@ -202,6 +255,9 @@ export default function OpportunityDetail() {
   const deptHierarchy = parseDepartmentHierarchy(opportunity.department);
   const typeLabel = opportunity.type ? typeLabels[opportunity.type] || opportunity.type : '—';
   const hasAward = opportunity.award_number || opportunity.award_amount || opportunity.awardee_name;
+  const hasPrimaryContact = opportunity.primary_contact_fullname || opportunity.primary_contact_email || opportunity.primary_contact_phone;
+  const hasSecondaryContact = opportunity.secondary_contact_fullname || opportunity.secondary_contact_email || opportunity.secondary_contact_phone;
+  const hasContacts = hasPrimaryContact || hasSecondaryContact;
 
   const placeOfPerformance = [
     opportunity.pop_street_address,
@@ -383,6 +439,34 @@ export default function OpportunityDetail() {
               <p className="mt-3 text-xs text-dark-500 font-mono break-all">{opportunity.department}</p>
             )}
           </Section>
+
+          {/* Contacts */}
+          {hasContacts && (
+            <Section icon={Users} title="Contacts" defaultOpen={true}>
+              <div className="space-y-4">
+                {hasPrimaryContact && (
+                  <ContactCard
+                    label="Primary Contact"
+                    name={opportunity.primary_contact_fullname}
+                    title={opportunity.primary_contact_title}
+                    email={opportunity.primary_contact_email}
+                    phone={opportunity.primary_contact_phone}
+                    fax={opportunity.primary_contact_fax}
+                  />
+                )}
+                {hasSecondaryContact && (
+                  <ContactCard
+                    label="Secondary Contact"
+                    name={opportunity.secondary_contact_fullname}
+                    title={opportunity.secondary_contact_title}
+                    email={opportunity.secondary_contact_email}
+                    phone={opportunity.secondary_contact_phone}
+                    fax={opportunity.secondary_contact_fax}
+                  />
+                )}
+              </div>
+            </Section>
+          )}
 
           {/* Place of Performance */}
           {placeOfPerformance && (

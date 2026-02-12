@@ -46,6 +46,16 @@ export interface Opportunity {
   ui_link?: string;
   resource_links?: string[];
   data_source?: string;
+  primary_contact_title?: string;
+  primary_contact_fullname?: string;
+  primary_contact_email?: string;
+  primary_contact_phone?: string;
+  primary_contact_fax?: string;
+  secondary_contact_title?: string;
+  secondary_contact_fullname?: string;
+  secondary_contact_email?: string;
+  secondary_contact_phone?: string;
+  secondary_contact_fax?: string;
   created_at: string;
   updated_at: string;
 }
