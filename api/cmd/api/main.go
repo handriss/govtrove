@@ -11,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -19,6 +22,7 @@ import (
 
 	"github.com/handriss/govtrove/api/internal/config"
 	"github.com/handriss/govtrove/api/internal/handlers"
+	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -77,13 +81,45 @@ func main() {
 	defer pool.Close()
 	logger.Info("connected to database")
 
+	var snsClient *sns.Client
+	if cfg.SNSTopicARN != "" {
+		awsCfg, awsErr := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
+		if awsErr != nil {
+			logger.Warn("failed to load AWS config, SNS notifications disabled", "error", awsErr)
+		} else {
+			snsClient = sns.NewFromConfig(awsCfg)
+			logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
+		}
+	}
+
+	// JWKS for WorkOS JWT validation
+	var jwks keyfunc.Keyfunc
+	if cfg.WorkOSClientID != "" {
+		jwksURL := fmt.Sprintf("https://api.workos.com/sso/jwks/%s", cfg.WorkOSClientID)
+		k, jwksErr := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
+		if jwksErr != nil {
+			logger.Error("failed to initialize JWKS", "error", jwksErr)
+			os.Exit(1)
+		}
+		jwks = k
+		authmw.SetClientID(cfg.WorkOSClientID)
+		logger.Info("JWKS initialized", "client_id", cfg.WorkOSClientID)
+	} else {
+		logger.Warn("WORKOS_CLIENT_ID not set, auth endpoints disabled")
+	}
+
 	oppRepo := repository.NewOpportunityRepository(pool)
 	eventRepo := repository.NewEventRepository(pool)
 	analyticsRepo := repository.NewAnalyticsRepository(pool)
+	contactRepo := repository.NewContactRepository(pool)
+	userRepo := repository.NewUserRepository(pool)
 
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
-	_ = handlers.NewAnalyticsHandler(analyticsRepo, logger)
+	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
+	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
+	userHandler := handlers.NewUserHandler(userRepo, logger)
+	authHandler := handlers.NewAuthHandler(userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -102,7 +138,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -115,8 +151,20 @@ func main() {
 		r.Get("/opportunities/{id}", oppHandler.GetByID)
 		r.Get("/filters", oppHandler.GetFilters)
 		r.Post("/events", eventHandler.Create)
-		// r.Get("/admin/analytics", analyticsHandler.GetAnalytics) // TODO: re-enable behind auth for admin dashboard
 		r.Get("/status", statusHandler.GetStatus)
+		r.Route("/contact", func(r chi.Router) {
+			r.Use(httprate.LimitByIP(5, time.Hour))
+			r.Post("/", contactHandler.Create)
+		})
+
+		if jwks != nil {
+			r.Group(func(r chi.Router) {
+				r.Use(authmw.RequireAuth(jwks))
+				r.Get("/me", userHandler.GetMe)
+				r.Post("/auth/sync", authHandler.Sync)
+				r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
+			})
+		}
 	})
 
 	server := &http.Server{
