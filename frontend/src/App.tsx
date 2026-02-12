@@ -38,7 +38,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthKitProvider clientId={WORKOS_CLIENT_ID} redirectUri={REDIRECT_URI}>
+    <AuthKitProvider clientId={WORKOS_CLIENT_ID} redirectUri={REDIRECT_URI} devMode>
       <Router>
         <AuthProvider>
           <AppRoutes />
