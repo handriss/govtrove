@@ -34,11 +34,11 @@ WorkOS AuthKit — free up to 1M MAU, official Go SDK, hosted login UI, built-in
 
 Positioning principles to apply when revising the landing page:
 
-- [ ] **Metadata-first philosophy as core positioning** — "You don't read a 50-page SOW to decide if an opportunity is worth your time. Neither should your search tool." Reframes what competitors treat as a limitation into a deliberate product philosophy
-- [ ] **Messaging hierarchy**: speed -> simplicity -> intelligence (avoid leading with "AI")
-- [ ] **Transparent pricing from day one** — show pricing on the landing page, no "contact sales" gates. Free vs. Pro comparison table. In a market full of "request a demo" opacity, transparent pricing is a differentiator
-- [ ] **SEO targeting**: "SAM.gov search alternative", "find government contracts free", "SAM.gov frustrations"
-- [ ] **Scam awareness & trust positioning** — predatory ecosystem charges $600-$1,500 for SAM.gov registration (which is free). GSA OIG identified 400+ fraud attempts since 2021. Content/blog opportunity: "SAM.gov Registration Is Free — Here's How" drives SEO traffic and establishes credibility
+- [x] **Metadata-first philosophy as core positioning** — "You don't read a 50-page SOW to decide if an opportunity is worth your time. Neither should your search tool." Reframes what competitors treat as a limitation into a deliberate product philosophy
+- [x] **Messaging hierarchy**: speed -> simplicity -> intelligence (avoid leading with "AI")
+- [x] **Transparent pricing from day one** — show pricing on the landing page, no "contact sales" gates. Free vs. Pro comparison table. In a market full of "request a demo" opacity, transparent pricing is a differentiator
+- [x] **SEO targeting**: "SAM.gov search alternative", "find government contracts free", "SAM.gov frustrations"
+- [x] **Scam awareness & trust positioning** — predatory ecosystem charges $600-$1,500 for SAM.gov registration (which is free). GSA OIG identified 400+ fraud attempts since 2021. Content/blog opportunity: "SAM.gov Registration Is Free — Here's How" drives SEO traffic and establishes credibility
 
 ---
 
