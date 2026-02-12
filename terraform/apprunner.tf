@@ -53,7 +53,30 @@ resource "aws_iam_role_policy" "apprunner_secrets" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          aws_secretsmanager_secret.database_url.arn
+          aws_secretsmanager_secret.database_url.arn,
+          aws_secretsmanager_secret.workos_client_id.arn,
+          aws_secretsmanager_secret.workos_api_key.arn,
+        ]
+      }
+    ]
+  })
+}
+
+# Allow App Runner instance to publish SNS notifications
+resource "aws_iam_role_policy" "apprunner_sns" {
+  name = "${var.project_name}-apprunner-sns"
+  role = aws_iam_role.apprunner_instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = [
+          aws_sns_topic.notifications.arn
         ]
       }
     ]
@@ -89,13 +112,17 @@ resource "aws_apprunner_service" "api" {
         port = tostring(var.api_port)
 
         runtime_environment_secrets = {
-          DATABASE_URL = aws_secretsmanager_secret.database_url.arn
+          DATABASE_URL    = aws_secretsmanager_secret.database_url.arn
+          WORKOS_CLIENT_ID = aws_secretsmanager_secret.workos_client_id.arn
+          WORKOS_API_KEY   = aws_secretsmanager_secret.workos_api_key.arn
         }
 
         runtime_environment_variables = {
           PORT            = tostring(var.api_port)
           LOG_LEVEL       = "info"
           ALLOWED_ORIGINS = var.domain_name != "" ? "https://app.${var.domain_name},https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
+          SNS_TOPIC_ARN   = aws_sns_topic.notifications.arn
+          AWS_REGION      = var.aws_region
         }
       }
     }

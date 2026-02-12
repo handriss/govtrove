@@ -130,3 +130,9 @@ output "landing_domain_name" {
   description = "CNAME target for <domain> — the landing page CloudFront distribution"
   value       = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].domain_name : ""
 }
+
+output "workos_client_id" {
+  description = "WorkOS client ID (for frontend build)"
+  value       = var.workos_client_id
+  sensitive   = true
+}
