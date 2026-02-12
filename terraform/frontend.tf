@@ -81,6 +81,12 @@ resource "aws_cloudfront_distribution" "frontend" {
     response_page_path = "/index.html"
   }
 
+  logging_config {
+    bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
+    prefix          = "frontend/"
+    include_cookies = false
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
