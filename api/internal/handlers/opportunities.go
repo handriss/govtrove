@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -10,16 +12,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/handriss/govtrove/api/internal/models"
+	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
 type OpportunityHandler struct {
-	repo   *repository.OpportunityRepository
-	logger *slog.Logger
+	repo     *repository.OpportunityRepository
+	logger   *slog.Logger
+	renderer *ogimage.Renderer
 }
 
-func NewOpportunityHandler(repo *repository.OpportunityRepository, logger *slog.Logger) *OpportunityHandler {
-	return &OpportunityHandler{repo: repo, logger: logger}
+func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger) *OpportunityHandler {
+	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer}
 }
 
 func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +71,181 @@ func (h *OpportunityHandler) GetFilters(w http.ResponseWriter, r *http.Request) 
 	}
 
 	h.writeJSON(w, http.StatusOK, options)
+}
+
+var ogTemplate = template.Must(template.New("og").Parse(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="GovTrove">
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:image" content="{{.ImageURL}}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{.Title}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{.Title}}">
+<meta name="twitter:description" content="{{.Description}}">
+<meta name="twitter:image" content="{{.ImageURL}}">{{if .Deadline}}
+<meta name="twitter:label1" content="Deadline">
+<meta name="twitter:data1" content="{{.Deadline}}">{{end}}{{if .SetAside}}
+<meta name="twitter:label2" content="Set-Aside">
+<meta name="twitter:data2" content="{{.SetAside}}">{{end}}
+<title>{{.Title}} — GovTrove</title>
+</head>
+<body><p><a href="{{.URL}}">View on GovTrove</a></p></body>
+</html>`))
+
+type ogData struct {
+	Title       string
+	Description string
+	URL         string
+	ImageURL    string
+	Deadline    string
+	SetAside    string
+}
+
+func (h *OpportunityHandler) GetOGCard(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		h.renderOGFallback(w, idStr)
+		return
+	}
+
+	opp, err := h.repo.GetByID(r.Context(), id)
+	if err != nil || opp == nil {
+		h.renderOGFallback(w, idStr)
+		return
+	}
+
+	agency := ""
+	if opp.Department != nil {
+		agency = ogimage.ShortenAgency(*opp.Department)
+	}
+
+	title := opp.Title
+	if agency != "" {
+		combined := title + " — " + agency
+		if len(combined) <= 60 {
+			title = combined
+		} else if len(title) > 57 {
+			title = title[:57] + "..."
+		}
+	}
+
+	var descParts []string
+	if opp.SetAsideDesc != nil {
+		descParts = append(descParts, *opp.SetAsideDesc)
+	}
+	if opp.Type != nil {
+		descParts = append(descParts, *opp.Type)
+	}
+	if opp.ResponseDeadline != nil {
+		descParts = append(descParts, "Deadline: "+opp.ResponseDeadline.Format("Jan 2, 2006"))
+	}
+	if opp.NAICSCode != nil {
+		descParts = append(descParts, "NAICS: "+*opp.NAICSCode)
+	}
+
+	desc := "Federal Contract Opportunity"
+	if len(descParts) > 0 {
+		desc = strings.Join(descParts, " | ")
+	}
+
+	deadline := ""
+	if opp.ResponseDeadline != nil {
+		deadline = opp.ResponseDeadline.Format("Jan 2, 2006")
+	}
+
+	setAside := ""
+	if opp.SetAsideDesc != nil {
+		setAside = *opp.SetAsideDesc
+	}
+
+	data := ogData{
+		Title:       title,
+		Description: desc,
+		URL:         fmt.Sprintf("https://app.govtrove.com/opportunity/%d", opp.ID),
+		ImageURL:    fmt.Sprintf("https://api.govtrove.com/og/opportunities/%d/card.png", opp.ID),
+		Deadline:    deadline,
+		SetAside:    setAside,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if err := ogTemplate.Execute(w, data); err != nil {
+		h.logger.Error("failed to render OG template", "error", err)
+	}
+}
+
+func (h *OpportunityHandler) GetOGImage(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	opp, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get opportunity for OG image failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if opp == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	data := ogimage.OpportunityData{
+		ID:    opp.ID,
+		Title: opp.Title,
+	}
+	if opp.Type != nil {
+		data.Type = *opp.Type
+	}
+	if opp.Department != nil {
+		data.Department = *opp.Department
+	}
+	if opp.SetAsideDesc != nil {
+		data.SetAsideDesc = *opp.SetAsideDesc
+	}
+	if opp.SetAsideCode != nil {
+		data.SetAsideCode = *opp.SetAsideCode
+	}
+	if opp.NAICSCode != nil {
+		data.NAICSCode = *opp.NAICSCode
+	}
+	data.ResponseDeadline = opp.ResponseDeadline
+
+	png, err := h.renderer.Render(data)
+	if err != nil {
+		h.logger.Error("render OG image failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(png)
+}
+
+func (h *OpportunityHandler) renderOGFallback(w http.ResponseWriter, idStr string) {
+	data := ogData{
+		Title:       "Federal Contract Opportunity",
+		Description: "Search and discover federal contract opportunities on GovTrove",
+		URL:         fmt.Sprintf("https://app.govtrove.com/opportunity/%s", idStr),
+		ImageURL:    "https://govtrove.com/og-image.png",
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	if err := ogTemplate.Execute(w, data); err != nil {
+		h.logger.Error("failed to render OG fallback template", "error", err)
+	}
 }
 
 func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchParams {

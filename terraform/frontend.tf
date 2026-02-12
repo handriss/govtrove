@@ -34,6 +34,14 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
   signing_protocol                  = "sigv4"
 }
 
+# CloudFront Function to redirect social crawlers to API for OG meta tags
+resource "aws_cloudfront_function" "og_redirect" {
+  name    = "${var.project_name}-og-redirect"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = file("${path.root}/../cf-functions/og-redirect.js")
+}
+
 # CloudFront distribution
 resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
@@ -61,6 +69,11 @@ resource "aws_cloudfront_distribution" "frontend" {
       cookies {
         forward = "none"
       }
+    }
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.og_redirect.arn
     }
 
     min_ttl     = 0
