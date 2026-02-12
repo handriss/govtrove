@@ -61,6 +61,19 @@ variable "sam_api_key" {
   sensitive   = true
 }
 
+# WorkOS Auth
+variable "workos_client_id" {
+  description = "WorkOS AuthKit client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "workos_api_key" {
+  description = "WorkOS API key"
+  type        = string
+  sensitive   = true
+}
+
 # Notifications
 variable "notification_email" {
   description = "Email address for ingestion notifications"
