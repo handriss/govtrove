@@ -1,6 +1,6 @@
 # GovTrove — Next Epic Backlog
 
-## 2. Search UX Improvements
+## 1. Search UX Improvements
 
 Already implemented: notice type filter, set-aside filter, NAICS filter, boolean search (AND/OR), exact-match via quoted strings, exclusions via `-term`.
 
@@ -16,18 +16,7 @@ Still to build:
 
 ---
 
-## 3. Opportunity Detail Page
-
-Most metadata is already displayed: solicitation number, notice type, dates (posted/response/archive), set-aside with color-coded badges, NAICS codes, agency/department hierarchy, place of performance, award info (number, amount, date, awardee), attachments/resources with links, "View on SAM.gov" link, expandable description.
-
-Still to build:
-
-- [x] **Shareable opportunity links with clean metadata summaries** — BD people need to share with capture teams. Add OG meta tags for opportunity pages so links preview nicely in Slack/Teams/email
-- [ ] **Interested Vendors List (IVL) data** — if SAM.gov API exposes IVL information, show vendor interest count and interested companies. Useful for gauging competition and identifying teaming partners
-
----
-
-## 4. Save Opportunities
+## 2. Save Opportunities
 
 Saved searches already exist (localStorage, Advanced Search page). Individual opportunity bookmarking does not exist yet.
 
@@ -40,7 +29,7 @@ Saved searches already exist (localStorage, Advanced Search page). Individual op
 
 ---
 
-## 5. Stripe Integration
+## 3. Stripe Integration
 
 - [ ] Checkout flow ($9/month or $79/year)
 - [ ] Webhook handling (subscription events)
