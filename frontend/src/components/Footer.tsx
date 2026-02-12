@@ -47,8 +47,8 @@ export default function Footer() {
           <a href="https://govtrove.com/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
             Privacy
           </a>
-          <a href="mailto:privacy@govtrove.com" className="hover:text-dark-300">
-            privacy@govtrove.com
+          <a href="https://govtrove.com/contact.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            Contact
           </a>
         </div>
       </div>

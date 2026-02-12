@@ -82,12 +82,12 @@
             /* Text - matching frontend */
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
-            --text-muted: #64748b;
+            --text-muted: #7b8ba2;
 
             /* Accent - matching frontend blue */
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --accent-subtle: rgba(59, 130, 246, 0.15);
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-subtle: rgba(37, 99, 235, 0.15);
 
             /* Set-aside badges - with borders like frontend */
             --badge-small-business-bg: rgba(59, 130, 246, 0.2);
@@ -1128,7 +1128,7 @@
             gap: 3rem;
         }
 
-        .footer-links-group h4 {
+        .footer-links-group .footer-heading {
             font-size: 0.875rem;
             font-weight: 600;
             color: var(--text-primary);
@@ -1259,6 +1259,7 @@
         <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
     </div>
 
+    <main>
     <!-- Hero Section -->
     <section class="hero">
         <div class="container hero-content">
@@ -1288,7 +1289,7 @@
                     </div>
                     <div class="mockup-body">
                         <div class="mockup-search">
-                            <input type="text" class="mockup-search-input" value="cybersecurity AND (assessment OR penetration)" readonly>
+                            <input type="text" class="mockup-search-input" value="cybersecurity AND (assessment OR penetration)" readonly aria-label="Example search query">
                             <button class="mockup-search-btn">Search</button>
                         </div>
                         <div class="mockup-filters">
@@ -1507,7 +1508,7 @@
                     </div>
                     <div class="mockup-body">
                         <div class="mockup-search">
-                            <input type="text" class="mockup-search-input" value="aircraft maintenance" readonly>
+                            <input type="text" class="mockup-search-input" value="aircraft maintenance" readonly aria-label="Example search query">
                             <button class="mockup-search-btn">Search</button>
                         </div>
                         <div class="mockup-filters">
@@ -1769,6 +1770,8 @@
         </div>
     </section>
 
+    </main>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -1782,7 +1785,7 @@
                 </div>
                 <div class="footer-links">
                     <div class="footer-links-group">
-                        <h4>Product</h4>
+                        <p class="footer-heading">Product</p>
                         <ul>
                             <li><a href="#features">Features</a></li>
                             <li><a href="#pricing">Pricing</a></li>
@@ -1790,10 +1793,11 @@
                         </ul>
                     </div>
                     <div class="footer-links-group">
-                        <h4>Legal</h4>
+                        <p class="footer-heading">Legal</p>
                         <ul>
                             <li><a href="/terms.html">Terms of Service</a></li>
                             <li><a href="/privacy.html">Privacy Policy</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
                         </ul>
                     </div>
                 </div>
