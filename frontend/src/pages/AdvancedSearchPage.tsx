@@ -4,6 +4,7 @@ import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookma
 import QueryBuilder, { buildQueryString, createEmptyGroup } from '../components/QueryBuilder';
 import FilterPanel from '../components/FilterPanel';
 import ResultsList from '../components/ResultsList';
+import AuthButton from '../components/AuthButton';
 import { useSearch } from '../hooks/useSearch';
 import type { QueryGroup, AdvancedFilters, SearchParams } from '../types/api';
 
@@ -359,6 +360,7 @@ export default function AdvancedSearchPage() {
               Examples
             </button>
             <span className="text-sm text-dark-500 tracking-wide">Advanced Search</span>
+            <AuthButton />
           </div>
         </div>
       </header>

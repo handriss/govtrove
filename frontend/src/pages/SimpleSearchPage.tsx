@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import ResultsList from '../components/ResultsList';
+import AuthButton from '../components/AuthButton';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 
@@ -66,6 +67,10 @@ export default function SimpleSearchPage() {
 
       {/* Subtle radial glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-accent/[0.02] rounded-full blur-3xl pointer-events-none" />
+
+      <div className="absolute top-4 right-6 z-20">
+        <AuthButton />
+      </div>
 
       <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'pt-[25vh]'}`}>
         {/* Logo */}

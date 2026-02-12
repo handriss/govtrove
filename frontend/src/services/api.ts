@@ -2,6 +2,17 @@ import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResp
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+export interface GovTroveUser {
+  id: number;
+  workos_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  plan: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function searchOpportunities(params: SearchParams = {}): Promise<SearchResult> {
   const searchParams = new URLSearchParams();
 
@@ -77,4 +88,32 @@ export function trackEvent(event: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...event, session_id: getSessionId() }),
   }).catch(() => {});
+}
+
+export async function syncUser(
+  token: string,
+  data: { email: string; first_name: string; last_name: string },
+): Promise<GovTroveUser> {
+  const response = await fetch(`${API_BASE}/auth/sync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error(`Sync failed: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getMe(token: string): Promise<GovTroveUser> {
+  const response = await fetch(`${API_BASE}/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Get me failed: ${response.statusText}`);
+  }
+  return response.json();
 }
