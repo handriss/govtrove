@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import ResultRow from './ResultRow';
+import ResultCard from './ResultCard';
 import NoResults from './NoResults';
 import type { OpportunityListItem } from '../types/api';
 
@@ -37,7 +38,15 @@ export default function ResultsList({
 
   return (
     <div>
-      <div className="rounded-xl border border-dark-800/50 overflow-hidden bg-dark-900/30 backdrop-blur-sm">
+      {/* Mobile: card layout */}
+      <div className="md:hidden space-y-3">
+        {results.map((opp, index) => (
+          <ResultCard key={opp.id} opportunity={opp} index={index} />
+        ))}
+      </div>
+
+      {/* Desktop: table layout */}
+      <div className="hidden md:block rounded-xl border border-dark-800/50 overflow-hidden bg-dark-900/30 backdrop-blur-sm">
         <table className="w-full">
           <thead>
             <tr className="text-[11px] text-dark-400 uppercase tracking-wider bg-dark-850/50">
