@@ -117,3 +117,21 @@ export async function getMe(token: string): Promise<GovTroveUser> {
   }
   return response.json();
 }
+
+export async function createAccountRequest(
+  token: string,
+  requestType: 'data_export' | 'account_deletion',
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/account/requests`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ request_type: requestType }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || response.statusText);
+  }
+}

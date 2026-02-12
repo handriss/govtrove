@@ -120,12 +120,14 @@ func main() {
 	eventRepo := repository.NewEventRepository(pool)
 	analyticsRepo := repository.NewAnalyticsRepository(pool)
 	contactRepo := repository.NewContactRepository(pool)
+	accountRequestRepo := repository.NewAccountRequestRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
+	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
@@ -172,6 +174,7 @@ func main() {
 				r.Use(authmw.RequireAuth(jwks))
 				r.Get("/me", userHandler.GetMe)
 				r.Post("/auth/sync", authHandler.Sync)
+				r.Post("/account/requests", accountRequestHandler.Create)
 				r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
 			})
 		}
