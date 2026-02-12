@@ -60,3 +60,4 @@ postgres_data/
 # Reference code
 reference/
 *.zip
+api/ogpreview

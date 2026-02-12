@@ -23,6 +23,7 @@ import (
 	"github.com/handriss/govtrove/api/internal/config"
 	"github.com/handriss/govtrove/api/internal/handlers"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
+	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -108,13 +109,20 @@ func main() {
 		logger.Warn("WORKOS_CLIENT_ID not set, auth endpoints disabled")
 	}
 
+	ogRenderer, err := ogimage.NewRenderer()
+	if err != nil {
+		logger.Error("failed to initialize OG image renderer", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("OG image renderer initialized")
+
 	oppRepo := repository.NewOpportunityRepository(pool)
 	eventRepo := repository.NewEventRepository(pool)
 	analyticsRepo := repository.NewAnalyticsRepository(pool)
 	contactRepo := repository.NewContactRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 
-	oppHandler := handlers.NewOpportunityHandler(oppRepo, logger)
+	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
@@ -145,6 +153,8 @@ func main() {
 	}))
 
 	r.Get("/health", healthHandler.Check)
+	r.Get("/og/opportunities/{id}/card.png", oppHandler.GetOGImage)
+	r.Get("/og/opportunities/{id}", oppHandler.GetOGCard)
 	r.Route("/api", func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Get("/opportunities", oppHandler.Search)
