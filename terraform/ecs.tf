@@ -38,6 +38,11 @@ resource "aws_ecs_task_definition" "ingestion" {
         {
           name  = "LOG_LEVEL"
           value = "info"
+        },
+        # TODO(pre-launch): Remove this before going live. Needed to stay within Neon free tier.
+        {
+          name  = "MIN_POSTED_DATE"
+          value = "2026-01-15"
         }
       ]
 

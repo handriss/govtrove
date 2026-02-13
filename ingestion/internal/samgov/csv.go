@@ -21,8 +21,10 @@ const (
 )
 
 type CSVClient struct {
-	httpClient *TrackedHTTPClient
-	logger     *slog.Logger
+	httpClient     *TrackedHTTPClient
+	logger         *slog.Logger
+	minPostedDate  *time.Time
+	skippedByDate  int
 }
 
 func NewCSVClient(db *database.DB, logger *slog.Logger) *CSVClient {
@@ -34,6 +36,14 @@ func NewCSVClient(db *database.DB, logger *slog.Logger) *CSVClient {
 
 func (c *CSVClient) SetIngestionRunID(runID int) {
 	c.httpClient.SetIngestionRunID(runID)
+}
+
+func (c *CSVClient) SetMinPostedDate(d *time.Time) {
+	c.minPostedDate = d
+}
+
+func (c *CSVClient) SkippedByDate() int {
+	return c.skippedByDate
 }
 
 type FetchResult struct {
@@ -112,12 +122,12 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 		headerIndex[strings.TrimSpace(h)] = i
 	}
 
+	c.skippedByDate = 0
 	result := &FetchResult{
 		Opportunities: make([]*database.Opportunity, 0, limit),
 	}
 
 	startTime := time.Now()
-	lastProgress := time.Now()
 	const progressInterval = 10000
 
 	for {
@@ -134,6 +144,17 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 
 		result.TotalRows++
 
+		// Filter by posted date BEFORE allocating the full Opportunity struct.
+		// This keeps memory bounded to only the records we'll actually use.
+		if c.minPostedDate != nil {
+			if idx, ok := headerIndex["PostedDate"]; ok && idx < len(record) {
+				if d := parseDate(strings.TrimSpace(record[idx])); d != nil && d.Before(*c.minPostedDate) {
+					c.skippedByDate++
+					continue
+				}
+			}
+		}
+
 		opp, err := c.mapRowToOpportunity(record, headerIndex)
 		if err != nil {
 			c.logger.Debug("failed to map row", "error", err, "row", result.TotalRows)
@@ -144,17 +165,16 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 		result.Opportunities = append(result.Opportunities, opp)
 		result.ParsedRows++
 
-		// Log progress every N records
 		if result.ParsedRows%progressInterval == 0 {
 			elapsed := time.Since(startTime)
 			rate := float64(result.ParsedRows) / elapsed.Seconds()
 			c.logger.Info("CSV parsing progress",
 				"parsed", result.ParsedRows,
+				"skipped", c.skippedByDate,
 				"errors", result.Errors,
 				"elapsed", elapsed.Round(time.Second),
 				"rate", fmt.Sprintf("%.0f/sec", rate),
 			)
-			lastProgress = time.Now()
 		}
 
 		if limit > 0 && result.ParsedRows >= limit {
@@ -163,12 +183,10 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*FetchResult, error) {
 		}
 	}
 
-	// Avoid unused variable warning
-	_ = lastProgress
-
 	c.logger.Info("CSV parsing complete",
 		"total_rows", result.TotalRows,
 		"parsed_rows", result.ParsedRows,
+		"skipped_by_date", c.skippedByDate,
 		"errors", result.Errors,
 	)
 

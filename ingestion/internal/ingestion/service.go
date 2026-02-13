@@ -33,17 +33,21 @@ type IngestionStats struct {
 	Inserted            int
 	Updated             int
 	Failed              int
+	Skipped             int
 	DescriptionsFetched int
 	DataMismatches      int
 	CSVNotModified      bool // true if CSV was not modified (304)
 }
 
 func New(cfg *config.Config, db *database.DB, snsClient *sns.Client, logger *slog.Logger) *Service {
+	csvClient := samgov.NewCSVClient(db, logger)
+	csvClient.SetMinPostedDate(cfg.GetMinPostedDate())
+
 	s := &Service{
 		cfg:       cfg,
 		db:        db,
 		sns:       snsClient,
-		csvClient: samgov.NewCSVClient(db, logger),
+		csvClient: csvClient,
 		logger:    logger,
 	}
 
@@ -93,16 +97,37 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}
 
+	durationMs := int(time.Since(startTime).Milliseconds())
+
 	if err != nil {
+		s.db.FailIngestionRun(ctx, runID, err.Error(), durationMs)
+		s.logger.Error("ingestion run failed", "error", err, "duration_ms", durationMs)
+		s.sendFailureNotification(ctx, runID, err, durationMs)
 		return err
 	}
 
-	total, err := s.db.CountOpportunities(ctx)
-	if err != nil {
-		s.logger.Warn("failed to count opportunities", "error", err)
-	} else {
-		s.logger.Info("total opportunities in database", "count", total)
+	totalDB, countErr := s.db.CountOpportunities(ctx)
+	if countErr != nil {
+		s.logger.Warn("failed to count opportunities", "error", countErr)
 	}
+
+	runStats := database.RunStats{
+		Fetched:    stats.CSVFetched + stats.APIFetched,
+		Inserted:   stats.Inserted,
+		Updated:    stats.Updated,
+		Failed:     stats.Failed,
+		Skipped:    stats.Skipped,
+		TotalDB:    totalDB,
+		DurationMs: durationMs,
+	}
+
+	if dbErr := s.db.CompleteIngestionRun(ctx, runID, runStats); dbErr != nil {
+		s.logger.Error("failed to complete ingestion run", "error", dbErr)
+		return dbErr
+	}
+
+	s.logFinalStats(runID, stats, durationMs)
+	s.sendSuccessNotification(ctx, runID, stats, runStats)
 
 	return nil
 }
@@ -112,34 +137,7 @@ func (s *Service) runCSVOnly(ctx context.Context, runID int, startTime time.Time
 
 	_, err := s.fetchAndSaveCSV(ctx, runID, stats)
 	if err != nil {
-		s.failRun(ctx, runID, startTime, err)
 		return err
-	}
-
-	durationMs := int(time.Since(startTime).Milliseconds())
-
-	// Handle 304 Not Modified case
-	if stats.CSVNotModified {
-		s.logger.Info("ingestion completed - CSV not modified",
-			"run_id", runID,
-			"duration_ms", durationMs,
-		)
-		if err := s.db.CompleteIngestionRun(ctx, runID, 0, 0, 0, 0, durationMs); err != nil {
-			s.logger.Error("failed to complete ingestion run", "error", err)
-			return err
-		}
-		return nil
-	}
-
-	if err := s.db.CompleteIngestionRun(ctx, runID, stats.CSVFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
-		s.logger.Error("failed to complete ingestion run", "error", err)
-		return err
-	}
-
-	s.logFinalStats(runID, stats, durationMs)
-
-	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
-		s.logger.Warn("failed to send notification", "error", err)
 	}
 
 	return nil
@@ -151,7 +149,6 @@ func (s *Service) runIncremental(ctx context.Context, runID int, startTime time.
 	since := time.Now().AddDate(0, 0, -s.cfg.LookbackDays)
 	result, err := s.apiClient.FetchOpportunitiesSince(ctx, since, s.cfg.RecordLimit)
 	if err != nil {
-		s.failRun(ctx, runID, startTime, err)
 		return err
 	}
 
@@ -186,18 +183,6 @@ func (s *Service) runIncremental(ctx context.Context, runID int, startTime time.
 		s.fetchDescriptions(ctx, noticeIDs, stats)
 	}
 
-	durationMs := int(time.Since(startTime).Milliseconds())
-	if err := s.db.CompleteIngestionRun(ctx, runID, stats.APIFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
-		s.logger.Error("failed to complete ingestion run", "error", err)
-		return err
-	}
-
-	s.logFinalStats(runID, stats, durationMs)
-
-	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
-		s.logger.Warn("failed to send notification", "error", err)
-	}
-
 	return nil
 }
 
@@ -206,7 +191,6 @@ func (s *Service) runFull(ctx context.Context, runID int, startTime time.Time, s
 	s.logger.Info("PHASE 1: Fetching CSV data")
 	csvOpps, err := s.fetchAndSaveCSV(ctx, runID, stats)
 	if err != nil {
-		s.failRun(ctx, runID, startTime, err)
 		return err
 	}
 
@@ -256,20 +240,6 @@ func (s *Service) runFull(ctx context.Context, runID int, startTime time.Time, s
 		s.logger.Info("PHASE 5: No descriptions to fetch")
 	}
 
-	durationMs := int(time.Since(startTime).Milliseconds())
-	totalFetched := stats.CSVFetched + stats.APIOnly
-
-	if err := s.db.CompleteIngestionRun(ctx, runID, totalFetched, stats.Inserted, stats.Updated, stats.Failed, durationMs); err != nil {
-		s.logger.Error("failed to complete ingestion run", "error", err)
-		return err
-	}
-
-	s.logFinalStats(runID, stats, durationMs)
-
-	if err := s.sendNotification(ctx, runID, stats, durationMs); err != nil {
-		s.logger.Warn("failed to send notification", "error", err)
-	}
-
 	return nil
 }
 
@@ -303,6 +273,7 @@ func (s *Service) fetchAndSaveCSV(ctx context.Context, runID int, stats *Ingesti
 	}
 
 	stats.CSVFetched = result.ParsedRows
+	stats.Skipped += s.csvClient.SkippedByDate()
 	opportunities := result.Opportunities
 
 	// Sort by posted_date descending (newest first) so we keep the most recent records
@@ -554,33 +525,22 @@ func (s *Service) fetchDescriptions(ctx context.Context, noticeIDs []string, sta
 	stats.Failed += result.Errors
 }
 
-func (s *Service) failRun(ctx context.Context, runID int, startTime time.Time, err error) {
-	durationMs := int(time.Since(startTime).Milliseconds())
-	s.db.FailIngestionRun(ctx, runID, err.Error(), durationMs)
-	s.logger.Error("ingestion run failed", "error", err, "duration_ms", durationMs)
-}
-
 func (s *Service) logFinalStats(runID int, stats *IngestionStats, durationMs int) {
 	s.logger.Info("ingestion completed",
 		"run_id", runID,
 		"csv_fetched", stats.CSVFetched,
 		"api_fetched", stats.APIFetched,
-		"csv_only", stats.CSVOnly,
-		"api_only", stats.APIOnly,
-		"in_both", stats.InBoth,
 		"inserted", stats.Inserted,
 		"updated", stats.Updated,
 		"failed", stats.Failed,
-		"descriptions_fetched", stats.DescriptionsFetched,
-		"data_mismatches", stats.DataMismatches,
+		"skipped", stats.Skipped,
 		"duration_ms", durationMs,
 	)
 }
 
-func (s *Service) sendNotification(ctx context.Context, runID int, stats *IngestionStats, durationMs int) error {
+func (s *Service) sendSuccessNotification(ctx context.Context, runID int, stats *IngestionStats, rs database.RunStats) {
 	if s.sns == nil || s.cfg.SNSTopicARN == "" {
-		s.logger.Debug("SNS not configured, skipping notification")
-		return nil
+		return
 	}
 
 	status := "SUCCESS"
@@ -588,36 +548,50 @@ func (s *Service) sendNotification(ctx context.Context, runID int, stats *Ingest
 		status = "PARTIAL_FAILURE"
 	}
 
-	message := fmt.Sprintf(`GovTrove Ingestion Report
-=========================
-Status: %s
-Run ID: %d
+	duration := time.Duration(rs.DurationMs) * time.Millisecond
+	message := fmt.Sprintf(`GovTrove Ingestion — %s
+Run ID:    %d
+Duration:  %s
 
-CSV Records:      %d
-API Records:      %d
-CSV Only:         %d
-API Only:         %d
-In Both Sources:  %d
-
+Records Fetched:  %d
 Records Inserted: %d
 Records Updated:  %d
 Records Failed:   %d
+Records Skipped:  %d
 
-Descriptions:     %d
-Data Mismatches:  %d
-
-Duration: %dms
-`, status, runID,
-		stats.CSVFetched, stats.APIFetched,
-		stats.CSVOnly, stats.APIOnly, stats.InBoth,
-		stats.Inserted, stats.Updated, stats.Failed,
-		stats.DescriptionsFetched, stats.DataMismatches,
-		durationMs)
+Total in DB:      %d
+`, status, runID, duration.Round(time.Second),
+		rs.Fetched, rs.Inserted, rs.Updated, rs.Failed, rs.Skipped,
+		rs.TotalDB)
 
 	_, err := s.sns.Publish(ctx, &sns.PublishInput{
 		TopicArn: aws.String(s.cfg.SNSTopicARN),
-		Subject:  aws.String(fmt.Sprintf("GovTrove Ingestion: %s", status)),
+		Subject:  aws.String(fmt.Sprintf("GovTrove Ingestion: %s (run %d)", status, runID)),
 		Message:  aws.String(message),
 	})
-	return err
+	if err != nil {
+		s.logger.Warn("failed to send success notification", "error", err)
+	}
+}
+
+func (s *Service) sendFailureNotification(ctx context.Context, runID int, runErr error, durationMs int) {
+	if s.sns == nil || s.cfg.SNSTopicARN == "" {
+		return
+	}
+
+	duration := time.Duration(durationMs) * time.Millisecond
+	message := fmt.Sprintf(`GovTrove Ingestion — FAILED
+Run ID:    %d
+Duration:  %s
+Error:     %s
+`, runID, duration.Round(time.Second), runErr.Error())
+
+	_, err := s.sns.Publish(ctx, &sns.PublishInput{
+		TopicArn: aws.String(s.cfg.SNSTopicARN),
+		Subject:  aws.String(fmt.Sprintf("GovTrove Ingestion: FAILED (run %d)", runID)),
+		Message:  aws.String(message),
+	})
+	if err != nil {
+		s.logger.Warn("failed to send failure notification", "error", err)
+	}
 }
