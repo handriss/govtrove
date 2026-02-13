@@ -1,62 +1,102 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Clock } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import ResultsList from '../components/ResultsList';
+import SetAsideChips from '../components/SetAsideChips';
 import AuthButton from '../components/AuthButton';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
+
+const DEFAULT_TYPES = 'Solicitation,Presolicitation,Combined Synopsis/Solicitation,Sources Sought';
 
 export default function SimpleSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
+  const initialSetAsides = searchParams.get('set_aside')?.split(',').filter(Boolean) || [];
 
   const [query, setQuery] = useState(initialQuery);
+  const [setAsides, setSetAsides] = useState<string[]>(initialSetAsides);
   const debouncedQuery = useDebounce(query, 300);
   const { results, total, page, totalPages, loading, search, reset } = useSearch();
   const [hasSearched, setHasSearched] = useState(initialQuery.length >= 2);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialMount = useRef(true);
 
-  const updateURL = useCallback((q: string, p: number) => {
+  const updateURL = useCallback((q: string, p: number, sa?: string[]) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (p > 1) params.set('page', String(p));
+    if (sa && sa.length) params.set('set_aside', sa.join(','));
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
+  const buildParams = useCallback((q: string, pageNum: number, sa: string[]) => ({
+    q: q || undefined,
+    type: DEFAULT_TYPES,
+    set_aside: sa.length ? sa.join(',') : undefined,
+    sort: q ? 'relevance' : 'posted_date' as const,
+    order: 'desc' as const,
+    page: pageNum,
+    limit: 25,
+  }), []);
+
   useEffect(() => {
     if (isInitialMount.current && initialQuery.length >= 2) {
-      search({ q: initialQuery, sort: 'relevance', page: initialPage, limit: 25 });
+      search(buildParams(initialQuery, initialPage, setAsides));
       isInitialMount.current = false;
       return;
     }
     isInitialMount.current = false;
 
     if (debouncedQuery.length >= 2) {
-      search({ q: debouncedQuery, sort: 'relevance', page: 1, limit: 25 });
-      updateURL(debouncedQuery, 1);
+      search(buildParams(debouncedQuery, 1, setAsides));
+      updateURL(debouncedQuery, 1, setAsides);
       setHasSearched(true);
     } else if (debouncedQuery.length === 0 && hasSearched) {
       reset();
-      updateURL('', 1);
+      updateURL('', 1, setAsides);
       setHasSearched(false);
     }
-  }, [debouncedQuery, search, reset, hasSearched, initialQuery, initialPage, updateURL]);
+  }, [debouncedQuery, search, reset, hasSearched, initialQuery, initialPage, updateURL, buildParams, setAsides]);
 
   const handlePageChange = (newPage: number) => {
-    search({ q: debouncedQuery, sort: 'relevance', page: newPage, limit: 25 });
-    updateURL(debouncedQuery, newPage);
+    search(buildParams(debouncedQuery, newPage, setAsides));
+    updateURL(debouncedQuery, newPage, setAsides);
   };
 
   const handleSubmit = () => {
     if (query.length >= 2) {
-      search({ q: query, sort: 'relevance', page: 1, limit: 25 });
-      updateURL(query, 1);
+      search(buildParams(query, 1, setAsides));
+      updateURL(query, 1, setAsides);
       setHasSearched(true);
     }
   };
+
+  const handleSetAsideChange = useCallback((newSetAsides: string[]) => {
+    setSetAsides(newSetAsides);
+    if (hasSearched || results.length > 0) {
+      search(buildParams(debouncedQuery, 1, newSetAsides));
+      updateURL(debouncedQuery, 1, newSetAsides);
+    }
+  }, [hasSearched, results.length, search, buildParams, debouncedQuery, updateURL]);
+
+  const handleWhatsNew = useCallback(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const postedFrom = yesterday.toISOString().split('T')[0];
+    search({
+      type: DEFAULT_TYPES,
+      set_aside: setAsides.length ? setAsides.join(',') : undefined,
+      posted_from: postedFrom,
+      sort: 'posted_date',
+      order: 'desc',
+      page: 1,
+      limit: 25,
+    });
+    setHasSearched(true);
+  }, [search, setAsides]);
 
   const showResults = hasSearched || results.length > 0;
 
@@ -99,9 +139,25 @@ export default function SimpleSearchPage() {
           />
         </div>
 
-        {/* Hints and Advanced Link */}
+        {/* Quick Filters */}
         {!showResults && (
-          <div className="text-center space-y-6 animate-in fade-in duration-500">
+          <div className="text-center space-y-5 animate-in fade-in duration-500">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={handleWhatsNew}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
+                           border border-accent/30 bg-accent/10 text-accent
+                           hover:bg-accent/20 transition-all duration-200"
+              >
+                <Clock size={14} strokeWidth={1.5} />
+                What's New Today?
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <SetAsideChips selected={setAsides} onChange={handleSetAsideChange} />
+            </div>
+
             <Link
               to="/advanced"
               className="inline-flex items-center gap-2 text-sm text-dark-400 hover:text-accent transition-colors duration-200"
@@ -123,6 +179,15 @@ export default function SimpleSearchPage() {
                 <kbd className="px-2 py-0.5 bg-dark-800/50 rounded text-dark-400 font-mono">-minus</kbd>
                 <span>exclude</span>
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Set-aside chips when results are showing */}
+        {showResults && (
+          <div className="w-full max-w-2xl px-6 mb-4">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <SetAsideChips selected={setAsides} onChange={handleSetAsideChange} />
             </div>
           </div>
         )}
