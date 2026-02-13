@@ -51,6 +51,28 @@ resource "aws_cloudwatch_metric_alarm" "ingestion_errors" {
   }
 }
 
+# Fires when no successful ingestion completion is detected in 26 hours.
+# Catches silent failures (OOM kills, storage limit crashes) that don't log errors.
+resource "aws_cloudwatch_metric_alarm" "ingestion_missing" {
+  alarm_name          = "${var.project_name}-ingestion-missing"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "IngestionCompleted"
+  namespace           = "GovTrove"
+  period              = 93600 # 26 hours — allows buffer beyond the daily 24h schedule
+  statistic           = "Sum"
+  threshold           = 1
+  alarm_description   = "No successful ingestion in 26 hours — task may be crashing silently"
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
+  tags = {
+    Name = "${var.project_name}-ingestion-missing-alarm"
+  }
+}
+
 # --- Billing alarms (tiered) ---
 
 resource "aws_cloudwatch_metric_alarm" "billing_15" {
