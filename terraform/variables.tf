@@ -45,7 +45,7 @@ variable "task_cpu" {
 variable "task_memory" {
   description = "Memory for the Fargate task in MB"
   type        = number
-  default     = 512
+  default     = 1024
 }
 
 # Secrets (sensitive - provide via tfvars or environment)
