@@ -1,14 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark, Trash2, Clock } from 'lucide-react';
 import QueryBuilder, { buildQueryString, createEmptyGroup } from '../components/QueryBuilder';
 import FilterPanel from '../components/FilterPanel';
 import ResultsList from '../components/ResultsList';
 import AuthButton from '../components/AuthButton';
 import { useSearch } from '../hooks/useSearch';
+import SetAsideChips from '../components/SetAsideChips';
 import type { QueryGroup, AdvancedFilters, SearchParams } from '../types/api';
 
 const SAVED_SEARCHES_KEY = 'govtrove_saved_searches';
+
+const DEFAULT_TYPES = ['Solicitation', 'Presolicitation', 'Combined Synopsis/Solicitation', 'Sources Sought'];
 
 interface SavedSearch {
   id: string;
@@ -109,8 +112,9 @@ function saveSavedSearches(searches: SavedSearch[]) {
 }
 
 function parseFiltersFromParams(searchParams: URLSearchParams): AdvancedFilters {
+  const hasTypeParam = searchParams.has('type');
   return {
-    types: searchParams.get('type')?.split(',').filter(Boolean) || [],
+    types: hasTypeParam ? (searchParams.get('type')?.split(',').filter(Boolean) || []) : DEFAULT_TYPES,
     setAsides: searchParams.get('set_aside')?.split(',').filter(Boolean) || [],
     naicsCodes: searchParams.get('naics')?.split(',').filter(Boolean) || [],
     states: searchParams.get('state')?.split(',').filter(Boolean) || [],
@@ -149,8 +153,10 @@ export default function AdvancedSearchPage() {
   const examplesRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
 
+  const isDefaultTypes = filters.types.length === DEFAULT_TYPES.length &&
+    DEFAULT_TYPES.every((t) => filters.types.includes(t));
   const activeFilterCount = [
-    filters.types.length,
+    isDefaultTypes ? 0 : filters.types.length,
     filters.setAsides.length,
     filters.naicsCodes.length,
     filters.states.length,
@@ -206,12 +212,35 @@ export default function AdvancedSearchPage() {
     setHasSearched(true);
   }, [groups, groupOperator, filters, updateURL, search, buildSearchParams]);
 
-  // Run initial search if URL has params
+  const handleWhatsNew = useCallback(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const postedFrom = yesterday.toISOString().split('T')[0];
+    const newFilters = { ...filters, postedFrom, postedTo: undefined };
+    setFilters(newFilters);
+    const q = buildQueryString(groups, groupOperator);
+    updateURL(q, newFilters);
+    search({
+      q: q || undefined,
+      type: newFilters.types.length ? newFilters.types.join(',') : undefined,
+      set_aside: newFilters.setAsides.length ? newFilters.setAsides.join(',') : undefined,
+      naics: newFilters.naicsCodes.length ? newFilters.naicsCodes.join(',') : undefined,
+      state: newFilters.states.length ? newFilters.states.join(',') : undefined,
+      posted_from: postedFrom,
+      sort: 'posted_date',
+      order: 'desc',
+      page: 1,
+      limit: 25,
+    });
+    setHasSearched(true);
+  }, [filters, groups, groupOperator, updateURL, search]);
+
+  // Run initial search if URL has explicit params (default types don't count)
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      const hasParams = initialQuery || activeFilterCount > 0;
-      if (hasParams) {
+      const hasExplicitParams = initialQuery || searchParams.toString().length > 0;
+      if (hasExplicitParams) {
         search(buildSearchParams(1));
         setHasSearched(true);
       }
@@ -419,6 +448,24 @@ export default function AdvancedSearchPage() {
               <code className="text-xs text-accent font-mono">{queryString}</code>
             </div>
           )}
+
+          {/* Quick Filters Row */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleWhatsNew}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
+                         border border-accent/30 bg-accent/10 text-accent
+                         hover:bg-accent/20 transition-all duration-200"
+            >
+              <Clock size={14} strokeWidth={1.5} />
+              What's New Today?
+            </button>
+            <div className="w-px h-5 bg-dark-800/50 mx-1 hidden sm:block" />
+            <SetAsideChips
+              selected={filters.setAsides}
+              onChange={(setAsides) => setFilters({ ...filters, setAsides })}
+            />
+          </div>
         </div>
       </div>
 

@@ -101,13 +101,13 @@ function MultiSelect({ options, selected, onChange, searchable }: MultiSelectPro
 }
 
 const TYPE_OPTIONS = [
-  { code: 'o', label: 'Solicitation' },
-  { code: 'p', label: 'Pre-solicitation' },
-  { code: 'k', label: 'Combined Synopsis/Solicitation' },
-  { code: 'r', label: 'Sources Sought' },
-  { code: 's', label: 'Special Notice' },
-  { code: 'a', label: 'Award Notice' },
-  { code: 'i', label: 'Intent to Bundle' },
+  { code: 'Solicitation', label: 'Solicitation' },
+  { code: 'Presolicitation', label: 'Presolicitation' },
+  { code: 'Combined Synopsis/Solicitation', label: 'Combined Synopsis/Solicitation' },
+  { code: 'Sources Sought', label: 'Sources Sought' },
+  { code: 'Special Notice', label: 'Special Notice' },
+  { code: 'Award Notice', label: 'Award Notice' },
+  { code: 'Intent to Bundle', label: 'Intent to Bundle' },
 ];
 
 const SET_ASIDE_OPTIONS = [
@@ -193,7 +193,7 @@ export default function FilterPanel({ filters, onChange }: FilterPanelProps) {
         </div>
       )}
 
-      <AccordionSection title="Type">
+      <AccordionSection title="Type" defaultOpen>
         <MultiSelect
           options={typeOptions}
           selected={filters.types}
