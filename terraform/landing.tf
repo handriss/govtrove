@@ -29,6 +29,16 @@ resource "aws_cloudfront_origin_access_control" "landing" {
   signing_protocol                  = "sigv4"
 }
 
+# CloudFront Function for subdirectory index.html rewriting
+resource "aws_cloudfront_function" "landing_url_rewrite" {
+  count   = var.domain_name != "" ? 1 : 0
+  name    = "${var.project_name}-landing-url-rewrite"
+  runtime = "cloudfront-js-2.0"
+  comment = "Rewrite directory paths to index.html for landing page"
+  publish = true
+  code    = file("${path.module}/../cf-functions/landing-url-rewrite.js")
+}
+
 # CloudFront distribution for landing page at govtrove.com
 resource "aws_cloudfront_distribution" "landing" {
   count               = var.domain_name != "" ? 1 : 0
@@ -62,6 +72,11 @@ resource "aws_cloudfront_distribution" "landing" {
     min_ttl     = 0
     default_ttl = 3600
     max_ttl     = 86400
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.landing_url_rewrite[0].arn
+    }
   }
 
   logging_config {
