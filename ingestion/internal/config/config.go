@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -31,6 +32,22 @@ type Config struct {
 	SkipAPI          bool   `envconfig:"SKIP_API" default:"false"`
 	SkipDescriptions bool   `envconfig:"SKIP_DESCRIPTIONS" default:"false"`
 	VerboseLogging   bool   `envconfig:"VERBOSE_LOGGING" default:"false"`
+
+	// TODO(pre-launch): Remove MIN_POSTED_DATE before going live — we need full historical data.
+	// This is a temporary workaround to stay within Neon free tier (512 MB).
+	// Once upgraded to a paid plan, remove this env var and re-ingest all historical data.
+	MinPostedDate string `envconfig:"MIN_POSTED_DATE" default:""`
+}
+
+func (c *Config) GetMinPostedDate() *time.Time {
+	if c.MinPostedDate == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", c.MinPostedDate)
+	if err != nil {
+		return nil
+	}
+	return &t
 }
 
 func (c *Config) IsMockMode() bool {

@@ -109,7 +109,17 @@ func (db *DB) CreateIngestionRunWithMode(ctx context.Context, mode string, lookb
 	return id, nil
 }
 
-func (db *DB) CompleteIngestionRun(ctx context.Context, id int, fetched, inserted, updated, failed int, durationMs int) error {
+type RunStats struct {
+	Fetched    int
+	Inserted   int
+	Updated    int
+	Failed     int
+	Skipped    int
+	TotalDB    int
+	DurationMs int
+}
+
+func (db *DB) CompleteIngestionRun(ctx context.Context, id int, s RunStats) error {
 	_, err := db.pool.Exec(ctx, `
 		UPDATE ingestion_runs
 		SET status = 'completed',
@@ -118,9 +128,11 @@ func (db *DB) CompleteIngestionRun(ctx context.Context, id int, fetched, inserte
 		    records_inserted = $3,
 		    records_updated = $4,
 		    records_failed = $5,
-		    duration_ms = $6
+		    records_skipped = $6,
+		    total_db_count = $7,
+		    duration_ms = $8
 		WHERE id = $1
-	`, id, fetched, inserted, updated, failed, durationMs)
+	`, id, s.Fetched, s.Inserted, s.Updated, s.Failed, s.Skipped, s.TotalDB, s.DurationMs)
 	if err != nil {
 		return fmt.Errorf("failed to complete ingestion run: %w", err)
 	}

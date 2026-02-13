@@ -244,8 +244,10 @@ run-neon:
 	cd ingestion && \
 	DATABASE_URL="$(NEON_DATABASE_URL)" \
 	SAM_API_KEY="$(SAM_API_KEY)" \
+	MIN_POSTED_DATE=2026-01-15 \
 	LOG_LEVEL=debug \
 	go run ./cmd/ingest
+# TODO(pre-launch): Remove MIN_POSTED_DATE from run-neon and run-backfill-neon before going live
 
 run-backfill:
 	cd ingestion && \
@@ -267,6 +269,7 @@ run-backfill-neon:
 	cd ingestion && \
 	DATABASE_URL="$(NEON_DATABASE_URL)" \
 	SAM_API_KEY="$(SAM_API_KEY)" \
+	MIN_POSTED_DATE=2026-01-15 \
 	INGESTION_MODE=csv-only \
 	LOG_LEVEL=info \
 	go run ./cmd/ingest
