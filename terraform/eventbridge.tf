@@ -14,7 +14,7 @@ resource "aws_scheduler_schedule" "ingestion" {
     role_arn = aws_iam_role.eventbridge_scheduler.arn
 
     ecs_parameters {
-      task_definition_arn = aws_ecs_task_definition.ingestion.arn
+      task_definition_arn = aws_ecs_task_definition.ingestion.arn_without_revision
       launch_type         = "FARGATE"
       task_count          = 1
 
