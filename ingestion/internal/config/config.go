@@ -91,6 +91,26 @@ func LoadCSVArchive() (*CSVArchiveConfig, error) {
 	return &cfg, nil
 }
 
+type APIProbeConfig struct {
+	DatabaseURL      string `envconfig:"DATABASE_URL" required:"true"`
+	SAMAPIKey        string `envconfig:"SAM_API_KEY" required:"true"`
+	AWSRegion        string `envconfig:"AWS_REGION" default:"us-east-1"`
+	SNSTopicARN      string `envconfig:"SNS_TOPIC_ARN"`
+	LogLevel         string `envconfig:"LOG_LEVEL" default:"info"`
+	Mode             string `envconfig:"MODE" default:"probe"`
+	S3Bucket         string `envconfig:"S3_BUCKET" default:"govtrove-data"`
+	S3ArchiveEnabled bool   `envconfig:"S3_ARCHIVE_ENABLED" default:"true"`
+	LookbackDays     int    `envconfig:"LOOKBACK_DAYS" default:"7"`
+}
+
+func LoadAPIProbe() (*APIProbeConfig, error) {
+	var cfg APIProbeConfig
+	if err := envconfig.Process("", &cfg); err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	return &cfg, nil
+}
+
 func (m IngestionMode) IsValid() bool {
 	switch m {
 	case ModeFull, ModeCSVOnly, ModeIncremental:
