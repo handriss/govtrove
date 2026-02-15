@@ -100,11 +100,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	msg := fmt.Sprintf("CSV Archive — %s\nDuration: %s", result.Outcome, result.Duration.Round(time.Second))
-	if result.FileSize > 0 {
-		msg += fmt.Sprintf("\nFile size: %.1f MB", float64(result.FileSize)/1024/1024)
+	if result.Outcome == "new_file" {
+		msg := fmt.Sprintf("CSV Archive — new_file\nDuration: %s\nFile size: %.1f MB", result.Duration.Round(time.Second), float64(result.FileSize)/1024/1024)
+		sendNotification(ctx, snsClient, cfg.SNSTopicARN, logger, msg)
 	}
-	sendNotification(ctx, snsClient, cfg.SNSTopicARN, logger, msg)
 
 	return nil
 }
