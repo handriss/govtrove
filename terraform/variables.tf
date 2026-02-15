@@ -100,6 +100,32 @@ variable "csvarchive_schedule_enabled" {
   default     = true
 }
 
+# API Probe Schedule
+variable "apiprobe_schedule_expression" {
+  description = "EventBridge schedule expression for API probe"
+  type        = string
+  default     = "cron(0 2,6,10,14,18 * * ? *)"
+}
+
+variable "apiprobe_schedule_enabled" {
+  description = "Whether the API probe schedule is enabled"
+  type        = bool
+  default     = true
+}
+
+# API Archive Schedule
+variable "apiarchive_schedule_expression" {
+  description = "EventBridge schedule expression for API archive"
+  type        = string
+  default     = "cron(0 20 * * ? *)"
+}
+
+variable "apiarchive_schedule_enabled" {
+  description = "Whether the API archive schedule is enabled"
+  type        = bool
+  default     = true
+}
+
 # API
 variable "api_port" {
   description = "Port the API service listens on"

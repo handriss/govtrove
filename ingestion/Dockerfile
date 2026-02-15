@@ -11,12 +11,14 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /ingest ./cmd/ingest
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /csvarchive ./cmd/csvarchive
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /apiprobe ./cmd/apiprobe
 
 FROM alpine:3.19
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /ingest /ingest
 COPY --from=builder /csvarchive /csvarchive
+COPY --from=builder /apiprobe /apiprobe
 
 # Security: run as non-root
 RUN adduser -D -u 1000 appuser

@@ -4,6 +4,7 @@
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	run run-neon run-backfill run-backfill-neon run-mock mock-server \
 	run-csvarchive run-csvarchive-neon run-csvarchive-aws logs-csvarchive \
+	run-apiprobe run-apiprobe-neon run-apiarchive-neon run-apiprobe-aws run-apiarchive-aws logs-apiprobe \
 	build test ingestion-docker-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-ingestion deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
@@ -66,6 +67,14 @@ help:
 	@echo "  make run-csvarchive-neon - Run CSV archive against Neon + real S3"
 	@echo "  make run-csvarchive-aws  - Trigger ECS CSV archive task"
 	@echo "  make logs-csvarchive     - Tail CloudWatch logs for CSV archive"
+	@echo ""
+	@echo "API Probe / Archive:"
+	@echo "  make run-apiprobe        - Probe mode (local DB)"
+	@echo "  make run-apiprobe-neon   - Probe mode (Neon DB)"
+	@echo "  make run-apiarchive-neon - Archive mode (Neon + S3)"
+	@echo "  make run-apiprobe-aws    - Trigger ECS probe task"
+	@echo "  make run-apiarchive-aws  - Trigger ECS archive task"
+	@echo "  make logs-apiprobe       - Tail CloudWatch logs"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -333,6 +342,83 @@ run-csvarchive-aws:
 
 logs-csvarchive:
 	aws logs tail /govtrove/csvarchive --follow --profile $(AWS_PROFILE)
+
+# ============================================================================
+# API Probe / Archive
+# ============================================================================
+
+run-apiprobe:
+	cd ingestion && \
+	DATABASE_URL="$(LOCAL_DB_URL)" \
+	SAM_API_KEY="dummy-key-for-local-testing" \
+	MODE=probe \
+	LOG_LEVEL=debug \
+	go run ./cmd/apiprobe
+
+run-apiprobe-neon:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(SAM_API_KEY)" ]; then \
+		echo "Error: SAM_API_KEY environment variable is not set"; \
+		exit 1; \
+	fi
+	cd ingestion && \
+	DATABASE_URL="$(NEON_DATABASE_URL)" \
+	SAM_API_KEY="$(SAM_API_KEY)" \
+	MODE=probe \
+	LOG_LEVEL=debug \
+	go run ./cmd/apiprobe
+
+run-apiarchive-neon:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@if [ -z "$(SAM_API_KEY)" ]; then \
+		echo "Error: SAM_API_KEY environment variable is not set"; \
+		exit 1; \
+	fi
+	cd ingestion && \
+	DATABASE_URL="$(NEON_DATABASE_URL)" \
+	SAM_API_KEY="$(SAM_API_KEY)" \
+	MODE=archive \
+	S3_BUCKET=govtrove-data \
+	S3_ARCHIVE_ENABLED=true \
+	LOG_LEVEL=debug \
+	go run ./cmd/apiprobe
+
+run-apiprobe-aws:
+	@echo "Triggering ECS apiprobe task..."
+	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
+	TASK_DEF=$$(cd terraform && terraform output -raw apiprobe_task_definition_arn) && \
+	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
+	SG=$$(cd terraform && terraform output -raw security_group_id) && \
+	aws ecs run-task \
+		--cluster $$CLUSTER \
+		--task-definition $$TASK_DEF \
+		--launch-type FARGATE \
+		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "API probe task triggered! Check logs with 'make logs-apiprobe'"
+
+run-apiarchive-aws:
+	@echo "Triggering ECS apiarchive task..."
+	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
+	TASK_DEF=$$(cd terraform && terraform output -raw apiarchive_task_definition_arn) && \
+	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
+	SG=$$(cd terraform && terraform output -raw security_group_id) && \
+	aws ecs run-task \
+		--cluster $$CLUSTER \
+		--task-definition $$TASK_DEF \
+		--launch-type FARGATE \
+		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "API archive task triggered! Check logs with 'make logs-apiprobe'"
+
+logs-apiprobe:
+	aws logs tail /govtrove/apiprobe --follow --profile $(AWS_PROFILE)
 
 # ============================================================================
 # Build

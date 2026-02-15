@@ -141,6 +141,16 @@ output "csvarchive_task_definition_arn" {
   value       = aws_ecs_task_definition.csvarchive.arn
 }
 
+output "apiprobe_task_definition_arn" {
+  description = "ECS task definition ARN for API probe"
+  value       = aws_ecs_task_definition.apiprobe.arn
+}
+
+output "apiarchive_task_definition_arn" {
+  description = "ECS task definition ARN for API archive"
+  value       = aws_ecs_task_definition.apiarchive.arn
+}
+
 output "workos_client_id" {
   description = "WorkOS client ID (for frontend build)"
   value       = var.workos_client_id
