@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -10,11 +10,13 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /ingest ./cmd/ingest
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /csvarchive ./cmd/csvarchive
 
 FROM alpine:3.19
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /ingest /ingest
+COPY --from=builder /csvarchive /csvarchive
 
 # Security: run as non-root
 RUN adduser -D -u 1000 appuser

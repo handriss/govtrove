@@ -3,6 +3,7 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	run run-neon run-backfill run-backfill-neon run-mock mock-server \
+	run-csvarchive run-csvarchive-neon run-csvarchive-aws logs-csvarchive \
 	build test ingestion-docker-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-ingestion deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
@@ -58,6 +59,13 @@ help:
 	@echo "  make run-backfill-neon - Full CSV backfill (Neon DB)"
 	@echo "  make run-mock         - Run against mock SAM.gov server"
 	@echo "  make mock-server      - Start mock SAM.gov API server"
+	@echo ""
+	@echo ""
+	@echo "CSV Archive:"
+	@echo "  make run-csvarchive      - Run CSV archive locally (no S3)"
+	@echo "  make run-csvarchive-neon - Run CSV archive against Neon + real S3"
+	@echo "  make run-csvarchive-aws  - Trigger ECS CSV archive task"
+	@echo "  make logs-csvarchive     - Tail CloudWatch logs for CSV archive"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -285,6 +293,46 @@ run-mock:
 
 mock-server:
 	cd ingestion && go run ./cmd/mockserver -port=8080 -count=$(or $(MOCK_COUNT),500)
+
+# ============================================================================
+# CSV Archive Service
+# ============================================================================
+
+run-csvarchive:
+	cd ingestion && \
+	DATABASE_URL="$(LOCAL_DB_URL)" \
+	S3_ARCHIVE_ENABLED=false \
+	LOG_LEVEL=debug \
+	go run ./cmd/csvarchive
+
+run-csvarchive-neon:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	cd ingestion && \
+	DATABASE_URL="$(NEON_DATABASE_URL)" \
+	S3_BUCKET=govtrove-data \
+	S3_ARCHIVE_ENABLED=true \
+	LOG_LEVEL=debug \
+	go run ./cmd/csvarchive
+
+run-csvarchive-aws:
+	@echo "Triggering ECS csvarchive task..."
+	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
+	TASK_DEF=$$(cd terraform && terraform output -raw csvarchive_task_definition_arn) && \
+	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
+	SG=$$(cd terraform && terraform output -raw security_group_id) && \
+	aws ecs run-task \
+		--cluster $$CLUSTER \
+		--task-definition $$TASK_DEF \
+		--launch-type FARGATE \
+		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "CSV archive task triggered! Check logs with 'make logs-csvarchive'"
+
+logs-csvarchive:
+	aws logs tail /govtrove/csvarchive --follow --profile $(AWS_PROFILE)
 
 # ============================================================================
 # Build
