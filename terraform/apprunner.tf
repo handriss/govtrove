@@ -112,7 +112,7 @@ resource "aws_apprunner_service" "api" {
         port = tostring(var.api_port)
 
         runtime_environment_secrets = {
-          DATABASE_URL    = aws_secretsmanager_secret.database_url.arn
+          DATABASE_URL     = aws_secretsmanager_secret.database_url.arn
           WORKOS_CLIENT_ID = aws_secretsmanager_secret.workos_client_id.arn
           WORKOS_API_KEY   = aws_secretsmanager_secret.workos_api_key.arn
         }

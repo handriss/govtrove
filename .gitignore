@@ -51,7 +51,7 @@ frontend/node_modules/
 frontend/dist/
 
 # Test/temp data
-opportunities.json
+playground/
 
 # Local development
 postgres_data/
