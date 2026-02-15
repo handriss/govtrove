@@ -79,6 +79,27 @@ resource "aws_iam_role_policy" "ecs_task_sns" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_s3" {
+  name = "${var.project_name}-ecs-task-s3"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.data.arn}/raw/*"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role" "eventbridge_scheduler" {
   name = "${var.project_name}-eventbridge-scheduler"
 
@@ -109,7 +130,8 @@ resource "aws_iam_role_policy" "eventbridge_scheduler_ecs" {
           "ecs:RunTask"
         ]
         Resource = [
-          aws_ecs_task_definition.ingestion.arn
+          aws_ecs_task_definition.ingestion.arn,
+          aws_ecs_task_definition.csvarchive.arn
         ]
       },
       {

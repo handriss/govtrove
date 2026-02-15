@@ -7,6 +7,47 @@ resource "aws_cloudwatch_log_group" "ingestion" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "csvarchive" {
+  name              = "/govtrove/csvarchive"
+  retention_in_days = 30
+
+  tags = {
+    Name = "${var.project_name}-csvarchive-logs"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "csvarchive_failed" {
+  name           = "${var.project_name}-csvarchive-failed"
+  pattern        = "{ $.level = \"error\" }"
+  log_group_name = aws_cloudwatch_log_group.csvarchive.name
+
+  metric_transformation {
+    name      = "CSVArchiveErrors"
+    namespace = "GovTrove"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "csvarchive_errors" {
+  alarm_name          = "${var.project_name}-csvarchive-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "CSVArchiveErrors"
+  namespace           = "GovTrove"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Triggered when CSV archive service logs errors"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
+  tags = {
+    Name = "${var.project_name}-csvarchive-errors-alarm"
+  }
+}
+
 resource "aws_cloudwatch_log_metric_filter" "ingestion_completed" {
   name           = "${var.project_name}-ingestion-completed"
   pattern        = "{ $.msg = \"ingestion completed\" }"

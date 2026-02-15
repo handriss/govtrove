@@ -25,6 +25,10 @@ type Config struct {
 	LookbackDays  int           `envconfig:"LOOKBACK_DAYS" default:"7"`
 	IngestionMode IngestionMode `envconfig:"INGESTION_MODE" default:"full"`
 
+	// CSV archive settings
+	S3Bucket         string `envconfig:"S3_BUCKET" default:"govtrove-data"`
+	S3ArchiveEnabled bool   `envconfig:"S3_ARCHIVE_ENABLED" default:"true"`
+
 	// Development/testing options
 	MockAPIURL       string `envconfig:"MOCK_API_URL"`
 	RecordLimit      int    `envconfig:"RECORD_LIMIT" default:"0"`      // Limit CSV parsing (0 = no limit)
@@ -65,6 +69,25 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid INGESTION_MODE: %q (must be full, csv-only, or incremental)", cfg.IngestionMode)
 	}
 
+	return &cfg, nil
+}
+
+// CSVArchiveConfig holds settings for the CSV archive service.
+// Separate from Config because csvarchive doesn't need SAM_API_KEY or ingestion-specific fields.
+type CSVArchiveConfig struct {
+	DatabaseURL      string `envconfig:"DATABASE_URL" required:"true"`
+	AWSRegion        string `envconfig:"AWS_REGION" default:"us-east-1"`
+	SNSTopicARN      string `envconfig:"SNS_TOPIC_ARN"`
+	LogLevel         string `envconfig:"LOG_LEVEL" default:"info"`
+	S3Bucket         string `envconfig:"S3_BUCKET" default:"govtrove-data"`
+	S3ArchiveEnabled bool   `envconfig:"S3_ARCHIVE_ENABLED" default:"true"`
+}
+
+func LoadCSVArchive() (*CSVArchiveConfig, error) {
+	var cfg CSVArchiveConfig
+	if err := envconfig.Process("", &cfg); err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
 	return &cfg, nil
 }
 

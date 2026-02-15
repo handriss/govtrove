@@ -131,6 +131,16 @@ output "landing_domain_name" {
   value       = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].domain_name : ""
 }
 
+output "data_bucket_name" {
+  description = "S3 bucket name for raw data archives"
+  value       = aws_s3_bucket.data.id
+}
+
+output "csvarchive_task_definition_arn" {
+  description = "ECS task definition ARN for CSV archive"
+  value       = aws_ecs_task_definition.csvarchive.arn
+}
+
 output "workos_client_id" {
   description = "WorkOS client ID (for frontend build)"
   value       = var.workos_client_id

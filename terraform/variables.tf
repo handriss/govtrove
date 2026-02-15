@@ -87,6 +87,19 @@ variable "schedule_expression" {
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
 
+# CSV Archive Schedule
+variable "csvarchive_schedule_expression" {
+  description = "EventBridge schedule expression for CSV archive"
+  type        = string
+  default     = "cron(0/15 * * * ? *)"
+}
+
+variable "csvarchive_schedule_enabled" {
+  description = "Whether the CSV archive schedule is enabled"
+  type        = bool
+  default     = true
+}
+
 # API
 variable "api_port" {
   description = "Port the API service listens on"
