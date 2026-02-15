@@ -1,6 +1,7 @@
 resource "aws_scheduler_schedule" "ingestion" {
   name       = "${var.project_name}-ingestion-schedule"
   group_name = "default"
+  state      = "DISABLED"
 
   flexible_time_window {
     mode = "OFF"
