@@ -7,11 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/handriss/govtrove/jobs/internal/database"
+	"github.com/handriss/govtrove/jobs/internal/parse"
 	"golang.org/x/text/encoding/charmap"
 )
 
@@ -185,51 +185,6 @@ func sanitizeToUTF8(s string) string {
 	return result
 }
 
-func ParseDate(s string) *time.Time {
-	if s == "" {
-		return nil
-	}
-
-	formats := []string{
-		"2006-01-02 15:04:05.000-07",
-		"2006-01-02 15:04:05.00-07",
-		"2006-01-02 15:04:05.0-07",
-		"2006-01-02 15:04:05-07",
-		"2006-01-02 15:04:05.000-0700",
-		"2006-01-02 15:04:05-0700",
-		"2006-01-02T15:04:05.000-07:00",
-		"2006-01-02T15:04:05-07:00",
-		"2006-01-02T15:04:05Z",
-		"2006-01-02 15:04:05",
-		"2006-01-02",
-		"01/02/2006 15:04",
-		"01/02/2006",
-		"0102/2006",
-	}
-
-	for _, format := range formats {
-		if t, err := time.Parse(format, s); err == nil {
-			return &t
-		}
-	}
-	return nil
-}
-
-func ParseActive(s string) bool {
-	s = strings.ToLower(strings.TrimSpace(s))
-	return s == "yes" || s == "true" || s == "1"
-}
-
-func ParseAmount(s string) *float64 {
-	if s == "" {
-		return nil
-	}
-	s = strings.ReplaceAll(s, ",", "")
-	s = strings.ReplaceAll(s, "$", "")
-	s = strings.TrimSpace(s)
-
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		return &f
-	}
-	return nil
-}
+func ParseDate(s string) *time.Time    { return parse.Date(s) }
+func ParseActive(s string) bool         { return parse.Active(s) }
+func ParseAmount(s string) *float64     { return parse.Amount(s) }

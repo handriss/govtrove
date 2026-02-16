@@ -1,0 +1,6 @@
+ALTER TABLE csv_s3_archive_log RENAME TO bulk_csv_active_log;
+ALTER INDEX idx_csv_s3_archive_log_checked_at RENAME TO idx_bulk_csv_active_log_checked_at;
+ALTER INDEX idx_csv_s3_archive_log_sha256 RENAME TO idx_bulk_csv_active_log_sha256;
+
+ALTER TABLE archived_csv_s3_archive_log RENAME TO bulk_csv_archived_log;
+ALTER INDEX idx_archived_csv_s3_archive_fy_result RENAME TO idx_bulk_csv_archived_log_fy_result;

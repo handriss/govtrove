@@ -27,7 +27,7 @@ type CSVDownloadLogRecord struct {
 
 func (db *DB) InsertCSVDownloadLog(ctx context.Context, r *CSVDownloadLogRecord) (int, error) {
 	query := `
-		INSERT INTO csv_s3_archive_log (
+		INSERT INTO bulk_csv_active_log (
 			result, http_status, etag, last_modified,
 			file_size_bytes, compressed_size_bytes, row_count, sha256_hash,
 			s3_key, download_duration_ms, compression_duration_ms, upload_duration_ms,
@@ -48,7 +48,7 @@ func (db *DB) InsertCSVDownloadLog(ctx context.Context, r *CSVDownloadLogRecord)
 
 func (db *DB) GetLatestCSVDownloadHash(ctx context.Context) (string, error) {
 	query := `
-		SELECT sha256_hash FROM csv_s3_archive_log
+		SELECT sha256_hash FROM bulk_csv_active_log
 		WHERE result = 'new_file' AND sha256_hash IS NOT NULL
 		AND s3_key IS NOT NULL AND s3_key != ''
 		ORDER BY checked_at DESC LIMIT 1
@@ -63,7 +63,7 @@ func (db *DB) GetLatestCSVDownloadHash(ctx context.Context) (string, error) {
 
 func (db *DB) GetLatestCSVDownloadHeaders(ctx context.Context) (etag, lastModified string, err error) {
 	query := `
-		SELECT etag, last_modified FROM csv_s3_archive_log
+		SELECT etag, last_modified FROM bulk_csv_active_log
 		WHERE result != 'error' AND (etag IS NOT NULL OR last_modified IS NOT NULL)
 		ORDER BY checked_at DESC LIMIT 1
 	`
@@ -90,7 +90,7 @@ func (db *DB) HasNewFileForDate(ctx context.Context, date time.Time) (bool, erro
 
 	query := `
 		SELECT EXISTS(
-			SELECT 1 FROM csv_s3_archive_log
+			SELECT 1 FROM bulk_csv_active_log
 			WHERE result = 'new_file'
 			AND s3_key IS NOT NULL AND s3_key != ''
 			AND checked_at >= $1 AND checked_at < $2
