@@ -3,8 +3,8 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	run run-neon \
-	run-archive-active run-archive-active-neon run-archive-active-aws logs-archive-active \
-	run-archive-historical run-archive-historical-neon run-archive-historical-aws logs-archive-historical \
+	run-download-active run-download-active-neon run-download-active-aws logs-download-active \
+	run-download-archived run-download-archived-neon run-download-archived-aws logs-download-archived \
 	build test jobs-docker-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-jobs deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
@@ -57,16 +57,16 @@ help:
 	@echo "  make run              - Daily update (local DB)"
 	@echo "  make run-neon         - Daily update (Neon DB)"
 	@echo ""
-	@echo "S3 Archiving:"
-	@echo "  make run-archive-active          - Archive active CSV locally (no S3)"
-	@echo "  make run-archive-active-neon     - Archive active CSV (Neon + S3)"
-	@echo "  make run-archive-active-aws      - Trigger ECS active archive task"
-	@echo "  make logs-archive-active         - Tail CloudWatch logs for active archive"
+	@echo "Bulk CSV Download:"
+	@echo "  make run-download-active          - Download active CSV locally (no S3)"
+	@echo "  make run-download-active-neon     - Download active CSV (Neon + S3)"
+	@echo "  make run-download-active-aws      - Trigger ECS active CSV task"
+	@echo "  make logs-download-active         - Tail CloudWatch logs for active CSV"
 	@echo ""
-	@echo "  make run-archive-historical      - Archive historical CSVs locally (no S3)"
-	@echo "  make run-archive-historical-neon - Archive historical CSVs (Neon + S3)"
-	@echo "  make run-archive-historical-aws  - Trigger ECS historical archive task"
-	@echo "  make logs-archive-historical     - Tail CloudWatch logs for historical archive"
+	@echo "  make run-download-archived        - Download archived CSVs locally (no S3)"
+	@echo "  make run-download-archived-neon   - Download archived CSVs (Neon + S3)"
+	@echo "  make run-download-archived-aws    - Trigger ECS archived CSV task"
+	@echo "  make logs-download-archived       - Tail CloudWatch logs for archived CSV"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -258,17 +258,17 @@ run-neon:
 
 
 # ============================================================================
-# S3 Archiving
+# Bulk CSV Download
 # ============================================================================
 
-run-archive-active:
+run-download-active:
 	cd jobs && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
 	S3_ARCHIVE_ENABLED=false \
 	LOG_LEVEL=debug \
-	go run ./cmd/jobs archive-active
+	go run ./cmd/jobs download-bulk-csv-active
 
-run-archive-active-neon:
+run-download-active-neon:
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
 		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
 		exit 1; \
@@ -278,10 +278,10 @@ run-archive-active-neon:
 	S3_BUCKET=govtrove-data \
 	S3_ARCHIVE_ENABLED=true \
 	LOG_LEVEL=debug \
-	go run ./cmd/jobs archive-active
+	go run ./cmd/jobs download-bulk-csv-active
 
-run-archive-active-aws:
-	@echo "Triggering ECS archive-active task..."
+run-download-active-aws:
+	@echo "Triggering ECS download-active task..."
 	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
 	TASK_DEF=$$(cd terraform && terraform output -raw csvarchive_task_definition_arn) && \
 	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
@@ -292,19 +292,19 @@ run-archive-active-aws:
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "Archive-active task triggered! Check logs with 'make logs-archive-active'"
+	echo "Download-active task triggered! Check logs with 'make logs-download-active'"
 
-logs-archive-active:
+logs-download-active:
 	aws logs tail /govtrove/csvarchive --follow --profile $(AWS_PROFILE)
 
-run-archive-historical:
+run-download-archived:
 	cd jobs && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
 	S3_ARCHIVE_ENABLED=false \
 	LOG_LEVEL=debug \
-	go run ./cmd/jobs archive-historical
+	go run ./cmd/jobs download-bulk-csv-archived
 
-run-archive-historical-neon:
+run-download-archived-neon:
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
 		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
 		exit 1; \
@@ -314,10 +314,10 @@ run-archive-historical-neon:
 	S3_BUCKET=govtrove-data \
 	S3_ARCHIVE_ENABLED=true \
 	LOG_LEVEL=debug \
-	go run ./cmd/jobs archive-historical
+	go run ./cmd/jobs download-bulk-csv-archived
 
-run-archive-historical-aws:
-	@echo "Triggering ECS archive-historical task..."
+run-download-archived-aws:
+	@echo "Triggering ECS download-archived task..."
 	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
 	TASK_DEF=$$(cd terraform && terraform output -raw archivedcsv_task_definition_arn) && \
 	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
@@ -328,9 +328,9 @@ run-archive-historical-aws:
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "Archive-historical task triggered! Check logs with 'make logs-archive-historical'"
+	echo "Download-archived task triggered! Check logs with 'make logs-download-archived'"
 
-logs-archive-historical:
+logs-download-archived:
 	aws logs tail /govtrove/archivedcsv --follow --profile $(AWS_PROFILE)
 
 # ============================================================================

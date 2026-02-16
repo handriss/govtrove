@@ -14,7 +14,7 @@ import (
 	"github.com/handriss/govtrove/jobs/internal/database"
 )
 
-func RunArchiveHistorical(ctx context.Context, cfg *config.Config, db *database.DB, logger *slog.Logger) error {
+func RunDownloadBulkCSVArchived(ctx context.Context, cfg *config.Config, db *database.DB, logger *slog.Logger) error {
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
 	if err != nil {
 		return fmt.Errorf("load AWS config: %w", err)
