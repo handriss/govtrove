@@ -2,7 +2,7 @@
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	run run-neon \
+	run run-neon run-backfill-opps-neon \
 	run-download-active run-download-active-neon run-download-active-aws logs-download-active \
 	run-download-archived run-download-archived-neon run-download-archived-aws logs-download-archived \
 	build test jobs-docker-build \
@@ -54,8 +54,9 @@ help:
 	@echo "  make frontend-build   - Build frontend for production"
 	@echo ""
 	@echo "Ingestion Service:"
-	@echo "  make run              - Daily update (local DB)"
-	@echo "  make run-neon         - Daily update (Neon DB)"
+	@echo "  make run                        - Daily update (local DB)"
+	@echo "  make run-neon                   - Daily update (Neon DB)"
+	@echo "  make run-backfill-opps-neon     - Backfill opportunities from latest snapshot (Neon)"
 	@echo ""
 	@echo "Bulk CSV Download:"
 	@echo "  make run-download-active          - Download active CSV locally (no S3)"
@@ -256,6 +257,15 @@ run-neon:
 	LOG_LEVEL=debug \
 	go run ./cmd/jobs ingest
 
+run-backfill-opps-neon:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	cd jobs && \
+	DATABASE_URL="$(NEON_DATABASE_URL)" \
+	LOG_LEVEL=debug \
+	go run ./cmd/jobs backfill-opportunities
 
 # ============================================================================
 # Bulk CSV Download

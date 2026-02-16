@@ -29,7 +29,7 @@ type ArchivedCSVDownloadLogRecord struct {
 
 func (db *DB) InsertArchivedCSVDownloadLog(ctx context.Context, r *ArchivedCSVDownloadLogRecord) (int, error) {
 	query := `
-		INSERT INTO archived_csv_s3_archive_log (
+		INSERT INTO bulk_csv_archived_log (
 			fiscal_year, result, http_status, etag, last_modified, content_length,
 			file_size_bytes, compressed_size_bytes, row_count, sha256_hash,
 			s3_key, download_duration_ms, compression_duration_ms, upload_duration_ms,
@@ -50,7 +50,7 @@ func (db *DB) InsertArchivedCSVDownloadLog(ctx context.Context, r *ArchivedCSVDo
 
 func (db *DB) GetLatestArchivedCSVETag(ctx context.Context, fiscalYear int) (string, error) {
 	query := `
-		SELECT etag FROM archived_csv_s3_archive_log
+		SELECT etag FROM bulk_csv_archived_log
 		WHERE fiscal_year = $1 AND result != 'error' AND etag IS NOT NULL
 		ORDER BY checked_at DESC LIMIT 1
 	`
@@ -64,7 +64,7 @@ func (db *DB) GetLatestArchivedCSVETag(ctx context.Context, fiscalYear int) (str
 
 func (db *DB) GetLatestArchivedCSVHash(ctx context.Context, fiscalYear int) (string, error) {
 	query := `
-		SELECT sha256_hash FROM archived_csv_s3_archive_log
+		SELECT sha256_hash FROM bulk_csv_archived_log
 		WHERE fiscal_year = $1 AND result = 'new_file' AND sha256_hash IS NOT NULL
 		AND s3_key IS NOT NULL AND s3_key != ''
 		ORDER BY checked_at DESC LIMIT 1

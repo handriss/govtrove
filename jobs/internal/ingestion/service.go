@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/handriss/govtrove/jobs/internal/config"
 	"github.com/handriss/govtrove/jobs/internal/database"
+	"github.com/handriss/govtrove/jobs/internal/reconcile"
 	"github.com/handriss/govtrove/jobs/internal/samgov"
 )
 
@@ -80,8 +81,9 @@ func (s *Service) Run(ctx context.Context) error {
 	)
 
 	s.sendNotification(ctx, fmt.Sprintf(
-		"Ingest — snapshot complete\nRecords: %d\nNew: %d\nChanged: %d\nDisappeared: %d\nDuration: %s",
+		"Ingest — snapshot complete\nRecords: %d\nNew: %d\nChanged: %d\nDisappeared: %d\nOpps upserted: %d\nOpps deactivated: %d\nDuration: %s",
 		stats.recordCount, stats.newRecords, stats.changedRecords, stats.disappearedRecords,
+		stats.oppsUpserted, stats.oppsDeactivated,
 		duration.Round(time.Second)))
 
 	return nil
@@ -93,6 +95,8 @@ type snapshotStats struct {
 	changedRecords     int
 	disappearedRecords int
 	reappearedRecords  int
+	oppsUpserted       int
+	oppsDeactivated    int
 }
 
 func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, stats *snapshotStats) error {
@@ -177,7 +181,13 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 	if prevRunID == uuid.Nil {
 		s.logger.Info("first run, all records treated as new", "count", len(snapRows))
 		stats.newRecords = len(snapRows)
-		s.logger.Info("layer 3 reconciliation: not yet implemented, skipping")
+
+		ins, _, rErr := s.reconcileOpportunities(ctx, runID, snapshotDate, result.Rows, stats)
+		if rErr != nil {
+			s.logger.Error("reconciliation failed", "error", rErr)
+		} else {
+			s.logger.Info("reconciliation complete (first run)", "upserted", ins)
+		}
 		return nil
 	}
 
@@ -212,10 +222,36 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		}
 	}
 
-	// 13. Reconciliation stub
-	s.logger.Info("layer 3 reconciliation: not yet implemented, skipping")
+	// 13. Reconcile: populate opportunities table
+	s.reconcileOpportunities(ctx, runID, snapshotDate, result.Rows, stats)
+
+	// 14. Mark disappeared records inactive
+	deactivated, dErr := s.db.MarkDisappearedInactive(ctx, runID)
+	if dErr != nil {
+		s.logger.Error("failed to mark disappeared inactive", "error", dErr)
+	} else if deactivated > 0 {
+		stats.oppsDeactivated = deactivated
+		s.logger.Info("marked disappeared opportunities inactive", "count", deactivated)
+	}
 
 	return nil
+}
+
+func (s *Service) reconcileOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []map[string]string, stats *snapshotStats) (inserted, updated int, err error) {
+	opps := make([]reconcile.Opportunity, 0, len(rows))
+	for _, raw := range rows {
+		opps = append(opps, reconcile.FromCSV(raw))
+	}
+
+	s.logger.Info("upserting opportunities", "count", len(opps))
+	inserted, updated, err = s.db.UpsertOpportunities(ctx, runID, snapshotDate, opps)
+	if err != nil {
+		s.logger.Error("upsert opportunities failed", "error", err)
+		return 0, 0, err
+	}
+	stats.oppsUpserted = inserted + updated
+	s.logger.Info("opportunities upsert complete", "upserted", inserted+updated)
+	return inserted, updated, nil
 }
 
 func extractTypedFields(raw map[string]string) database.SnapCSVRow {
