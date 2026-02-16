@@ -100,28 +100,15 @@ variable "csvarchive_schedule_enabled" {
   default     = true
 }
 
-# API Probe Schedule
-variable "apiprobe_schedule_expression" {
-  description = "EventBridge schedule expression for API probe"
+# Archived CSV Schedule
+variable "archivedcsv_schedule_expression" {
+  description = "EventBridge schedule expression for archived CSV download"
   type        = string
-  default     = "cron(0 2,6,10,14,18 * * ? *)"
+  default     = "cron(0 0,6,12,18 * * ? *)"
 }
 
-variable "apiprobe_schedule_enabled" {
-  description = "Whether the API probe schedule is enabled"
-  type        = bool
-  default     = true
-}
-
-# API Archive Schedule
-variable "apiarchive_schedule_expression" {
-  description = "EventBridge schedule expression for API archive"
-  type        = string
-  default     = "cron(0 20 * * ? *)"
-}
-
-variable "apiarchive_schedule_enabled" {
-  description = "Whether the API archive schedule is enabled"
+variable "archivedcsv_schedule_enabled" {
+  description = "Whether the archived CSV schedule is enabled"
   type        = bool
   default     = true
 }

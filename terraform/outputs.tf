@@ -141,14 +141,9 @@ output "csvarchive_task_definition_arn" {
   value       = aws_ecs_task_definition.csvarchive.arn
 }
 
-output "apiprobe_task_definition_arn" {
-  description = "ECS task definition ARN for API probe"
-  value       = aws_ecs_task_definition.apiprobe.arn
-}
-
-output "apiarchive_task_definition_arn" {
-  description = "ECS task definition ARN for API archive"
-  value       = aws_ecs_task_definition.apiarchive.arn
+output "archivedcsv_task_definition_arn" {
+  description = "ECS task definition ARN for archived CSV download"
+  value       = aws_ecs_task_definition.archivedcsv.arn
 }
 
 output "workos_client_id" {
