@@ -84,7 +84,7 @@ resource "aws_ecs_task_definition" "csvarchive" {
       name      = "csvarchive"
       image     = "${aws_ecr_repository.ingestion.repository_url}:latest"
       essential = true
-      command   = ["archive-active"]
+      command   = ["download-bulk-csv-active"]
 
       environment = [
         {
@@ -142,7 +142,7 @@ resource "aws_ecs_task_definition" "archivedcsv" {
       name      = "archivedcsv"
       image     = "${aws_ecr_repository.ingestion.repository_url}:latest"
       essential = true
-      command   = ["archive-historical"]
+      command   = ["download-bulk-csv-archived"]
 
       environment = [
         {
