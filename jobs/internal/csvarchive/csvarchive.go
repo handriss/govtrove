@@ -14,9 +14,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/handriss/govtrove/ingestion/internal/config"
-	"github.com/handriss/govtrove/ingestion/internal/database"
-	"github.com/handriss/govtrove/ingestion/internal/samgov"
+	"github.com/handriss/govtrove/jobs/internal/config"
+	"github.com/handriss/govtrove/jobs/internal/database"
+	"github.com/handriss/govtrove/jobs/internal/samgov"
 )
 
 type Result struct {
@@ -25,7 +25,7 @@ type Result struct {
 	Duration time.Duration
 }
 
-func Run(ctx context.Context, cfg *config.CSVArchiveConfig, db *database.DB, s3Client *s3.Client, logger *slog.Logger) (*Result, error) {
+func Run(ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client, logger *slog.Logger) (*Result, error) {
 	today := time.Now().UTC()
 	result := &Result{}
 	startTime := time.Now()
