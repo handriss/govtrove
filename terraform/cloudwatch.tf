@@ -16,44 +16,44 @@ resource "aws_cloudwatch_log_group" "csvarchive" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "apiprobe" {
-  name              = "/govtrove/apiprobe"
+resource "aws_cloudwatch_log_group" "archivedcsv" {
+  name              = "/govtrove/archivedcsv"
   retention_in_days = 30
 
   tags = {
-    Name = "${var.project_name}-apiprobe-logs"
+    Name = "${var.project_name}-archivedcsv-logs"
   }
 }
 
-resource "aws_cloudwatch_log_metric_filter" "apiprobe_failed" {
-  name           = "${var.project_name}-apiprobe-failed"
+resource "aws_cloudwatch_log_metric_filter" "archivedcsv_failed" {
+  name           = "${var.project_name}-archivedcsv-failed"
   pattern        = "{ $.level = \"error\" }"
-  log_group_name = aws_cloudwatch_log_group.apiprobe.name
+  log_group_name = aws_cloudwatch_log_group.archivedcsv.name
 
   metric_transformation {
-    name      = "APIProbeErrors"
+    name      = "ArchivedCSVErrors"
     namespace = "GovTrove"
     value     = "1"
   }
 }
 
-resource "aws_cloudwatch_metric_alarm" "apiprobe_errors" {
-  alarm_name          = "${var.project_name}-apiprobe-errors"
+resource "aws_cloudwatch_metric_alarm" "archivedcsv_errors" {
+  alarm_name          = "${var.project_name}-archivedcsv-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  metric_name         = "APIProbeErrors"
+  metric_name         = "ArchivedCSVErrors"
   namespace           = "GovTrove"
   period              = 300
   statistic           = "Sum"
   threshold           = 0
-  alarm_description   = "Triggered when API probe/archive service logs errors"
+  alarm_description   = "Triggered when archived CSV service logs errors"
   treat_missing_data  = "notBreaching"
 
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 
   tags = {
-    Name = "${var.project_name}-apiprobe-errors-alarm"
+    Name = "${var.project_name}-archivedcsv-errors-alarm"
   }
 }
 

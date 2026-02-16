@@ -2,11 +2,11 @@
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	run run-neon run-backfill run-backfill-neon run-mock mock-server \
-	run-csvarchive run-csvarchive-neon run-csvarchive-aws logs-csvarchive \
-	run-apiprobe run-apiprobe-neon run-apiarchive-neon run-apiprobe-aws run-apiarchive-aws logs-apiprobe \
-	build test ingestion-docker-build \
-	ecr-login deploy-frontend deploy-landing deploy-api deploy-ingestion deploy-all \
+	run run-neon \
+	run-archive-active run-archive-active-neon run-archive-active-aws logs-archive-active \
+	run-archive-historical run-archive-historical-neon run-archive-historical-aws logs-archive-historical \
+	build test jobs-docker-build \
+	ecr-login deploy-frontend deploy-landing deploy-api deploy-jobs deploy-all \
 	logs-ingestion logs-api run-ingestion-aws status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
 	clean
@@ -56,25 +56,17 @@ help:
 	@echo "Ingestion Service:"
 	@echo "  make run              - Daily update (local DB)"
 	@echo "  make run-neon         - Daily update (Neon DB)"
-	@echo "  make run-backfill     - Full CSV backfill (local DB)"
-	@echo "  make run-backfill-neon - Full CSV backfill (Neon DB)"
-	@echo "  make run-mock         - Run against mock SAM.gov server"
-	@echo "  make mock-server      - Start mock SAM.gov API server"
 	@echo ""
+	@echo "S3 Archiving:"
+	@echo "  make run-archive-active          - Archive active CSV locally (no S3)"
+	@echo "  make run-archive-active-neon     - Archive active CSV (Neon + S3)"
+	@echo "  make run-archive-active-aws      - Trigger ECS active archive task"
+	@echo "  make logs-archive-active         - Tail CloudWatch logs for active archive"
 	@echo ""
-	@echo "CSV Archive:"
-	@echo "  make run-csvarchive      - Run CSV archive locally (no S3)"
-	@echo "  make run-csvarchive-neon - Run CSV archive against Neon + real S3"
-	@echo "  make run-csvarchive-aws  - Trigger ECS CSV archive task"
-	@echo "  make logs-csvarchive     - Tail CloudWatch logs for CSV archive"
-	@echo ""
-	@echo "API Probe / Archive:"
-	@echo "  make run-apiprobe        - Probe mode (local DB)"
-	@echo "  make run-apiprobe-neon   - Probe mode (Neon DB)"
-	@echo "  make run-apiarchive-neon - Archive mode (Neon + S3)"
-	@echo "  make run-apiprobe-aws    - Trigger ECS probe task"
-	@echo "  make run-apiarchive-aws  - Trigger ECS archive task"
-	@echo "  make logs-apiprobe       - Tail CloudWatch logs"
+	@echo "  make run-archive-historical      - Archive historical CSVs locally (no S3)"
+	@echo "  make run-archive-historical-neon - Archive historical CSVs (Neon + S3)"
+	@echo "  make run-archive-historical-aws  - Trigger ECS historical archive task"
+	@echo "  make logs-archive-historical     - Tail CloudWatch logs for historical archive"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -82,16 +74,16 @@ help:
 	@echo "  make migrate-neon     - Run migrations (Neon DB)"
 	@echo ""
 	@echo "Build:"
-	@echo "  make build                  - Build ingestion binary"
-	@echo "  make ingestion-docker-build - Build ingestion Docker image"
-	@echo "  make test                   - Run tests"
+	@echo "  make build              - Build jobs binary"
+	@echo "  make jobs-docker-build  - Build jobs Docker image"
+	@echo "  make test               - Run tests"
 	@echo ""
 	@echo "Deploy:"
 	@echo "  make ecr-login        - Login to AWS ECR"
 	@echo "  make deploy-landing   - Deploy landing page to S3/CloudFront"
 	@echo "  make deploy-frontend  - Build & deploy frontend app to S3/CloudFront"
 	@echo "  make deploy-api       - Build & deploy API to App Runner"
-	@echo "  make deploy-ingestion - Build & push ingestion image to ECR"
+	@echo "  make deploy-jobs      - Build & push jobs image to ECR"
 	@echo "  make deploy-all       - Deploy everything"
 	@echo ""
 	@echo "Operations:"
@@ -243,11 +235,11 @@ frontend-build:
 # ============================================================================
 
 run:
-	cd ingestion && \
+	cd jobs && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
 	SAM_API_KEY="dummy-key-for-local-testing" \
 	LOG_LEVEL=debug \
-	go run ./cmd/ingest
+	go run ./cmd/jobs ingest
 
 run-neon:
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
@@ -258,76 +250,38 @@ run-neon:
 		echo "Error: SAM_API_KEY environment variable is not set"; \
 		exit 1; \
 	fi
-	cd ingestion && \
+	cd jobs && \
 	DATABASE_URL="$(NEON_DATABASE_URL)" \
 	SAM_API_KEY="$(SAM_API_KEY)" \
-	MIN_POSTED_DATE=2026-01-15 \
 	LOG_LEVEL=debug \
-	go run ./cmd/ingest
-# TODO(pre-launch): Remove MIN_POSTED_DATE from run-neon and run-backfill-neon before going live
+	go run ./cmd/jobs ingest
 
-run-backfill:
-	cd ingestion && \
-	DATABASE_URL="$(LOCAL_DB_URL)" \
-	SAM_API_KEY="dummy-key" \
-	INGESTION_MODE=csv-only \
-	LOG_LEVEL=debug \
-	go run ./cmd/ingest
-
-run-backfill-neon:
-	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
-		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	@if [ -z "$(SAM_API_KEY)" ]; then \
-		echo "Error: SAM_API_KEY environment variable is not set"; \
-		exit 1; \
-	fi
-	cd ingestion && \
-	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	SAM_API_KEY="$(SAM_API_KEY)" \
-	MIN_POSTED_DATE=2026-01-15 \
-	INGESTION_MODE=csv-only \
-	LOG_LEVEL=info \
-	go run ./cmd/ingest
-
-run-mock:
-	cd ingestion && \
-	DATABASE_URL="$(LOCAL_DB_URL)" \
-	SAM_API_KEY="mock-key" \
-	MOCK_API_URL="http://localhost:8080" \
-	LOG_LEVEL=debug \
-	RECORD_LIMIT=$(or $(RECORD_LIMIT),100) \
-	go run ./cmd/ingest
-
-mock-server:
-	cd ingestion && go run ./cmd/mockserver -port=8080 -count=$(or $(MOCK_COUNT),500)
 
 # ============================================================================
-# CSV Archive Service
+# S3 Archiving
 # ============================================================================
 
-run-csvarchive:
-	cd ingestion && \
+run-archive-active:
+	cd jobs && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
 	S3_ARCHIVE_ENABLED=false \
 	LOG_LEVEL=debug \
-	go run ./cmd/csvarchive
+	go run ./cmd/jobs archive-active
 
-run-csvarchive-neon:
+run-archive-active-neon:
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
 		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
 		exit 1; \
 	fi
-	cd ingestion && \
+	cd jobs && \
 	DATABASE_URL="$(NEON_DATABASE_URL)" \
 	S3_BUCKET=govtrove-data \
 	S3_ARCHIVE_ENABLED=true \
 	LOG_LEVEL=debug \
-	go run ./cmd/csvarchive
+	go run ./cmd/jobs archive-active
 
-run-csvarchive-aws:
-	@echo "Triggering ECS csvarchive task..."
+run-archive-active-aws:
+	@echo "Triggering ECS archive-active task..."
 	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
 	TASK_DEF=$$(cd terraform && terraform output -raw csvarchive_task_definition_arn) && \
 	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
@@ -338,61 +292,34 @@ run-csvarchive-aws:
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "CSV archive task triggered! Check logs with 'make logs-csvarchive'"
+	echo "Archive-active task triggered! Check logs with 'make logs-archive-active'"
 
-logs-csvarchive:
+logs-archive-active:
 	aws logs tail /govtrove/csvarchive --follow --profile $(AWS_PROFILE)
 
-# ============================================================================
-# API Probe / Archive
-# ============================================================================
-
-run-apiprobe:
-	cd ingestion && \
+run-archive-historical:
+	cd jobs && \
 	DATABASE_URL="$(LOCAL_DB_URL)" \
-	SAM_API_KEY="dummy-key-for-local-testing" \
-	MODE=probe \
+	S3_ARCHIVE_ENABLED=false \
 	LOG_LEVEL=debug \
-	go run ./cmd/apiprobe
+	go run ./cmd/jobs archive-historical
 
-run-apiprobe-neon:
+run-archive-historical-neon:
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
 		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
 		exit 1; \
 	fi
-	@if [ -z "$(SAM_API_KEY)" ]; then \
-		echo "Error: SAM_API_KEY environment variable is not set"; \
-		exit 1; \
-	fi
-	cd ingestion && \
+	cd jobs && \
 	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	SAM_API_KEY="$(SAM_API_KEY)" \
-	MODE=probe \
-	LOG_LEVEL=debug \
-	go run ./cmd/apiprobe
-
-run-apiarchive-neon:
-	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
-		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	@if [ -z "$(SAM_API_KEY)" ]; then \
-		echo "Error: SAM_API_KEY environment variable is not set"; \
-		exit 1; \
-	fi
-	cd ingestion && \
-	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	SAM_API_KEY="$(SAM_API_KEY)" \
-	MODE=archive \
 	S3_BUCKET=govtrove-data \
 	S3_ARCHIVE_ENABLED=true \
 	LOG_LEVEL=debug \
-	go run ./cmd/apiprobe
+	go run ./cmd/jobs archive-historical
 
-run-apiprobe-aws:
-	@echo "Triggering ECS apiprobe task..."
+run-archive-historical-aws:
+	@echo "Triggering ECS archive-historical task..."
 	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
-	TASK_DEF=$$(cd terraform && terraform output -raw apiprobe_task_definition_arn) && \
+	TASK_DEF=$$(cd terraform && terraform output -raw archivedcsv_task_definition_arn) && \
 	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
 	SG=$$(cd terraform && terraform output -raw security_group_id) && \
 	aws ecs run-task \
@@ -401,38 +328,24 @@ run-apiprobe-aws:
 		--launch-type FARGATE \
 		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "API probe task triggered! Check logs with 'make logs-apiprobe'"
+	echo "Archive-historical task triggered! Check logs with 'make logs-archive-historical'"
 
-run-apiarchive-aws:
-	@echo "Triggering ECS apiarchive task..."
-	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
-	TASK_DEF=$$(cd terraform && terraform output -raw apiarchive_task_definition_arn) && \
-	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
-	SG=$$(cd terraform && terraform output -raw security_group_id) && \
-	aws ecs run-task \
-		--cluster $$CLUSTER \
-		--task-definition $$TASK_DEF \
-		--launch-type FARGATE \
-		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
-		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "API archive task triggered! Check logs with 'make logs-apiprobe'"
-
-logs-apiprobe:
-	aws logs tail /govtrove/apiprobe --follow --profile $(AWS_PROFILE)
+logs-archive-historical:
+	aws logs tail /govtrove/archivedcsv --follow --profile $(AWS_PROFILE)
 
 # ============================================================================
 # Build
 # ============================================================================
 
 build:
-	cd ingestion && go build -o ../bin/ingest ./cmd/ingest
+	cd jobs && go build -o ../bin/jobs ./cmd/jobs
 
 test:
-	cd ingestion && go test -v ./...
+	cd jobs && go test -v ./...
 	cd api && go test -v ./...
 
-ingestion-docker-build:
-	docker build --platform linux/amd64 -t govtrove-ingestion:latest ./ingestion
+jobs-docker-build:
+	docker build --platform linux/amd64 -t govtrove-jobs:latest ./jobs
 
 # ============================================================================
 # Deploy
@@ -468,12 +381,12 @@ deploy-api: api-docker-build ecr-login
 	aws apprunner start-deployment --service-arn $$ARN --profile $(AWS_PROFILE) --region $(AWS_REGION) && \
 	echo "API deployment triggered! Check status with 'make status'"
 
-deploy-ingestion: ingestion-docker-build ecr-login
-	@echo "Deploying ingestion image to ECR..."
+deploy-jobs: jobs-docker-build ecr-login
+	@echo "Deploying jobs image to ECR..."
 	@ECR_URL=$$(cd terraform && terraform output -raw ecr_repository_url) && \
-	docker tag govtrove-ingestion:latest $$ECR_URL:latest && \
+	docker tag govtrove-jobs:latest $$ECR_URL:latest && \
 	docker push $$ECR_URL:latest && \
-	echo "Ingestion image pushed successfully!"
+	echo "Jobs image pushed successfully!"
 
 deploy-landing:
 	@echo "Deploying landing page to S3/CloudFront..."
@@ -484,7 +397,7 @@ deploy-landing:
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
 	echo "Landing page deployed successfully!"
 
-deploy-all: deploy-api deploy-ingestion deploy-frontend deploy-landing
+deploy-all: deploy-api deploy-jobs deploy-frontend deploy-landing
 	@echo ""
 	@echo "All services deployed!"
 
