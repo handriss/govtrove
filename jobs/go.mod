@@ -1,4 +1,4 @@
-module github.com/handriss/govtrove/ingestion
+module github.com/handriss/govtrove/jobs
 
 go 1.23
 
@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/sns v1.29.0
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	golang.org/x/text v0.16.0

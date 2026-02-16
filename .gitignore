@@ -61,3 +61,6 @@ postgres_data/
 reference/
 *.zip
 api/ogpreview
+
+# Research data
+research/
