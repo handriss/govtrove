@@ -1,16 +1,13 @@
 package samgov
 
 import (
-	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/handriss/govtrove/jobs/internal/database"
 	"github.com/handriss/govtrove/jobs/internal/parse"
 	"golang.org/x/text/encoding/charmap"
 )
@@ -19,74 +16,15 @@ const (
 	FullCSVURL = "https://sam.gov/api/prod/fileextractservices/v1/api/download/Contract%20Opportunities/datagov/ContractOpportunitiesFullCSV.csv"
 )
 
-type CSVClient struct {
-	httpClient *TrackedHTTPClient
-	logger     *slog.Logger
-}
-
-func NewCSVClient(db *database.DB, logger *slog.Logger) *CSVClient {
-	return &CSVClient{
-		httpClient: NewTrackedHTTPClient(db, logger),
-		logger:     logger,
-	}
-}
-
 type CSVParseResult struct {
-	Rows         []map[string]string
-	Headers      []string
-	TotalRows    int
-	ParsedRows   int
-	Errors       int
-	NotModified  bool
-	ETag         string
+	Rows        []map[string]string
+	Headers     []string
+	TotalRows   int
+	ParsedRows  int
+	Errors      int
+	NotModified bool
+	ETag        string
 	LastModified string
-}
-
-func (c *CSVClient) FetchOpportunities(ctx context.Context, limit int) (*CSVParseResult, error) {
-	return c.FetchOpportunitiesConditional(ctx, limit, "", "")
-}
-
-func (c *CSVClient) FetchOpportunitiesConditional(ctx context.Context, limit int, etag, lastModified string) (*CSVParseResult, error) {
-	c.logger.Info("starting CSV download", "url", FullCSVURL, "has_etag", etag != "", "has_last_modified", lastModified != "")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, FullCSVURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	if etag != "" {
-		req.Header.Set("If-None-Match", etag)
-	}
-	if lastModified != "" {
-		req.Header.Set("If-Modified-Since", lastModified)
-	}
-
-	resp, err := c.httpClient.Do(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch CSV: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotModified {
-		c.logger.Info("CSV not modified (304), skipping download")
-		return &CSVParseResult{NotModified: true}, nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	c.logger.Info("CSV download started, parsing stream", "response_time_ms", resp.ResponseTimeMs)
-
-	result, err := ParseCSVFromReader(resp.Body, limit, c.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	result.ETag = resp.Header.Get("ETag")
-	result.LastModified = resp.Header.Get("Last-Modified")
-
-	return result, nil
 }
 
 func ParseCSVFromReader(r io.Reader, limit int, logger *slog.Logger) (*CSVParseResult, error) {

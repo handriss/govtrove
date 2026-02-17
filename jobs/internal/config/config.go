@@ -9,16 +9,10 @@ import (
 
 type Config struct {
 	DatabaseURL      string `envconfig:"DATABASE_URL" required:"true"`
-	SAMAPIKey        string `envconfig:"SAM_API_KEY"`
 	AWSRegion        string `envconfig:"AWS_REGION" default:"us-east-1"`
-	SNSTopicARN      string `envconfig:"SNS_TOPIC_ARN"`
 	LogLevel         string `envconfig:"LOG_LEVEL" default:"info"`
 	S3Bucket         string `envconfig:"S3_BUCKET" default:"govtrove-data"`
 	S3ArchiveEnabled bool   `envconfig:"S3_ARCHIVE_ENABLED" default:"true"`
-	RecordLimit      int    `envconfig:"RECORD_LIMIT" default:"0"`
-
-	// Set by bulk CSV job when triggering ingestion from S3
-	S3ActiveCSVKey string `envconfig:"S3_ACTIVE_CSV_KEY"`
 }
 
 func Load() (*Config, error) {
