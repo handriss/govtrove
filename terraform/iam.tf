@@ -100,6 +100,37 @@ resource "aws_iam_role_policy" "ecs_task_s3" {
   })
 }
 
+resource "aws_iam_role_policy" "ecs_task_run_ingestion" {
+  name = "${var.project_name}-ecs-task-run-ingestion"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecs:RunTask"
+        ]
+        Resource = [
+          aws_ecs_task_definition.ingestion.arn,
+          "${aws_ecs_task_definition.ingestion.arn_without_revision}:*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = [
+          aws_iam_role.ecs_task_execution.arn,
+          aws_iam_role.ecs_task.arn
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role" "eventbridge_scheduler" {
   name = "${var.project_name}-eventbridge-scheduler"
 

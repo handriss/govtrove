@@ -16,6 +16,15 @@ type Config struct {
 	S3Bucket         string `envconfig:"S3_BUCKET" default:"govtrove-data"`
 	S3ArchiveEnabled bool   `envconfig:"S3_ARCHIVE_ENABLED" default:"true"`
 	RecordLimit      int    `envconfig:"RECORD_LIMIT" default:"0"`
+
+	// Set by bulk CSV job when triggering ingestion from S3
+	S3ActiveCSVKey string `envconfig:"S3_ACTIVE_CSV_KEY"`
+
+	// ECS config for triggering ingestion from bulk CSV task
+	ECSCluster       string `envconfig:"ECS_CLUSTER"`
+	IngestionTaskDef string `envconfig:"INGESTION_TASK_DEF"`
+	ECSSubnets       string `envconfig:"ECS_SUBNETS"`
+	ECSSecurityGroup string `envconfig:"ECS_SECURITY_GROUP"`
 }
 
 func Load() (*Config, error) {

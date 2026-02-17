@@ -5,6 +5,7 @@ go 1.23
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
+	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/sns v1.29.0
 	github.com/google/uuid v1.6.0

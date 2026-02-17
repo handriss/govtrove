@@ -40,6 +40,10 @@ resource "aws_ecs_task_definition" "ingestion" {
         {
           name  = "LOG_LEVEL"
           value = "info"
+        },
+        {
+          name  = "S3_BUCKET"
+          value = aws_s3_bucket.data.id
         }
       ]
 
@@ -102,6 +106,22 @@ resource "aws_ecs_task_definition" "bulkcsv" {
         {
           name  = "S3_BUCKET"
           value = aws_s3_bucket.data.id
+        },
+        {
+          name  = "ECS_CLUSTER"
+          value = aws_ecs_cluster.main.arn
+        },
+        {
+          name  = "INGESTION_TASK_DEF"
+          value = aws_ecs_task_definition.ingestion.arn_without_revision
+        },
+        {
+          name  = "ECS_SUBNETS"
+          value = join(",", aws_subnet.public[*].id)
+        },
+        {
+          name  = "ECS_SECURITY_GROUP"
+          value = aws_security_group.ecs_tasks.id
         }
       ]
 

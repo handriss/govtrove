@@ -1,12 +1,14 @@
 package ingestion
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/google/uuid"
 	"github.com/handriss/govtrove/jobs/internal/config"
@@ -16,20 +18,22 @@ import (
 )
 
 type Service struct {
-	db     *database.DB
-	csv    *samgov.CSVClient
-	sns    *sns.Client
-	cfg    *config.Config
-	logger *slog.Logger
+	db       *database.DB
+	csv      *samgov.CSVClient
+	s3Client *s3.Client
+	sns      *sns.Client
+	cfg      *config.Config
+	logger   *slog.Logger
 }
 
-func New(cfg *config.Config, db *database.DB, snsClient *sns.Client, logger *slog.Logger) *Service {
+func New(cfg *config.Config, db *database.DB, s3Client *s3.Client, snsClient *sns.Client, logger *slog.Logger) *Service {
 	return &Service{
-		cfg:    cfg,
-		db:     db,
-		sns:    snsClient,
-		csv:    samgov.NewCSVClient(db, logger),
-		logger: logger,
+		cfg:      cfg,
+		db:       db,
+		s3Client: s3Client,
+		sns:      snsClient,
+		csv:      samgov.NewCSVClient(db, logger),
+		logger:   logger,
 	}
 }
 
@@ -100,33 +104,47 @@ type snapshotStats struct {
 }
 
 func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, stats *snapshotStats) error {
-	// 1. Load cached ETag
-	var etag, lastModified string
-	cached, err := s.db.GetCSVCacheHeaders(ctx, samgov.FullCSVURL)
-	if err == nil && cached != nil {
-		etag = cached.ETag
-		lastModified = cached.LastModified
-	}
+	var result *samgov.CSVParseResult
+	var downloadURL string
 
-	// 2. Download CSV
-	result, err := s.csv.FetchOpportunitiesConditional(ctx, s.cfg.RecordLimit, etag, lastModified)
-	if err != nil {
-		return fmt.Errorf("fetch CSV: %w", err)
-	}
+	if s.cfg.S3ActiveCSVKey != "" {
+		// Read CSV from S3 (triggered by bulk CSV job)
+		downloadURL = fmt.Sprintf("s3://%s/%s", s.cfg.S3Bucket, s.cfg.S3ActiveCSVKey)
+		s.logger.Info("reading CSV from S3", "bucket", s.cfg.S3Bucket, "key", s.cfg.S3ActiveCSVKey)
 
-	// 3. Handle 304 Not Modified
-	if result.NotModified {
-		s.logger.Info("CSV not modified (304), skipping snapshot")
-		if err := s.db.UpdateCSVCacheLastChecked(ctx, samgov.FullCSVURL); err != nil {
-			s.logger.Warn("failed to update cache last_checked_at", "error", err)
+		out, err := s.s3Client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(s.cfg.S3Bucket),
+			Key:    aws.String(s.cfg.S3ActiveCSVKey),
+		})
+		if err != nil {
+			return fmt.Errorf("get S3 object: %w", err)
 		}
-		return nil
+		defer out.Body.Close()
+
+		gz, err := gzip.NewReader(out.Body)
+		if err != nil {
+			return fmt.Errorf("open gzip stream: %w", err)
+		}
+		defer gz.Close()
+
+		result, err = samgov.ParseCSVFromReader(gz, s.cfg.RecordLimit, s.logger)
+		if err != nil {
+			return fmt.Errorf("parse CSV from S3: %w", err)
+		}
+	} else {
+		// Direct download from SAM.gov (local dev / backwards compat)
+		downloadURL = samgov.FullCSVURL
+		var err error
+		result, err = s.csv.FetchOpportunities(ctx, s.cfg.RecordLimit)
+		if err != nil {
+			return fmt.Errorf("fetch CSV: %w", err)
+		}
 	}
 
-	// 4. Create download log entry
+	// Create download log entry
 	downloadEntry := &database.CSVDownloadEntry{
 		RunID:        runID,
-		URL:          samgov.FullCSVURL,
+		URL:          downloadURL,
 		Status:       "downloading",
 		ETag:         result.ETag,
 		LastModified: result.LastModified,
@@ -136,7 +154,7 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		return fmt.Errorf("create download entry: %w", err)
 	}
 
-	// 5. Convert rows to snapshot format
+	// Convert rows to snapshot format
 	s.logger.Info("converting CSV rows to snapshot format", "rows", result.ParsedRows)
 	snapRows := make([]database.SnapCSVRow, 0, len(result.Rows))
 	for _, raw := range result.Rows {
@@ -146,7 +164,7 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 	}
 	stats.recordCount = len(snapRows)
 
-	// 6. Bulk insert via COPY protocol
+	// Bulk insert via COPY protocol
 	s.logger.Info("bulk inserting snapshot rows", "count", len(snapRows))
 	inserted, err := s.db.BulkInsertSnapCSV(ctx, runID, snapshotDate, downloadID, snapRows)
 	if err != nil {
@@ -155,24 +173,10 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 	}
 	s.logger.Info("bulk insert complete", "inserted", inserted)
 
-	// 7. Complete download log
+	// Complete download log
 	s.db.CompleteCSVDownloadEntry(ctx, downloadID, len(snapRows), 0)
 
-	// 8. Update cache headers
-	if result.ETag != "" || result.LastModified != "" {
-		now := time.Now()
-		cacheHeaders := &database.CSVCacheHeaders{
-			URL:              samgov.FullCSVURL,
-			ETag:             result.ETag,
-			LastModified:     result.LastModified,
-			LastDownloadedAt: &now,
-		}
-		if err := s.db.UpsertCSVCacheHeaders(ctx, cacheHeaders); err != nil {
-			s.logger.Warn("failed to save CSV cache headers", "error", err)
-		}
-	}
-
-	// 9. Get previous run for change detection
+	// Get previous run for change detection
 	prevRunID, _, prevErr := s.db.GetLastCompletedRun(ctx, "snapshot-csv")
 	if prevErr != nil {
 		s.logger.Warn("failed to get previous run", "error", prevErr)
@@ -191,7 +195,7 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		return nil
 	}
 
-	// 10. Change detection
+	// Change detection
 	s.logger.Info("detecting changes", "current_run", runID, "previous_run", prevRunID)
 	newCount, changedCount, err := s.db.DetectChanges(ctx, runID, prevRunID, snapshotDate, s.logger)
 	if err != nil {
@@ -202,7 +206,7 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		s.logger.Info("change detection complete", "new", newCount, "changed", changedCount)
 	}
 
-	// 11. Disappearance detection
+	// Disappearance detection
 	disappearedCount, err := s.db.DetectDisappearances(ctx, runID, prevRunID, snapshotDate, s.logger)
 	if err != nil {
 		s.logger.Error("disappearance detection failed", "error", err)
@@ -211,7 +215,7 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		s.logger.Info("disappearance detection complete", "disappeared", disappearedCount)
 	}
 
-	// 12. Reappearance detection
+	// Reappearance detection
 	reappearedCount, err := s.db.DetectReappearances(ctx, runID, snapshotDate)
 	if err != nil {
 		s.logger.Error("reappearance detection failed", "error", err)
@@ -222,10 +226,10 @@ func (s *Service) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 		}
 	}
 
-	// 13. Reconcile: populate opportunities table
+	// Reconcile: populate opportunities table
 	s.reconcileOpportunities(ctx, runID, snapshotDate, result.Rows, stats)
 
-	// 14. Mark disappeared records inactive
+	// Mark disappeared records inactive
 	deactivated, dErr := s.db.MarkDisappearedInactive(ctx, runID)
 	if dErr != nil {
 		s.logger.Error("failed to mark disappeared inactive", "error", dErr)

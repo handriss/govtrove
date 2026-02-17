@@ -62,6 +62,7 @@ help:
 	@echo "  make run-download-csv-neon        - Download all bulk CSVs (Neon + S3)"
 	@echo "  make run-download-csv-aws         - Trigger ECS bulk CSV task"
 	@echo "  make logs-download-csv            - Tail CloudWatch logs for bulk CSV"
+	@echo "  (In prod, ingestion is triggered automatically by bulk CSV on new active file)"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
