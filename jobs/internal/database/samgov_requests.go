@@ -24,7 +24,7 @@ type SAMGovRequest struct {
 func (db *DB) RecordSAMGovRequest(ctx context.Context, req *SAMGovRequest) (int, error) {
 	var id int
 	err := db.pool.QueryRow(ctx, `
-		INSERT INTO samgov_requests (
+		INSERT INTO pipeline.samgov_requests (
 			endpoint,
 			method,
 			http_status_code,
@@ -58,7 +58,7 @@ func (db *DB) CountSAMGovRequestsSince(ctx context.Context, duration time.Durati
 	var count int
 	since := time.Now().Add(-duration)
 	err := db.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM samgov_requests
+		SELECT COUNT(*) FROM pipeline.samgov_requests
 		WHERE request_timestamp >= $1
 	`, since).Scan(&count)
 
@@ -72,7 +72,7 @@ func (db *DB) CountSuccessfulSAMGovRequestsSince(ctx context.Context, duration t
 	var count int
 	since := time.Now().Add(-duration)
 	err := db.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM samgov_requests
+		SELECT COUNT(*) FROM pipeline.samgov_requests
 		WHERE request_timestamp >= $1 AND success = true
 	`, since).Scan(&count)
 
@@ -86,7 +86,7 @@ func (db *DB) CountFailedSAMGovRequestsSince(ctx context.Context, duration time.
 	var count int
 	since := time.Now().Add(-duration)
 	err := db.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM samgov_requests
+		SELECT COUNT(*) FROM pipeline.samgov_requests
 		WHERE request_timestamp >= $1 AND success = false
 	`, since).Scan(&count)
 
@@ -113,7 +113,7 @@ func (db *DB) GetSAMGovRequestStatsSince(ctx context.Context, duration time.Dura
 			COUNT(*) FILTER (WHERE success = true) as successful,
 			COUNT(*) FILTER (WHERE success = false) as failed,
 			AVG(response_time_ms) FILTER (WHERE response_time_ms IS NOT NULL) as avg_response_time
-		FROM samgov_requests
+		FROM pipeline.samgov_requests
 		WHERE request_timestamp >= $1
 	`, since).Scan(&stats.TotalRequests, &stats.SuccessfulRequests, &stats.FailedRequests, &stats.AvgResponseTimeMs)
 
@@ -125,7 +125,7 @@ func (db *DB) GetSAMGovRequestStatsSince(ctx context.Context, duration time.Dura
 
 func (db *DB) UpdateSAMGovRequestResponseSize(ctx context.Context, requestID int, sizeBytes int) error {
 	_, err := db.pool.Exec(ctx, `
-		UPDATE samgov_requests
+		UPDATE pipeline.samgov_requests
 		SET response_size_bytes = $2
 		WHERE id = $1
 	`, requestID, sizeBytes)
