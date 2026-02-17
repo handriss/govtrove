@@ -54,10 +54,8 @@ func main() {
 	switch command {
 	case "ingest":
 		runErr = RunIngest(ctx, cfg, db, logger)
-	case "download-bulk-csv-active":
-		runErr = RunDownloadBulkCSVActive(ctx, cfg, db, logger)
-	case "download-bulk-csv-archived":
-		runErr = RunDownloadBulkCSVArchived(ctx, cfg, db, logger)
+	case "download-bulk-csv":
+		runErr = RunDownloadBulkCSV(ctx, cfg, db, logger)
 	case "backfill-opportunities":
 		runErr = RunBackfillOpportunities(ctx, db, logger)
 	default:
@@ -79,7 +77,6 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  ingest                       Run snapshot-based CSV ingestion")
-	fmt.Fprintln(os.Stderr, "  download-bulk-csv-active     Download active opportunities CSV to S3")
-	fmt.Fprintln(os.Stderr, "  download-bulk-csv-archived   Download archived opportunities CSVs to S3")
+	fmt.Fprintln(os.Stderr, "  download-bulk-csv            Download all bulk CSVs (active + archived) to S3")
 	fmt.Fprintln(os.Stderr, "  backfill-opportunities       Populate opportunities table from latest snapshot")
 }
