@@ -13,9 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/handriss/govtrove/jobs/internal/bulkcsv"
-	"github.com/handriss/govtrove/jobs/internal/config"
-	"github.com/handriss/govtrove/jobs/internal/database"
+	"github.com/handriss/govtrove/pipeline/internal/bulkcsv"
+	"github.com/handriss/govtrove/pipeline/internal/config"
+	"github.com/handriss/govtrove/pipeline/internal/database"
 )
 
 var (

@@ -15,8 +15,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/handriss/govtrove/jobs/internal/config"
-	"github.com/handriss/govtrove/jobs/internal/database"
+	"github.com/handriss/govtrove/pipeline/internal/config"
+	"github.com/handriss/govtrove/pipeline/internal/database"
 )
 
 const (

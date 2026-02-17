@@ -95,7 +95,9 @@
               "Payload.$": "$"
             },
             "ResultSelector": {
-              "status.$": "$.Payload.status"
+              "status.$": "$.Payload.status",
+              "run_id.$": "$.Payload.run_id",
+              "job_type.$": "$.Payload.job_type"
             },
             "Retry": [
               {
@@ -116,7 +118,9 @@
               "Payload.$": "$"
             },
             "ResultSelector": {
-              "status.$": "$.Payload.status"
+              "status.$": "$.Payload.status",
+              "run_id.$": "$.Payload.run_id",
+              "job_type.$": "$.Payload.job_type"
             },
             "Retry": [
               {

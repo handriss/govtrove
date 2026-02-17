@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/handriss/govtrove/jobs/internal/parse"
+	"github.com/handriss/govtrove/pipeline/internal/parse"
 	"golang.org/x/text/encoding/charmap"
 )
 

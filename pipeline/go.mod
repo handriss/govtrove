@@ -1,4 +1,4 @@
-module github.com/handriss/govtrove/jobs
+module github.com/handriss/govtrove/pipeline
 
 go 1.23
 

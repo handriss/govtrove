@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/handriss/govtrove/jobs/internal/reconcile"
+	"github.com/handriss/govtrove/pipeline/internal/reconcile"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -168,6 +168,26 @@ func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int
 	`, runID)
 	if err != nil {
 		return 0, fmt.Errorf("mark disappeared inactive: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+// ResolveExpectedDisappearances marks disappearances as "archived" when the
+// notice_id appears in the archived CSV run. Returns the count resolved.
+func (db *DB) ResolveExpectedDisappearances(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error) {
+	tag, err := db.pool.Exec(ctx, `
+		UPDATE pipeline.snap_disappearances d
+		SET resolution = 'archived',
+		    resolution_date = $3,
+		    resolution_source = 'archived_csv'
+		FROM pipeline.snap_csv a
+		WHERE a.notice_id = d.notice_id
+		  AND a.run_id = $2
+		  AND d.run_id = $1
+		  AND d.resolution IS NULL
+	`, activeRunID, archivedRunID, snapshotDate)
+	if err != nil {
+		return 0, fmt.Errorf("resolve expected disappearances: %w", err)
 	}
 	return int(tag.RowsAffected()), nil
 }

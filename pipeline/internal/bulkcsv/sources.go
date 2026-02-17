@@ -1,6 +1,6 @@
 package bulkcsv
 
-import "github.com/handriss/govtrove/jobs/internal/samgov"
+import "github.com/handriss/govtrove/pipeline/internal/samgov"
 
 type Source struct {
 	Key           string
