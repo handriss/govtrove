@@ -3,10 +3,11 @@ module github.com/handriss/govtrove/jobs
 go 1.23
 
 require (
+	github.com/aws/aws-lambda-go v1.52.0
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
-	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.1
 	github.com/aws/aws-sdk-go-v2/service/sns v1.29.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/aws/aws-lambda-go v1.52.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.0 // indirect

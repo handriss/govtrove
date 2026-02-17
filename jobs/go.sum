@@ -18,8 +18,6 @@ github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 h1:hT8rVHwugYE2lEfdFE0QWVo81lF7
 github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0/go.mod h1:8tu/lYfQfFe6IGnaOdrpVgEL2IrrDOf6/m9RQum4NkY=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.17 h1:JqcdRG//czea7Ppjb+g/n4o8i/R50aTBHkA7vu0lK+k=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.17/go.mod h1:CO+WeGmIdj/MlPel2KwID9Gt7CNq4M65HUfBW97liM0=
-github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0 h1:MzP/ElwTpINq+hS80ZQz4epKVnUTlz8Sz+P/AFORCKM=
-github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0/go.mod h1:pMlGFDpHoLTJOIZHGdJOAWmi+xeIlQXuFTuQxs1epYE=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.4 h1:0ryTNEdJbzUCEWkVXEXoqlXV72J5keC1GvILMOuD00E=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.4/go.mod h1:HQ4qwNZh32C3CBeO6iJLQlgtMzqeG17ziAA/3KDJFow=
 github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.8 h1:Z5EiPIzXKewUQK0QTMkutjiaPVeVYXX7KIqhXu/0fXs=
@@ -30,6 +28,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.17 h1:bGeHBsGZx0Dvu
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.17/go.mod h1:dcW24lbU0CzHusTE8LLHhRLI42ejmINN8Lcr22bwh/g=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0 h1:oeu8VPlOre74lBA/PMhxa5vewaMIMmILM+RraSyB8KA=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0/go.mod h1:5jggDlZ2CLQhwJBiZJb4vfk4f0GxWdEDruWKEJ1xOdo=
+github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.1 h1:72DBkm/CCuWx2LMHAXvLDkZfzopT3psfAeyZDIt1/yE=
+github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.1/go.mod h1:A+oSJxFvzgjZWkpM0mXs3RxB5O1SD6473w3qafOC9eU=
 github.com/aws/aws-sdk-go-v2/service/sns v1.29.0 h1:7EIbjw6JdNpNYOy/OEWCsYtAYzpQ8I94HdSv22jo1yc=
 github.com/aws/aws-sdk-go-v2/service/sns v1.29.0/go.mod h1:Je6tsVODi2e/0GpfbXtsP/wu1ZaXVe8C9SSiEr3h7OY=
 github.com/aws/aws-sdk-go-v2/service/sso v1.20.0 h1:6YL8G91QZ52KlPrLkEgEez5kejIVwChVCgND3qgY5j0=
