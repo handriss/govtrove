@@ -131,8 +131,7 @@ resource "aws_iam_role_policy" "eventbridge_scheduler_ecs" {
         ]
         Resource = [
           aws_ecs_task_definition.ingestion.arn,
-          aws_ecs_task_definition.csvarchive.arn,
-          aws_ecs_task_definition.archivedcsv.arn
+          aws_ecs_task_definition.bulkcsv.arn
         ]
       },
       {

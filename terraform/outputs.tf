@@ -136,14 +136,9 @@ output "data_bucket_name" {
   value       = aws_s3_bucket.data.id
 }
 
-output "csvarchive_task_definition_arn" {
-  description = "ECS task definition ARN for CSV archive"
-  value       = aws_ecs_task_definition.csvarchive.arn
-}
-
-output "archivedcsv_task_definition_arn" {
-  description = "ECS task definition ARN for archived CSV download"
-  value       = aws_ecs_task_definition.archivedcsv.arn
+output "bulkcsv_task_definition_arn" {
+  description = "ECS task definition ARN for bulk CSV download"
+  value       = aws_ecs_task_definition.bulkcsv.arn
 }
 
 output "workos_client_id" {
