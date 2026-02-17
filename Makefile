@@ -2,9 +2,7 @@
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	run run-neon run-backfill-opps-neon \
-	run-download-csv run-download-csv-neon \
-	build test lambda-build \
+	test lambda-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-pipeline deploy-all \
 	run-pipeline pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
@@ -53,15 +51,6 @@ help:
 	@echo "  make frontend-stop    - Stop background frontend server"
 	@echo "  make frontend-build   - Build frontend for production"
 	@echo ""
-	@echo "Ingestion Service (local dev):"
-	@echo "  make run                        - Daily update (local DB)"
-	@echo "  make run-neon                   - Daily update (Neon DB)"
-	@echo "  make run-backfill-opps-neon     - Backfill opportunities from latest snapshot (Neon)"
-	@echo ""
-	@echo "Bulk CSV Download (local dev):"
-	@echo "  make run-download-csv             - Download all bulk CSVs locally (no S3)"
-	@echo "  make run-download-csv-neon        - Download all bulk CSVs (Neon + S3)"
-	@echo ""
 	@echo "Pipeline (production):"
 	@echo "  make run-pipeline                 - Manually trigger Step Functions pipeline"
 	@echo "  make pipeline-status              - Show recent pipeline executions"
@@ -75,7 +64,6 @@ help:
 	@echo "  make migrate-neon     - Run migrations (Neon DB)"
 	@echo ""
 	@echo "Build:"
-	@echo "  make build              - Build jobs binary"
 	@echo "  make lambda-build       - Build all 4 pipeline Lambda zips"
 	@echo "  make test               - Run tests"
 	@echo ""
@@ -231,82 +219,20 @@ frontend-build:
 	cd frontend && npm run build
 
 # ============================================================================
-# Ingestion Service
-# ============================================================================
-
-run:
-	cd jobs && \
-	DATABASE_URL="$(LOCAL_DB_URL)" \
-	SAM_API_KEY="dummy-key-for-local-testing" \
-	LOG_LEVEL=debug \
-	go run ./cmd/jobs ingest
-
-run-neon:
-	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
-		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	@if [ -z "$(SAM_API_KEY)" ]; then \
-		echo "Error: SAM_API_KEY environment variable is not set"; \
-		exit 1; \
-	fi
-	cd jobs && \
-	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	SAM_API_KEY="$(SAM_API_KEY)" \
-	LOG_LEVEL=debug \
-	go run ./cmd/jobs ingest
-
-run-backfill-opps-neon:
-	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
-		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	cd jobs && \
-	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	LOG_LEVEL=debug \
-	go run ./cmd/jobs backfill-opportunities
-
-# ============================================================================
-# Bulk CSV Download
-# ============================================================================
-
-run-download-csv:
-	cd jobs && \
-	DATABASE_URL="$(LOCAL_DB_URL)" \
-	S3_ARCHIVE_ENABLED=false \
-	LOG_LEVEL=debug \
-	go run ./cmd/jobs download-bulk-csv
-
-run-download-csv-neon:
-	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
-		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
-		exit 1; \
-	fi
-	cd jobs && \
-	DATABASE_URL="$(NEON_DATABASE_URL)" \
-	S3_BUCKET=govtrove-data \
-	S3_ARCHIVE_ENABLED=true \
-	LOG_LEVEL=debug \
-	go run ./cmd/jobs download-bulk-csv
-
-# ============================================================================
 # Build
 # ============================================================================
 
 LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile
 
-build:
-	cd jobs && go build -o ../bin/jobs ./cmd/jobs
-
 test:
-	cd jobs && go test -v ./...
+	cd pipeline && go test -v ./...
 	cd api && go test -v ./...
 
 lambda-build:
 	@for svc in $(LAMBDA_FUNCTIONS); do \
 		echo "Building Lambda: $$svc..."; \
 		mkdir -p bin/lambda/$$svc; \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -C jobs -o ../bin/lambda/$$svc/bootstrap ./cmd/lambda/$$svc; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -C pipeline -o ../bin/lambda/$$svc/bootstrap ./cmd/lambda/$$svc; \
 	done
 	@echo "All Lambda functions built"
 

@@ -1,8 +1,8 @@
 package ingest
 
 import (
-	"github.com/handriss/govtrove/jobs/internal/database"
-	"github.com/handriss/govtrove/jobs/internal/samgov"
+	"github.com/handriss/govtrove/pipeline/internal/database"
+	"github.com/handriss/govtrove/pipeline/internal/samgov"
 )
 
 func ExtractSnapCSVRow(raw map[string]string) database.SnapCSVRow {

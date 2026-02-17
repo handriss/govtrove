@@ -3,7 +3,7 @@ package reconcile
 import (
 	"time"
 
-	"github.com/handriss/govtrove/jobs/internal/parse"
+	"github.com/handriss/govtrove/pipeline/internal/parse"
 )
 
 // Opportunity is the write model for upserting into the opportunities table.
