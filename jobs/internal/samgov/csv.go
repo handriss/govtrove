@@ -78,7 +78,7 @@ func (c *CSVClient) FetchOpportunitiesConditional(ctx context.Context, limit int
 
 	c.logger.Info("CSV download started, parsing stream", "response_time_ms", resp.ResponseTimeMs)
 
-	result, err := c.parseCSV(resp.Body, limit)
+	result, err := ParseCSVFromReader(resp.Body, limit, c.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (c *CSVClient) FetchOpportunitiesConditional(ctx context.Context, limit int
 	return result, nil
 }
 
-func (c *CSVClient) parseCSV(r io.Reader, limit int) (*CSVParseResult, error) {
+func ParseCSVFromReader(r io.Reader, limit int, logger *slog.Logger) (*CSVParseResult, error) {
 	reader := csv.NewReader(r)
 	reader.LazyQuotes = true
 	reader.FieldsPerRecord = -1
@@ -121,7 +121,7 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*CSVParseResult, error) {
 			break
 		}
 		if err != nil {
-			c.logger.Warn("failed to read CSV row", "error", err, "row", result.TotalRows+1)
+			logger.Warn("failed to read CSV row", "error", err, "row", result.TotalRows+1)
 			result.Errors++
 			result.TotalRows++
 			continue
@@ -150,7 +150,7 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*CSVParseResult, error) {
 		if result.ParsedRows%progressInterval == 0 {
 			elapsed := time.Since(startTime)
 			rate := float64(result.ParsedRows) / elapsed.Seconds()
-			c.logger.Info("CSV parsing progress",
+			logger.Info("CSV parsing progress",
 				"parsed", result.ParsedRows,
 				"errors", result.Errors,
 				"elapsed", elapsed.Round(time.Second),
@@ -159,12 +159,12 @@ func (c *CSVClient) parseCSV(r io.Reader, limit int) (*CSVParseResult, error) {
 		}
 
 		if limit > 0 && result.ParsedRows >= limit {
-			c.logger.Info("reached record limit", "limit", limit)
+			logger.Info("reached record limit", "limit", limit)
 			break
 		}
 	}
 
-	c.logger.Info("CSV parsing complete",
+	logger.Info("CSV parsing complete",
 		"total_rows", result.TotalRows,
 		"parsed_rows", result.ParsedRows,
 		"errors", result.Errors,

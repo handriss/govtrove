@@ -30,6 +30,7 @@ type SourceResult struct {
 	Outcome string // new_file, not_modified, hash_match, error
 	Size    int64
 	Rows    int
+	S3Key   string
 }
 
 func Run(ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client, logger *slog.Logger) ([]SourceResult, error) {
@@ -65,15 +66,6 @@ func processSource(ctx context.Context, cfg *config.Config, db *database.DB, s3C
 	prevETag, prevLastModified, err := db.GetLatestBulkCSVHeaders(ctx, src.Key)
 	if err != nil {
 		logger.Warn("failed to get previous headers", "error", err)
-	}
-
-	// For active source, also check csv_cache_headers as fallback
-	if !src.UseRangeProbe && prevETag == "" && prevLastModified == "" {
-		cached, cacheErr := db.GetCSVCacheHeaders(ctx, src.URL)
-		if cacheErr == nil && cached != nil {
-			prevETag = cached.ETag
-			prevLastModified = cached.LastModified
-		}
 	}
 
 	// S3 existence check: if we have a previous s3_key, verify it still exists
@@ -270,21 +262,6 @@ func archiveFile(
 		s3Key = ""
 	}
 
-	// Update csv_cache_headers for ingestion service
-	if etag != "" || lastModified != "" {
-		now := time.Now()
-		cacheHeaders := &database.CSVCacheHeaders{
-			URL:              src.URL,
-			ETag:             etag,
-			LastModified:     lastModified,
-			ContentLength:    fileSize,
-			LastDownloadedAt: &now,
-		}
-		if err := db.UpsertCSVCacheHeaders(ctx, cacheHeaders); err != nil {
-			logger.Warn("failed to update csv_cache_headers", "error", err)
-		}
-	}
-
 	// Log new_file to DB
 	var cl *int64
 	if contentLength > 0 {
@@ -324,6 +301,7 @@ func archiveFile(
 		Outcome: "new_file",
 		Size:   fileSize,
 		Rows:   rowCount,
+		S3Key:  s3Key,
 	}, nil
 }
 

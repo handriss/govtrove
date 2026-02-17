@@ -8,6 +8,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/handriss/govtrove/jobs/internal/bulkcsv"
@@ -80,6 +82,14 @@ func RunDownloadBulkCSV(ctx context.Context, cfg *config.Config, db *database.DB
 			fmt.Sprintf("Bulk CSV results:\n%s", bulkcsv.FormatSummary(results)))
 	}
 
+	// Trigger ingestion if the active source produced a new file
+	for _, r := range results {
+		if r.Source == "active" && r.Outcome == "new_file" && r.S3Key != "" {
+			triggerIngestion(ctx, cfg, awsCfg, logger, r.S3Key)
+			break
+		}
+	}
+
 	// Return error if any source failed
 	if hasError {
 		var failed []string
@@ -92,4 +102,63 @@ func RunDownloadBulkCSV(ctx context.Context, cfg *config.Config, db *database.DB
 	}
 
 	return nil
+}
+
+func triggerIngestion(ctx context.Context, cfg *config.Config, awsCfg aws.Config, logger *slog.Logger, s3Key string) {
+	if cfg.ECSCluster == "" || cfg.IngestionTaskDef == "" {
+		logger.Info("ECS config not set, skipping ingestion trigger", "s3_key", s3Key)
+		return
+	}
+
+	subnets := strings.Split(cfg.ECSSubnets, ",")
+	ecsClient := ecs.NewFromConfig(awsCfg)
+
+	input := &ecs.RunTaskInput{
+		Cluster:        aws.String(cfg.ECSCluster),
+		TaskDefinition: aws.String(cfg.IngestionTaskDef),
+		LaunchType:     ecstypes.LaunchTypeFargate,
+		Count:          aws.Int32(1),
+		NetworkConfiguration: &ecstypes.NetworkConfiguration{
+			AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{
+				Subnets:        subnets,
+				SecurityGroups: []string{cfg.ECSSecurityGroup},
+				AssignPublicIp: ecstypes.AssignPublicIpEnabled,
+			},
+		},
+		Overrides: &ecstypes.TaskOverride{
+			ContainerOverrides: []ecstypes.ContainerOverride{
+				{
+					Name: aws.String("ingestion"),
+					Environment: []ecstypes.KeyValuePair{
+						{
+							Name:  aws.String("S3_ACTIVE_CSV_KEY"),
+							Value: aws.String(s3Key),
+						},
+						{
+							Name:  aws.String("S3_BUCKET"),
+							Value: aws.String(cfg.S3Bucket),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	out, err := ecsClient.RunTask(ctx, input)
+	if err != nil {
+		logger.Error("failed to trigger ingestion task", "error", err)
+		return
+	}
+
+	if len(out.Tasks) > 0 {
+		logger.Info("ingestion task triggered",
+			"task_arn", aws.ToString(out.Tasks[0].TaskArn),
+			"s3_key", s3Key,
+		)
+	}
+	if len(out.Failures) > 0 {
+		logger.Error("ingestion task launch had failures",
+			"reason", aws.ToString(out.Failures[0].Reason),
+		)
+	}
 }
