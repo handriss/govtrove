@@ -87,28 +87,15 @@ variable "schedule_expression" {
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
 
-# CSV Archive Schedule
-variable "csvarchive_schedule_expression" {
-  description = "EventBridge schedule expression for CSV archive"
+# Bulk CSV Schedule
+variable "bulkcsv_schedule_expression" {
+  description = "EventBridge schedule expression for bulk CSV download (active + archived)"
   type        = string
   default     = "cron(0/15 * * * ? *)"
 }
 
-variable "csvarchive_schedule_enabled" {
-  description = "Whether the CSV archive schedule is enabled"
-  type        = bool
-  default     = true
-}
-
-# Archived CSV Schedule
-variable "archivedcsv_schedule_expression" {
-  description = "EventBridge schedule expression for archived CSV download"
-  type        = string
-  default     = "cron(0 0,6,12,18 * * ? *)"
-}
-
-variable "archivedcsv_schedule_enabled" {
-  description = "Whether the archived CSV schedule is enabled"
+variable "bulkcsv_schedule_enabled" {
+  description = "Whether the bulk CSV schedule is enabled"
   type        = bool
   default     = true
 }
