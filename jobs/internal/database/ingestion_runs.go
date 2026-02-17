@@ -22,7 +22,7 @@ type RunStats struct {
 func (db *DB) CreateIngestionRun(ctx context.Context, jobType string) (uuid.UUID, error) {
 	var runID uuid.UUID
 	err := db.pool.QueryRow(ctx,
-		`INSERT INTO ingestion_runs (job_type, status) VALUES ($1, 'running') RETURNING run_id`,
+		`INSERT INTO pipeline.ingestion_runs (job_type, status) VALUES ($1, 'running') RETURNING run_id`,
 		jobType,
 	).Scan(&runID)
 	if err != nil {
@@ -33,7 +33,7 @@ func (db *DB) CreateIngestionRun(ctx context.Context, jobType string) (uuid.UUID
 
 func (db *DB) CompleteIngestionRun(ctx context.Context, runID uuid.UUID, s RunStats) error {
 	_, err := db.pool.Exec(ctx, `
-		UPDATE ingestion_runs
+		UPDATE pipeline.ingestion_runs
 		SET status = 'completed',
 		    completed_at = NOW(),
 		    records_fetched = $2,
@@ -53,7 +53,7 @@ func (db *DB) CompleteIngestionRun(ctx context.Context, runID uuid.UUID, s RunSt
 
 func (db *DB) FailIngestionRun(ctx context.Context, runID uuid.UUID, errMsg string, durationMs int) error {
 	_, err := db.pool.Exec(ctx, `
-		UPDATE ingestion_runs
+		UPDATE pipeline.ingestion_runs
 		SET status = 'failed',
 		    completed_at = NOW(),
 		    error_message = $2,
@@ -71,7 +71,7 @@ func (db *DB) GetLastCompletedRun(ctx context.Context, jobType string) (uuid.UUI
 	var snapshotDate time.Time
 	err := db.pool.QueryRow(ctx, `
 		SELECT run_id, started_at
-		FROM ingestion_runs
+		FROM pipeline.ingestion_runs
 		WHERE job_type = $1 AND status = 'completed'
 		ORDER BY started_at DESC
 		LIMIT 1

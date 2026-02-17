@@ -20,7 +20,7 @@ type CSVCacheHeaders struct {
 func (db *DB) GetCSVCacheHeaders(ctx context.Context, url string) (*CSVCacheHeaders, error) {
 	query := `
 		SELECT id, url, etag, last_modified, content_length, last_checked_at, last_downloaded_at, created_at
-		FROM csv_cache_headers
+		FROM pipeline.csv_cache_headers
 		WHERE url = $1
 	`
 
@@ -58,7 +58,7 @@ func (db *DB) GetCSVCacheHeaders(ctx context.Context, url string) (*CSVCacheHead
 // UpsertCSVCacheHeaders inserts or updates cache headers for a URL
 func (db *DB) UpsertCSVCacheHeaders(ctx context.Context, h *CSVCacheHeaders) error {
 	query := `
-		INSERT INTO csv_cache_headers (url, etag, last_modified, content_length, last_checked_at, last_downloaded_at)
+		INSERT INTO pipeline.csv_cache_headers (url, etag, last_modified, content_length, last_checked_at, last_downloaded_at)
 		VALUES ($1, $2, $3, $4, NOW(), $5)
 		ON CONFLICT (url) DO UPDATE SET
 			etag = EXCLUDED.etag,
@@ -87,7 +87,7 @@ func (db *DB) UpsertCSVCacheHeaders(ctx context.Context, h *CSVCacheHeaders) err
 
 // UpdateCSVCacheLastChecked updates just the last_checked_at timestamp
 func (db *DB) UpdateCSVCacheLastChecked(ctx context.Context, url string) error {
-	query := `UPDATE csv_cache_headers SET last_checked_at = NOW() WHERE url = $1`
+	query := `UPDATE pipeline.csv_cache_headers SET last_checked_at = NOW() WHERE url = $1`
 	_, err := db.pool.Exec(ctx, query, url)
 	return err
 }

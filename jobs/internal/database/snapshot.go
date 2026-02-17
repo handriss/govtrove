@@ -72,7 +72,7 @@ func ComputeContentHash(row map[string]string) string {
 func (db *DB) CreateCSVDownloadEntry(ctx context.Context, e *CSVDownloadEntry) (int64, error) {
 	var id int64
 	err := db.pool.QueryRow(ctx, `
-		INSERT INTO csv_download_log (run_id, url, status, etag, last_modified)
+		INSERT INTO pipeline.csv_download_log (run_id, url, status, etag, last_modified)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`, e.RunID, e.URL, e.Status, nilIfEmpty(e.ETag), nilIfEmpty(e.LastModified)).Scan(&id)
@@ -84,7 +84,7 @@ func (db *DB) CreateCSVDownloadEntry(ctx context.Context, e *CSVDownloadEntry) (
 
 func (db *DB) CompleteCSVDownloadEntry(ctx context.Context, id int64, recordCount int, fileSizeBytes int64) error {
 	_, err := db.pool.Exec(ctx, `
-		UPDATE csv_download_log
+		UPDATE pipeline.csv_download_log
 		SET status = 'completed', record_count = $2, file_size_bytes = $3
 		WHERE id = $1
 	`, id, recordCount, fileSizeBytes)
@@ -93,7 +93,7 @@ func (db *DB) CompleteCSVDownloadEntry(ctx context.Context, id int64, recordCoun
 
 func (db *DB) FailCSVDownloadEntry(ctx context.Context, id int64, errMsg string) error {
 	_, err := db.pool.Exec(ctx, `
-		UPDATE csv_download_log
+		UPDATE pipeline.csv_download_log
 		SET status = 'failed', error_message = $2
 		WHERE id = $1
 	`, id, errMsg)
@@ -113,7 +113,7 @@ func (db *DB) BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snapshotDa
 
 	copyCount, err := db.pool.CopyFrom(
 		ctx,
-		pgx.Identifier{"snap_csv"},
+		pgx.Identifier{"pipeline", "snap_csv"},
 		columns,
 		&snapCSVCopySource{rows: rows, runID: runID, snapshotDate: snapshotDate, downloadID: downloadID},
 	)
@@ -161,8 +161,8 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 	// Find new records (in current but not in previous)
 	newRows, err := db.pool.Query(ctx, `
 		SELECT c.notice_id, c.solicitation_number
-		FROM snap_csv c
-		LEFT JOIN snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
+		FROM pipeline.snap_csv c
+		LEFT JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
 		WHERE c.run_id = $1 AND p.notice_id IS NULL
 	`, currentRunID, previousRunID)
 	if err != nil {
@@ -179,7 +179,7 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 		}
 		newCount++
 		batch.Queue(`
-			INSERT INTO snap_changes (run_id, notice_id, solicitation_number, source, field_name, new_value, detected_date, change_type)
+			INSERT INTO pipeline.snap_changes (run_id, notice_id, solicitation_number, source, field_name, new_value, detected_date, change_type)
 			VALUES ($1, $2, $3, 'active_csv', '_record', 'new', $4, 'new')
 		`, currentRunID, noticeID, solNum, snapshotDate)
 	}
@@ -190,8 +190,8 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 	// Find changed records (hash mismatch)
 	changedRows, err := db.pool.Query(ctx, `
 		SELECT c.notice_id, c.solicitation_number, c.raw_data, p.raw_data
-		FROM snap_csv c
-		JOIN snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
+		FROM pipeline.snap_csv c
+		JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
 		WHERE c.run_id = $1 AND c.content_hash != p.content_hash
 	`, currentRunID, previousRunID)
 	if err != nil {
@@ -202,7 +202,7 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 	previousDate := snapshotDate // approximate — use previous run's snapshot_date ideally
 	// Get previous run's start time for previous_date
 	var prevDate time.Time
-	pErr := db.pool.QueryRow(ctx, `SELECT started_at FROM ingestion_runs WHERE run_id = $1`, previousRunID).Scan(&prevDate)
+	pErr := db.pool.QueryRow(ctx, `SELECT started_at FROM pipeline.ingestion_runs WHERE run_id = $1`, previousRunID).Scan(&prevDate)
 	if pErr == nil {
 		previousDate = prevDate
 	}
@@ -233,7 +233,7 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 			newVal := curr[field]
 			if oldVal != newVal {
 				batch.Queue(`
-					INSERT INTO snap_changes (run_id, notice_id, solicitation_number, source, field_name, old_value, new_value, detected_date, previous_date, change_type)
+					INSERT INTO pipeline.snap_changes (run_id, notice_id, solicitation_number, source, field_name, old_value, new_value, detected_date, previous_date, change_type)
 					VALUES ($1, $2, $3, 'active_csv', $4, $5, $6, $7, $8, 'modified')
 				`, currentRunID, noticeID, solNum, field, nilIfEmpty(oldVal), nilIfEmpty(newVal), snapshotDate, previousDate)
 			}
@@ -259,8 +259,8 @@ func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uui
 func (db *DB) DetectDisappearances(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, error) {
 	rows, err := db.pool.Query(ctx, `
 		SELECT p.notice_id, p.solicitation_number, p.type, p.archive_type, p.archive_date, p.snapshot_date
-		FROM snap_csv p
-		LEFT JOIN snap_csv c ON p.notice_id = c.notice_id AND c.run_id = $1
+		FROM pipeline.snap_csv p
+		LEFT JOIN pipeline.snap_csv c ON p.notice_id = c.notice_id AND c.run_id = $1
 		WHERE p.run_id = $2 AND c.notice_id IS NULL
 	`, currentRunID, previousRunID)
 	if err != nil {
@@ -279,7 +279,7 @@ func (db *DB) DetectDisappearances(ctx context.Context, currentRunID, previousRu
 		}
 		count++
 		batch.Queue(`
-			INSERT INTO snap_disappearances (run_id, notice_id, solicitation_number, last_seen_date, disappeared_date, last_type, last_archive_type, last_archive_date)
+			INSERT INTO pipeline.snap_disappearances (run_id, notice_id, solicitation_number, last_seen_date, disappeared_date, last_type, last_archive_type, last_archive_date)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`, currentRunID, noticeID, solNum, lastSeen, snapshotDate, typ, archType, archDate)
 	}
@@ -302,12 +302,12 @@ func (db *DB) DetectDisappearances(ctx context.Context, currentRunID, previousRu
 
 func (db *DB) DetectReappearances(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error) {
 	tag, err := db.pool.Exec(ctx, `
-		UPDATE snap_disappearances d
+		UPDATE pipeline.snap_disappearances d
 		SET resolution = 'glitch',
 		    resolution_date = $2,
 		    resolution_source = 'active_csv_reappeared',
 		    reappeared_date = $2
-		FROM snap_csv c
+		FROM pipeline.snap_csv c
 		WHERE d.notice_id = c.notice_id
 		  AND c.run_id = $1
 		  AND d.resolution IS NULL

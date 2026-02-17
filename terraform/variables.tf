@@ -35,19 +35,6 @@ variable "availability_zones" {
   default     = ["us-east-1a", "us-east-1b"]
 }
 
-# ECS Task
-variable "task_cpu" {
-  description = "CPU units for the Fargate task (256 = 0.25 vCPU)"
-  type        = number
-  default     = 256
-}
-
-variable "task_memory" {
-  description = "Memory for the Fargate task in MB"
-  type        = number
-  default     = 1024
-}
-
 # Secrets (sensitive - provide via tfvars or environment)
 variable "database_url" {
   description = "Neon PostgreSQL connection string"
@@ -87,17 +74,29 @@ variable "schedule_expression" {
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
 
-# Bulk CSV Schedule
 variable "bulkcsv_schedule_expression" {
-  description = "EventBridge schedule expression for bulk CSV download (active + archived)"
+  description = "EventBridge schedule expression for pipeline (active + archived)"
   type        = string
   default     = "cron(0/15 * * * ? *)"
 }
 
-variable "bulkcsv_schedule_enabled" {
-  description = "Whether the bulk CSV schedule is enabled"
+variable "pipeline_schedule_enabled" {
+  description = "Whether the pipeline schedule is enabled"
   type        = bool
   default     = true
+}
+
+# Lambda
+variable "lambda_memory" {
+  description = "Memory for pipeline Lambda functions in MB"
+  type        = number
+  default     = 1024
+}
+
+variable "lambda_timeout" {
+  description = "Timeout for pipeline Lambda functions in seconds"
+  type        = number
+  default     = 900
 }
 
 # API

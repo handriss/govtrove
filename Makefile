@@ -3,10 +3,11 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	run run-neon run-backfill-opps-neon \
-	run-download-csv run-download-csv-neon run-download-csv-aws logs-download-csv \
-	build test jobs-docker-build \
-	ecr-login deploy-frontend deploy-landing deploy-api deploy-jobs deploy-all \
-	logs-ingestion logs-api run-ingestion-aws status \
+	run-download-csv run-download-csv-neon \
+	build test lambda-build \
+	ecr-login deploy-frontend deploy-landing deploy-api deploy-pipeline deploy-all \
+	run-pipeline pipeline-status pipeline-dlq-status \
+	logs-pipeline logs-api status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
 	clean
 
@@ -52,17 +53,21 @@ help:
 	@echo "  make frontend-stop    - Stop background frontend server"
 	@echo "  make frontend-build   - Build frontend for production"
 	@echo ""
-	@echo "Ingestion Service:"
+	@echo "Ingestion Service (local dev):"
 	@echo "  make run                        - Daily update (local DB)"
 	@echo "  make run-neon                   - Daily update (Neon DB)"
 	@echo "  make run-backfill-opps-neon     - Backfill opportunities from latest snapshot (Neon)"
 	@echo ""
-	@echo "Bulk CSV Download:"
+	@echo "Bulk CSV Download (local dev):"
 	@echo "  make run-download-csv             - Download all bulk CSVs locally (no S3)"
 	@echo "  make run-download-csv-neon        - Download all bulk CSVs (Neon + S3)"
-	@echo "  make run-download-csv-aws         - Trigger ECS bulk CSV task"
-	@echo "  make logs-download-csv            - Tail CloudWatch logs for bulk CSV"
-	@echo "  (In prod, ingestion is triggered automatically by bulk CSV on new active file)"
+	@echo ""
+	@echo "Pipeline (production):"
+	@echo "  make run-pipeline                 - Manually trigger Step Functions pipeline"
+	@echo "  make pipeline-status              - Show recent pipeline executions"
+	@echo "  make pipeline-dlq-status          - Check DLQ depth"
+	@echo "  make logs-pipeline SVC=<name>     - Tail logs for pipeline Lambda"
+	@echo "  (Lambda functions: download-csvs, ingest-active, ingest-archived, reconcile)"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -71,22 +76,21 @@ help:
 	@echo ""
 	@echo "Build:"
 	@echo "  make build              - Build jobs binary"
-	@echo "  make jobs-docker-build  - Build jobs Docker image"
+	@echo "  make lambda-build       - Build all 4 pipeline Lambda zips"
 	@echo "  make test               - Run tests"
 	@echo ""
 	@echo "Deploy:"
-	@echo "  make ecr-login        - Login to AWS ECR"
-	@echo "  make deploy-landing   - Deploy landing page to S3/CloudFront"
-	@echo "  make deploy-frontend  - Build & deploy frontend app to S3/CloudFront"
-	@echo "  make deploy-api       - Build & deploy API to App Runner"
-	@echo "  make deploy-jobs      - Build & push jobs image to ECR"
-	@echo "  make deploy-all       - Deploy everything"
+	@echo "  make ecr-login                  - Login to AWS ECR"
+	@echo "  make deploy-landing             - Deploy landing page to S3/CloudFront"
+	@echo "  make deploy-frontend            - Build & deploy frontend app to S3/CloudFront"
+	@echo "  make deploy-api                 - Build & deploy API to App Runner"
+	@echo "  make deploy-pipeline            - Build & deploy pipeline Lambda functions"
+	@echo "  make deploy-all                 - Deploy everything"
 	@echo ""
 	@echo "Operations:"
-	@echo "  make logs-ingestion   - Tail CloudWatch logs for ingestion"
-	@echo "  make logs-api         - Tail App Runner logs for API"
-	@echo "  make run-ingestion-aws - Manually trigger ECS ingestion task"
-	@echo "  make status           - Show status of deployed services"
+	@echo "  make logs-pipeline SVC=x - Tail logs for a pipeline Lambda"
+	@echo "  make logs-api            - Tail App Runner logs for API"
+	@echo "  make status              - Show status of deployed services"
 	@echo ""
 	@echo "Terraform:"
 	@echo "  make tf-init          - Initialize Terraform"
@@ -285,26 +289,11 @@ run-download-csv-neon:
 	LOG_LEVEL=debug \
 	go run ./cmd/jobs download-bulk-csv
 
-run-download-csv-aws:
-	@echo "Triggering ECS bulk CSV task..."
-	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
-	TASK_DEF=$$(cd terraform && terraform output -raw bulkcsv_task_definition_arn) && \
-	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
-	SG=$$(cd terraform && terraform output -raw security_group_id) && \
-	aws ecs run-task \
-		--cluster $$CLUSTER \
-		--task-definition $$TASK_DEF \
-		--launch-type FARGATE \
-		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
-		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "Bulk CSV task triggered! Check logs with 'make logs-download-csv'"
-
-logs-download-csv:
-	aws logs tail /govtrove/bulkcsv --follow --profile $(AWS_PROFILE)
-
 # ============================================================================
 # Build
 # ============================================================================
+
+LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile
 
 build:
 	cd jobs && go build -o ../bin/jobs ./cmd/jobs
@@ -313,8 +302,13 @@ test:
 	cd jobs && go test -v ./...
 	cd api && go test -v ./...
 
-jobs-docker-build:
-	docker build --platform linux/amd64 -t govtrove-jobs:latest ./jobs
+lambda-build:
+	@for svc in $(LAMBDA_FUNCTIONS); do \
+		echo "Building Lambda: $$svc..."; \
+		mkdir -p bin/lambda/$$svc; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -C jobs -o ../bin/lambda/$$svc/bootstrap ./cmd/lambda/$$svc; \
+	done
+	@echo "All Lambda functions built"
 
 # ============================================================================
 # Deploy
@@ -350,12 +344,17 @@ deploy-api: api-docker-build ecr-login
 	aws apprunner start-deployment --service-arn $$ARN --profile $(AWS_PROFILE) --region $(AWS_REGION) && \
 	echo "API deployment triggered! Check status with 'make status'"
 
-deploy-jobs: jobs-docker-build ecr-login
-	@echo "Deploying jobs image to ECR..."
-	@ECR_URL=$$(cd terraform && terraform output -raw ecr_repository_url) && \
-	docker tag govtrove-jobs:latest $$ECR_URL:latest && \
-	docker push $$ECR_URL:latest && \
-	echo "Jobs image pushed successfully!"
+deploy-pipeline: lambda-build
+	@echo "Deploying pipeline Lambda functions..."
+	@for svc in $(LAMBDA_FUNCTIONS); do \
+		echo "Updating $$svc..."; \
+		cd bin/lambda/$$svc && zip -j ../$$svc.zip bootstrap && cd ../../..; \
+		aws lambda update-function-code \
+			--function-name govtrove-$$svc \
+			--zip-file fileb://bin/lambda/$$svc.zip \
+			--profile $(AWS_PROFILE) --region $(AWS_REGION) > /dev/null; \
+	done
+	@echo "All pipeline Lambda functions deployed!"
 
 deploy-landing:
 	@echo "Deploying landing page to S3/CloudFront..."
@@ -366,35 +365,53 @@ deploy-landing:
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
 	echo "Landing page deployed successfully!"
 
-deploy-all: deploy-api deploy-jobs deploy-frontend deploy-landing
+deploy-all: deploy-api deploy-pipeline deploy-frontend deploy-landing
 	@echo ""
 	@echo "All services deployed!"
+
+# ============================================================================
+# Pipeline Operations
+# ============================================================================
+
+run-pipeline:
+	@echo "Starting Step Functions pipeline execution..."
+	@ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn) && \
+	aws stepfunctions start-execution \
+		--state-machine-arn $$ARN \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "Pipeline execution started! Check status with 'make pipeline-status'"
+
+pipeline-status:
+	@echo "=== Recent Pipeline Executions ==="
+	@ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn) && \
+	aws stepfunctions list-executions \
+		--state-machine-arn $$ARN \
+		--max-results 5 \
+		--query 'executions[].{Name:name,Status:status,Start:startDate,Stop:stopDate}' \
+		--output table \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION)
+
+pipeline-dlq-status:
+	@echo "=== Pipeline DLQ Depth ==="
+	@DLQ_URL=$$(cd terraform && terraform output -raw pipeline_dlq_url) && \
+	COUNT=$$(aws sqs get-queue-attributes --queue-url "$$DLQ_URL" \
+		--attribute-names ApproximateNumberOfMessages \
+		--query 'Attributes.ApproximateNumberOfMessages' --output text \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION)) && \
+	echo "  pipeline-dlq: $$COUNT messages"
 
 # ============================================================================
 # Operations
 # ============================================================================
 
-logs-ingestion:
-	aws logs tail /govtrove/ingestion --follow --profile $(AWS_PROFILE)
+logs-pipeline:
+	@if [ -z "$(SVC)" ]; then echo "Usage: make logs-pipeline SVC=<name>"; echo "Functions: download-csvs, ingest-active, ingest-archived, reconcile"; exit 1; fi
+	aws logs tail /aws/lambda/govtrove-$(SVC) --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
 
 logs-api:
 	@SERVICE_ARN=$$(cd terraform && terraform output -raw apprunner_service_arn) && \
 	SERVICE_ID=$$(echo $$SERVICE_ARN | rev | cut -d'/' -f1 | rev) && \
 	aws logs tail /aws/apprunner/govtrove-api/$$SERVICE_ID/application --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
-
-run-ingestion-aws:
-	@echo "Triggering ECS ingestion task..."
-	@CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name) && \
-	TASK_DEF=$$(cd terraform && terraform output -raw ecs_task_definition_arn) && \
-	SUBNETS=$$(cd terraform && terraform output -json public_subnet_ids | jq -r 'join(",")') && \
-	SG=$$(cd terraform && terraform output -raw security_group_id) && \
-	aws ecs run-task \
-		--cluster $$CLUSTER \
-		--task-definition $$TASK_DEF \
-		--launch-type FARGATE \
-		--network-configuration "awsvpcConfiguration={subnets=[$$SUBNETS],securityGroups=[$$SG],assignPublicIp=ENABLED}" \
-		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
-	echo "Ingestion task triggered! Check logs with 'make logs-ingestion'"
 
 status:
 	@echo "=== App Runner API ===" && \
@@ -417,15 +434,16 @@ status:
 		echo "CloudFront distribution not found (run tf-apply first)"; \
 	fi
 	@echo ""
-	@echo "=== Recent Ingestion Tasks ===" && \
-	CLUSTER=$$(cd terraform && terraform output -raw ecs_cluster_name 2>/dev/null) && \
-	if [ -n "$$CLUSTER" ]; then \
-		aws ecs list-tasks --cluster $$CLUSTER \
-			--family govtrove-ingestion --desired-status STOPPED --max-items 5 \
-			--query 'taskArns' --output table --profile $(AWS_PROFILE) --region $(AWS_REGION) 2>/dev/null || \
-			echo "No recent tasks"; \
+	@echo "=== Recent Pipeline Executions ===" && \
+	SFN_ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn 2>/dev/null) && \
+	if [ -n "$$SFN_ARN" ]; then \
+		aws stepfunctions list-executions \
+			--state-machine-arn $$SFN_ARN \
+			--max-results 5 \
+			--query 'executions[].{Name:name,Status:status,Start:startDate}' \
+			--output table --profile $(AWS_PROFILE) --region $(AWS_REGION); \
 	else \
-		echo "ECS cluster not found (run tf-apply first)"; \
+		echo "Step Functions state machine not found (run tf-apply first)"; \
 	fi
 
 # ============================================================================

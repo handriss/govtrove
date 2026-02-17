@@ -20,11 +20,15 @@ type Config struct {
 	// Set by bulk CSV job when triggering ingestion from S3
 	S3ActiveCSVKey string `envconfig:"S3_ACTIVE_CSV_KEY"`
 
-	// ECS config for triggering ingestion from bulk CSV task
+	// ECS config for triggering ingestion from bulk CSV task (legacy, kept for local dev)
 	ECSCluster       string `envconfig:"ECS_CLUSTER"`
 	IngestionTaskDef string `envconfig:"INGESTION_TASK_DEF"`
 	ECSSubnets       string `envconfig:"ECS_SUBNETS"`
 	ECSSecurityGroup string `envconfig:"ECS_SECURITY_GROUP"`
+
+	// Pipeline SNS topics (set for pipeline Docker images)
+	SNSCSVDownloadedTopicARN      string `envconfig:"SNS_CSV_DOWNLOADED_TOPIC_ARN"`
+	SNSIngestionCompletedTopicARN string `envconfig:"SNS_INGESTION_COMPLETED_TOPIC_ARN"`
 }
 
 func Load() (*Config, error) {

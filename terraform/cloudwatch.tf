@@ -1,116 +1,26 @@
-resource "aws_cloudwatch_log_group" "ingestion" {
-  name              = "/govtrove/ingestion"
-  retention_in_days = 30
+# --- Pipeline Step Functions alarm ---
 
-  tags = {
-    Name = "${var.project_name}-ingestion-logs"
-  }
-}
-
-resource "aws_cloudwatch_log_group" "bulkcsv" {
-  name              = "/govtrove/bulkcsv"
-  retention_in_days = 30
-
-  tags = {
-    Name = "${var.project_name}-bulkcsv-logs"
-  }
-}
-
-resource "aws_cloudwatch_log_metric_filter" "bulkcsv_failed" {
-  name           = "${var.project_name}-bulkcsv-failed"
-  pattern        = "{ $.level = \"error\" }"
-  log_group_name = aws_cloudwatch_log_group.bulkcsv.name
-
-  metric_transformation {
-    name      = "BulkCSVErrors"
-    namespace = "GovTrove"
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "bulkcsv_errors" {
-  alarm_name          = "${var.project_name}-bulkcsv-errors"
+resource "aws_cloudwatch_metric_alarm" "pipeline_failures" {
+  alarm_name          = "${var.project_name}-pipeline-failures"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  metric_name         = "BulkCSVErrors"
-  namespace           = "GovTrove"
+  metric_name         = "ExecutionsFailed"
+  namespace           = "AWS/States"
   period              = 300
   statistic           = "Sum"
   threshold           = 0
-  alarm_description   = "Triggered when bulk CSV service logs errors"
+  alarm_description   = "Step Functions pipeline execution failed"
   treat_missing_data  = "notBreaching"
 
-  alarm_actions = [aws_sns_topic.notifications.arn]
-  ok_actions    = [aws_sns_topic.notifications.arn]
-
-  tags = {
-    Name = "${var.project_name}-bulkcsv-errors-alarm"
+  dimensions = {
+    StateMachineArn = aws_sfn_state_machine.pipeline.arn
   }
-}
-
-resource "aws_cloudwatch_log_metric_filter" "ingestion_completed" {
-  name           = "${var.project_name}-ingestion-completed"
-  pattern        = "{ $.msg = \"ingestion completed\" }"
-  log_group_name = aws_cloudwatch_log_group.ingestion.name
-
-  metric_transformation {
-    name      = "IngestionCompleted"
-    namespace = "GovTrove"
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_log_metric_filter" "ingestion_failed" {
-  name           = "${var.project_name}-ingestion-failed"
-  pattern        = "{ $.level = \"error\" }"
-  log_group_name = aws_cloudwatch_log_group.ingestion.name
-
-  metric_transformation {
-    name      = "IngestionErrors"
-    namespace = "GovTrove"
-    value     = "1"
-  }
-}
-
-resource "aws_cloudwatch_metric_alarm" "ingestion_errors" {
-  alarm_name          = "${var.project_name}-ingestion-errors"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
-  metric_name         = "IngestionErrors"
-  namespace           = "GovTrove"
-  period              = 300
-  statistic           = "Sum"
-  threshold           = 0
-  alarm_description   = "Triggered when ingestion service logs errors"
-  treat_missing_data  = "notBreaching"
 
   alarm_actions = [aws_sns_topic.notifications.arn]
   ok_actions    = [aws_sns_topic.notifications.arn]
 
   tags = {
-    Name = "${var.project_name}-ingestion-errors-alarm"
-  }
-}
-
-# Fires when no successful ingestion completion is detected in 26 hours.
-# Catches silent failures (OOM kills, storage limit crashes) that don't log errors.
-resource "aws_cloudwatch_metric_alarm" "ingestion_missing" {
-  alarm_name          = "${var.project_name}-ingestion-missing"
-  comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 1
-  metric_name         = "IngestionCompleted"
-  namespace           = "GovTrove"
-  period              = 93600 # 26 hours — allows buffer beyond the daily 24h schedule
-  statistic           = "Sum"
-  threshold           = 1
-  alarm_description   = "No successful ingestion in 26 hours — task may be crashing silently"
-  treat_missing_data  = "breaching"
-
-  alarm_actions = [aws_sns_topic.notifications.arn]
-  ok_actions    = [aws_sns_topic.notifications.arn]
-
-  tags = {
-    Name = "${var.project_name}-ingestion-missing-alarm"
+    Name = "${var.project_name}-pipeline-failures-alarm"
   }
 }
 

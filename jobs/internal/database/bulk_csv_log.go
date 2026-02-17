@@ -27,7 +27,7 @@ type BulkCSVLogRecord struct {
 
 func (db *DB) InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, error) {
 	query := `
-		INSERT INTO bulk_csv_log (
+		INSERT INTO pipeline.bulk_csv_log (
 			source, result, http_status, etag, last_modified, content_length,
 			file_size_bytes, compressed_size_bytes, row_count, sha256_hash,
 			s3_key, download_duration_ms, compression_duration_ms, upload_duration_ms,
@@ -48,7 +48,7 @@ func (db *DB) InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, e
 
 func (db *DB) GetLatestBulkCSVHash(ctx context.Context, source string) (string, error) {
 	query := `
-		SELECT sha256_hash FROM bulk_csv_log
+		SELECT sha256_hash FROM pipeline.bulk_csv_log
 		WHERE source = $1 AND result = 'new_file'
 		AND sha256_hash IS NOT NULL
 		AND s3_key IS NOT NULL AND s3_key != ''
@@ -64,7 +64,7 @@ func (db *DB) GetLatestBulkCSVHash(ctx context.Context, source string) (string, 
 
 func (db *DB) GetLatestBulkCSVHeaders(ctx context.Context, source string) (etag, lastModified string, err error) {
 	query := `
-		SELECT etag, last_modified FROM bulk_csv_log
+		SELECT etag, last_modified FROM pipeline.bulk_csv_log
 		WHERE source = $1 AND result = 'new_file'
 		AND (etag IS NOT NULL OR last_modified IS NOT NULL)
 		ORDER BY checked_at DESC LIMIT 1
@@ -88,7 +88,7 @@ func (db *DB) GetLatestBulkCSVHeaders(ctx context.Context, source string) (etag,
 
 func (db *DB) GetLatestBulkCSVS3Key(ctx context.Context, source string) (string, error) {
 	query := `
-		SELECT s3_key FROM bulk_csv_log
+		SELECT s3_key FROM pipeline.bulk_csv_log
 		WHERE source = $1 AND result = 'new_file'
 		AND s3_key IS NOT NULL AND s3_key != ''
 		ORDER BY checked_at DESC LIMIT 1

@@ -3,39 +3,9 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
-output "ecr_repository_url" {
-  description = "ECR repository URL for ingestion service"
-  value       = aws_ecr_repository.ingestion.repository_url
-}
-
-output "ecs_cluster_name" {
-  description = "ECS cluster name"
-  value       = aws_ecs_cluster.main.name
-}
-
-output "ecs_task_definition_arn" {
-  description = "ECS task definition ARN"
-  value       = aws_ecs_task_definition.ingestion.arn
-}
-
-output "cloudwatch_log_group" {
-  description = "CloudWatch log group name"
-  value       = aws_cloudwatch_log_group.ingestion.name
-}
-
 output "sns_topic_arn" {
   description = "SNS topic ARN for notifications"
   value       = aws_sns_topic.notifications.arn
-}
-
-output "public_subnet_ids" {
-  description = "Public subnet IDs (for running tasks)"
-  value       = aws_subnet.public[*].id
-}
-
-output "security_group_id" {
-  description = "Security group ID for ECS tasks"
-  value       = aws_security_group.ecs_tasks.id
 }
 
 # API outputs
@@ -136,13 +106,24 @@ output "data_bucket_name" {
   value       = aws_s3_bucket.data.id
 }
 
-output "bulkcsv_task_definition_arn" {
-  description = "ECS task definition ARN for bulk CSV download"
-  value       = aws_ecs_task_definition.bulkcsv.arn
-}
-
 output "workos_client_id" {
   description = "WorkOS client ID (for frontend build)"
   value       = var.workos_client_id
   sensitive   = true
+}
+
+# Pipeline outputs
+output "pipeline_state_machine_arn" {
+  description = "Step Functions state machine ARN for pipeline"
+  value       = aws_sfn_state_machine.pipeline.arn
+}
+
+output "pipeline_lambda_arns" {
+  description = "Lambda function ARNs for pipeline steps"
+  value       = { for k, v in aws_lambda_function.pipeline : k => v.arn }
+}
+
+output "pipeline_dlq_url" {
+  description = "SQS DLQ URL for pipeline failures"
+  value       = aws_sqs_queue.pipeline_dlq.url
 }

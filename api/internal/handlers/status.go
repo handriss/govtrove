@@ -27,7 +27,7 @@ func (h *StatusHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 
 	var resp StatusResponse
 	err := h.pool.QueryRow(ctx,
-		`SELECT completed_at FROM ingestion_runs
+		`SELECT completed_at FROM pipeline.ingestion_runs
 		 WHERE status = 'completed'
 		 ORDER BY completed_at DESC LIMIT 1`,
 	).Scan(&resp.LastSyncedAt)

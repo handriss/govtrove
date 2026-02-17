@@ -161,7 +161,7 @@ func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int
 	tag, err := db.pool.Exec(ctx, `
 		UPDATE opportunities o
 		SET active = false
-		FROM snap_disappearances d
+		FROM pipeline.snap_disappearances d
 		WHERE d.notice_id = o.notice_id
 		  AND d.run_id = $1
 		  AND d.resolution IS NULL
@@ -175,7 +175,7 @@ func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int
 // GetSnapCSVRawData loads raw_data for all rows of a given run from snap_csv.
 func (db *DB) GetSnapCSVRawData(ctx context.Context, runID uuid.UUID) ([]map[string]string, error) {
 	rows, err := db.pool.Query(ctx, `
-		SELECT raw_data FROM snap_csv WHERE run_id = $1
+		SELECT raw_data FROM pipeline.snap_csv WHERE run_id = $1
 	`, runID)
 	if err != nil {
 		return nil, fmt.Errorf("query snap_csv raw_data: %w", err)
