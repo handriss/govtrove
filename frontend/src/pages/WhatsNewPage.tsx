@@ -1,35 +1,149 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Clock } from 'lucide-react';
 import ResultsList from '../components/ResultsList';
 import AuthButton from '../components/AuthButton';
-import { useSearch } from '../hooks/useSearch';
-import { getWhatsNewSync, getWhatsNew, whatsNewParams } from '../services/whatsNewCache';
+import { searchOpportunities } from '../services/api';
+import { getWhatsNewSync, getWhatsNew, whatsNewBaseParams } from '../services/whatsNewCache';
+import type { OpportunityListItem } from '../types/api';
 
+const PAGE_SIZE = 25;
+
+function compareValues(a: string | undefined | null, b: string | undefined | null, order: string): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  const cmp = a.localeCompare(b);
+  return order === 'asc' ? cmp : -cmp;
+}
 
 export default function WhatsNewPage() {
-  const { results, total, page, totalPages, loading, search, inject } = useSearch();
-  const [initialized, setInitialized] = useState(false);
+  const allData = useRef<OpportunityListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState('posted_date');
+  const [order, setOrder] = useState('desc');
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [selectedNaics, setSelectedNaics] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const cached = getWhatsNewSync();
     if (cached) {
-      inject(cached);
-      setInitialized(true);
-    } else {
-      getWhatsNew().then((data) => {
-        inject(data);
-        setInitialized(true);
-      }).catch(() => {
-        search(whatsNewParams());
-        setInitialized(true);
-      });
+      allData.current = cached.opportunities || [];
+      setLoading(false);
+      return;
     }
-  }, [inject, search]);
+    getWhatsNew()
+      .then((data) => {
+        allData.current = data.opportunities || [];
+        setLoading(false);
+      })
+      .catch(() => {
+        searchOpportunities(whatsNewBaseParams()).then((data) => {
+          allData.current = data.opportunities || [];
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      });
+  }, []);
+
+  const agencies = useMemo(() => {
+    if (loading) return [];
+    return [...new Set(allData.current.map((o) => o.department).filter(Boolean) as string[])].sort();
+  }, [loading]);
+
+  const setAsideCodes = useMemo(() => {
+    if (loading) return [];
+    return [...new Set(allData.current.map((o) => o.set_aside_code).filter(Boolean) as string[])].sort();
+  }, [loading]);
+
+  const stateCodes = useMemo(() => {
+    if (loading) return [];
+    return [...new Set(allData.current.map((o) => o.pop_state).filter(Boolean) as string[])].sort();
+  }, [loading]);
+
+  const filtered = useMemo(() => {
+    if (loading) return [];
+    let items = allData.current;
+
+    if (filters.title) {
+      const q = filters.title.toLowerCase();
+      items = items.filter((o) => o.title.toLowerCase().includes(q));
+    }
+    if (filters.set_aside) {
+      const codes = new Set(filters.set_aside.split(','));
+      items = items.filter((o) => o.set_aside_code && codes.has(o.set_aside_code));
+    }
+    if (filters.department) {
+      const depts = new Set(filters.department.split(','));
+      items = items.filter((o) => o.department && depts.has(o.department));
+    }
+    if (filters.naics_prefix) {
+      const prefix = filters.naics_prefix;
+      items = items.filter((o) => o.naics_code?.startsWith(prefix));
+    }
+    if (selectedNaics.length > 0) {
+      items = items.filter((o) =>
+        o.naics_code && selectedNaics.some((code) => o.naics_code!.startsWith(code)),
+      );
+    }
+    if (filters.state) {
+      const states = new Set(filters.state.split(','));
+      items = items.filter((o) => o.pop_state && states.has(o.pop_state));
+    }
+
+    items = [...items].sort((a, b) => {
+      const fieldMap: Record<string, keyof OpportunityListItem> = {
+        title: 'title',
+        department: 'department',
+        posted_date: 'posted_date',
+        set_aside_code: 'set_aside_code',
+        deadline: 'response_deadline',
+        naics_code: 'naics_code',
+        pop_state: 'pop_state',
+      };
+      const key = fieldMap[sort] || 'posted_date';
+      const av = a[key] as string | undefined;
+      const bv = b[key] as string | undefined;
+      return compareValues(av, bv, order);
+    });
+
+    return items;
+  }, [loading, filters, sort, order, selectedNaics]);
+
+  const totalFiltered = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageResults = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const hasActiveFilters = Object.keys(filters).length > 0 || selectedNaics.length > 0;
 
   const handlePageChange = useCallback((newPage: number) => {
-    search(whatsNewParams(newPage));
-  }, [search]);
+    setPage(newPage);
+  }, []);
+
+  const handleSortChange = useCallback((newSort: string, newOrder: string) => {
+    setSort(newSort);
+    setOrder(newOrder);
+    setPage(1);
+  }, []);
+
+  const handleFilterChange = useCallback((field: string, value: string) => {
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (value) {
+        next[field] = value;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+    setPage(1);
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setFilters({});
+    setSelectedNaics([]);
+    setPage(1);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -60,26 +174,44 @@ export default function WhatsNewPage() {
         </div>
       </div>
 
-      <div className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-6 pb-10">
+      <div className="relative z-10 flex-1 max-w-[1400px] w-full mx-auto px-6 pb-10">
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-dark-800/50">
           <p className="text-sm text-dark-400">
-            {loading || !initialized ? (
+            {loading ? (
               <span className="text-dark-500">Loading...</span>
             ) : (
               <>
-                <span className="text-dark-200 font-medium">{total.toLocaleString()}</span>
+                <span className="text-dark-200 font-medium">{totalFiltered.toLocaleString()}</span>
                 <span className="ml-1">new opportunities with open deadlines</span>
               </>
             )}
           </p>
+          {hasActiveFilters && (
+            <button
+              onClick={handleResetFilters}
+              className="text-xs text-dark-400 hover:text-accent transition-colors"
+            >
+              Reset filters
+            </button>
+          )}
         </div>
         <ResultsList
-          results={results}
-          page={page}
+          results={pageResults}
+          page={currentPage}
           totalPages={totalPages}
-          loading={loading || !initialized}
+          loading={loading}
           query=""
           onPageChange={handlePageChange}
+          sort={sort}
+          order={order}
+          onSortChange={handleSortChange}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          agencies={agencies}
+          availableSetAsides={setAsideCodes}
+          availableStates={stateCodes}
+          selectedNaics={selectedNaics}
+          onNaicsChange={(codes) => { setSelectedNaics(codes); setPage(1); }}
         />
       </div>
     </div>
