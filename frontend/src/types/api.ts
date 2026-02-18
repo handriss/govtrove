@@ -85,7 +85,9 @@ export interface SearchParams {
   type?: string;
   set_aside?: string;
   naics?: string;
+  naics_prefix?: string;
   state?: string;
+  department?: string;
   posted_from?: string;
   posted_to?: string;
   deadline_from?: string;

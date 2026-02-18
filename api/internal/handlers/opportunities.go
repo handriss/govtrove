@@ -271,6 +271,9 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 		params.NAICSCodes = strings.Split(naicsStr, ",")
 	}
 
+	params.NAICSPrefix = q.Get("naics_prefix")
+	params.Department = q.Get("department")
+
 	if stateStr := q.Get("state"); stateStr != "" {
 		params.States = strings.Split(stateStr, ",")
 	}
@@ -306,7 +309,7 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	if limitStr := q.Get("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 100 {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 2000 {
 			params.Limit = limit
 		}
 	}

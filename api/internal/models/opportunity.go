@@ -70,7 +70,9 @@ type SearchParams struct {
 	Types        []string
 	SetAsides    []string
 	NAICSCodes   []string
+	NAICSPrefix  string
 	States       []string
+	Department   string
 	PostedFrom   *time.Time
 	PostedTo     *time.Time
 	DeadlineFrom *time.Time
