@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark, Trash2, Clock } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark, Clock } from 'lucide-react';
 import QueryBuilder, { buildQueryString, createEmptyGroup } from '../components/QueryBuilder';
 import FilterPanel from '../components/FilterPanel';
 import ResultsList from '../components/ResultsList';
@@ -107,9 +107,6 @@ function loadSavedSearches(): SavedSearch[] {
   }
 }
 
-function saveSavedSearches(searches: SavedSearch[]) {
-  localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(searches));
-}
 
 function parseFiltersFromParams(searchParams: URLSearchParams): AdvancedFilters {
   const hasTypeParam = searchParams.has('type');
@@ -147,9 +144,7 @@ export default function AdvancedSearchPage() {
   const [showFilters, setShowFilters] = useState(false);
   const { results, total, page, totalPages, loading, search } = useSearch();
   const [hasSearched, setHasSearched] = useState(false);
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>(loadSavedSearches);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveName, setSaveName] = useState('');
+  const [savedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const examplesRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
 
@@ -212,29 +207,6 @@ export default function AdvancedSearchPage() {
     setHasSearched(true);
   }, [groups, groupOperator, filters, updateURL, search, buildSearchParams]);
 
-  const handleWhatsNew = useCallback(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const postedFrom = yesterday.toISOString().split('T')[0];
-    const newFilters = { ...filters, postedFrom, postedTo: undefined };
-    setFilters(newFilters);
-    const q = buildQueryString(groups, groupOperator);
-    updateURL(q, newFilters);
-    search({
-      q: q || undefined,
-      type: newFilters.types.length ? newFilters.types.join(',') : undefined,
-      set_aside: newFilters.setAsides.length ? newFilters.setAsides.join(',') : undefined,
-      naics: newFilters.naicsCodes.length ? newFilters.naicsCodes.join(',') : undefined,
-      state: newFilters.states.length ? newFilters.states.join(',') : undefined,
-      posted_from: postedFrom,
-      sort: 'posted_date',
-      order: 'desc',
-      page: 1,
-      limit: 25,
-    });
-    setHasSearched(true);
-  }, [filters, groups, groupOperator, updateURL, search]);
-
   // Run initial search if URL has explicit params (default types don't count)
   useEffect(() => {
     if (isInitialMount.current) {
@@ -294,70 +266,7 @@ export default function AdvancedSearchPage() {
     examplesRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const getCurrentParams = (): Record<string, string> => {
-    const params: Record<string, string> = {};
-    const q = buildQueryString(groups, groupOperator);
-    if (q) params.q = q;
-    if (filters.types.length) params.type = filters.types.join(',');
-    if (filters.setAsides.length) params.set_aside = filters.setAsides.join(',');
-    if (filters.naicsCodes.length) params.naics = filters.naicsCodes.join(',');
-    if (filters.states.length) params.state = filters.states.join(',');
-    if (filters.postedFrom) params.posted_from = filters.postedFrom;
-    if (filters.postedTo) params.posted_to = filters.postedTo;
-    if (filters.deadlineFrom) params.deadline_from = filters.deadlineFrom;
-    if (filters.deadlineTo) params.deadline_to = filters.deadlineTo;
-    return params;
-  };
 
-  const handleSaveSearch = () => {
-    if (!saveName.trim()) return;
-    const newSearch: SavedSearch = {
-      id: Math.random().toString(36).substring(2, 9),
-      name: saveName.trim(),
-      params: getCurrentParams(),
-      createdAt: Date.now(),
-    };
-    const updated = [newSearch, ...savedSearches];
-    setSavedSearches(updated);
-    saveSavedSearches(updated);
-    setSaveName('');
-    setShowSaveDialog(false);
-  };
-
-  const handleDeleteSaved = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = savedSearches.filter((s) => s.id !== id);
-    setSavedSearches(updated);
-    saveSavedSearches(updated);
-  };
-
-  const handleLoadSaved = (saved: SavedSearch) => {
-    const newParams = new URLSearchParams(saved.params);
-    setSearchParams(newParams);
-
-    const newQuery = saved.params.q || '';
-    setGroups(createGroupFromQuery(newQuery));
-    setFilters(parseFiltersFromParams(newParams));
-
-    const searchParamsObj: SearchParams = {
-      q: saved.params.q || undefined,
-      type: saved.params.type || undefined,
-      set_aside: saved.params.set_aside || undefined,
-      naics: saved.params.naics || undefined,
-      state: saved.params.state || undefined,
-      posted_from: saved.params.posted_from || undefined,
-      posted_to: saved.params.posted_to || undefined,
-      deadline_from: saved.params.deadline_from || undefined,
-      deadline_to: saved.params.deadline_to || undefined,
-      sort: saved.params.q ? 'relevance' : 'posted_date',
-      order: 'desc',
-      page: 1,
-      limit: 25,
-    };
-    search(searchParamsObj);
-    setHasSearched(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const queryString = buildQueryString(groups, groupOperator);
 

@@ -5,7 +5,7 @@ import ResultsList from '../components/ResultsList';
 import AuthButton from '../components/AuthButton';
 import { useSearch } from '../hooks/useSearch';
 import { getWhatsNewSync, getWhatsNew, whatsNewParams } from '../services/whatsNewCache';
-import { searchOpportunities } from '../services/api';
+
 
 export default function WhatsNewPage() {
   const { results, total, page, totalPages, loading, search, inject } = useSearch();
