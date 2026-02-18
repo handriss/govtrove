@@ -49,6 +49,17 @@ export function useSearch() {
     }
   }, []);
 
+  const inject = useCallback((data: SearchResult) => {
+    setState({
+      results: data.opportunities || [],
+      total: data.total,
+      page: data.page,
+      totalPages: data.total_pages,
+      loading: false,
+      error: null,
+    });
+  }, []);
+
   const reset = useCallback(() => {
     setState({
       results: [],
@@ -60,5 +71,5 @@ export function useSearch() {
     });
   }, []);
 
-  return { ...state, search, reset };
+  return { ...state, search, inject, reset };
 }
