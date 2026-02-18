@@ -33,8 +33,7 @@ func init() {
 
 	secretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
 	if secretARN == "" {
-		logger.Error("DATABASE_URL_SECRET_ARN not set")
-		os.Exit(1)
+		return
 	}
 
 	cfg.S3Bucket = os.Getenv("S3_BUCKET")
@@ -87,22 +86,29 @@ type Output struct {
 	Files         []File `json:"files"`
 }
 
-func handler(ctx context.Context, event json.RawMessage) (*Output, error) {
+// Handler holds dependencies for the download-csvs Lambda.
+type Handler struct {
+	Store    database.Store
+	S3       bulkcsv.S3Client
+	Cfg      *config.Config
+	Logger   *slog.Logger
+}
+
+func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (*Output, error) {
 	start := time.Now()
 
-	runID, err := db.CreatePipelineRun(ctx, "download-csvs", nil)
+	runID, err := h.Store.CreatePipelineRun(ctx, "download-csvs", nil)
 	if err != nil {
 		return nil, fmt.Errorf("create pipeline run: %w", err)
 	}
 
-	results, err := bulkcsv.Run(ctx, &cfg, db, s3Client, logger)
+	results, err := bulkcsv.Run(ctx, h.Cfg, h.Store, h.S3, h.Logger)
 	if err != nil {
 		dur := int(time.Since(start).Milliseconds())
-		_ = db.FailPipelineRun(ctx, runID, err.Error(), dur)
+		_ = h.Store.FailPipelineRun(ctx, runID, err.Error(), dur)
 		return nil, fmt.Errorf("bulk csv run: %w", err)
 	}
 
-	// Check for errors in individual sources
 	var failed []string
 	for _, r := range results {
 		if r.Outcome == "error" {
@@ -112,11 +118,10 @@ func handler(ctx context.Context, event json.RawMessage) (*Output, error) {
 	if len(failed) > 0 {
 		errMsg := fmt.Sprintf("sources failed: %s", strings.Join(failed, ", "))
 		dur := int(time.Since(start).Milliseconds())
-		_ = db.FailPipelineRun(ctx, runID, errMsg, dur)
+		_ = h.Store.FailPipelineRun(ctx, runID, errMsg, dur)
 		return nil, fmt.Errorf("%s", errMsg)
 	}
 
-	// Build output files for Step Functions (only new files)
 	var files []File
 	for _, r := range results {
 		if r.Outcome != "new_file" {
@@ -139,11 +144,11 @@ func handler(ctx context.Context, event json.RawMessage) (*Output, error) {
 		"summary":   bulkcsv.FormatSummary(results),
 		"new_files": len(files),
 	}
-	if err := db.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
-		logger.Warn("failed to complete pipeline run", "error", err)
+	if err := h.Store.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
+		h.Logger.Warn("failed to complete pipeline run", "error", err)
 	}
 
-	logger.Info("handler complete",
+	h.Logger.Info("handler complete",
 		"pipeline_run_id", runID.String(),
 		"new_files", len(files),
 		"duration_ms", dur,
@@ -155,4 +160,7 @@ func handler(ctx context.Context, event json.RawMessage) (*Output, error) {
 	}, nil
 }
 
-func main() { lambda.Start(handler) }
+func main() {
+	h := &Handler{Store: db, S3: s3Client, Cfg: &cfg, Logger: logger}
+	lambda.Start(h.Handle)
+}

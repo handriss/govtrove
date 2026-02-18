@@ -19,6 +19,14 @@ import (
 	"github.com/handriss/govtrove/pipeline/internal/database"
 )
 
+// BulkCSVStore is the subset of database.Store used by the bulkcsv package.
+type BulkCSVStore interface {
+	InsertBulkCSVLog(ctx context.Context, r *database.BulkCSVLogRecord) (int, error)
+	GetLatestBulkCSVHash(ctx context.Context, source string) (string, error)
+	GetLatestBulkCSVHeaders(ctx context.Context, source string) (string, string, error)
+	GetLatestBulkCSVS3Key(ctx context.Context, source string) (string, error)
+}
+
 const (
 	rangeRequestTimeout = 30 * time.Second
 	downloadTimeout     = 10 * time.Minute
@@ -33,7 +41,7 @@ type SourceResult struct {
 	S3Key   string
 }
 
-func Run(ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client, logger *slog.Logger) ([]SourceResult, error) {
+func Run(ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Client, logger *slog.Logger) ([]SourceResult, error) {
 	var results []SourceResult
 
 	for _, src := range Sources {
@@ -54,7 +62,7 @@ func Run(ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.
 	return results, nil
 }
 
-func processSource(ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client, logger *slog.Logger, src Source) (*SourceResult, error) {
+func processSource(ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Client, logger *slog.Logger, src Source) (*SourceResult, error) {
 	startTime := time.Now()
 
 	// Load previous state
@@ -102,7 +110,7 @@ func processSource(ctx context.Context, cfg *config.Config, db *database.DB, s3C
 }
 
 func processWithConditionalGet(
-	ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client,
+	ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Client,
 	logger *slog.Logger, src Source,
 	prevETag, prevLastModified, prevHash string,
 	startTime time.Time,
@@ -169,7 +177,7 @@ func processWithConditionalGet(
 }
 
 func processWithRangeProbe(
-	ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client,
+	ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Client,
 	logger *slog.Logger, src Source,
 	prevETag, prevHash string,
 	startTime time.Time,
@@ -210,7 +218,7 @@ func processWithRangeProbe(
 }
 
 func archiveFile(
-	ctx context.Context, cfg *config.Config, db *database.DB, s3Client *s3.Client,
+	ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Client,
 	logger *slog.Logger, src Source,
 	tmpPath string, fileSize int64, hashHex string, rowCount int,
 	httpStatus *int, etag, lastModified string, contentLength int64,
@@ -486,7 +494,7 @@ func compressFile(srcPath string) (gzPath string, compressedSize int64, err erro
 	return gzPath, info.Size(), nil
 }
 
-func logError(ctx context.Context, db *database.DB, logger *slog.Logger, source string, err error, httpStatus *int) {
+func logError(ctx context.Context, db BulkCSVStore, logger *slog.Logger, source string, err error, httpStatus *int) {
 	errMsg := err.Error()
 	record := &database.BulkCSVLogRecord{
 		Source:       source,

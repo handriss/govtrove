@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -35,8 +36,7 @@ func init() {
 
 	secretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
 	if secretARN == "" {
-		logger.Error("DATABASE_URL_SECRET_ARN not set")
-		os.Exit(1)
+		return
 	}
 
 	bucket = os.Getenv("S3_BUCKET")
@@ -91,37 +91,50 @@ type Output struct {
 
 const jobType = "snapshot-csv"
 
-func handler(ctx context.Context, event json.RawMessage) (*Output, error) {
+// S3Getter abstracts the S3 GetObject call for testability.
+type S3Getter interface {
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+}
+
+// Handler holds dependencies for the ingest-active Lambda.
+type Handler struct {
+	Store  database.Store
+	S3     S3Getter
+	Bucket string
+	Logger *slog.Logger
+}
+
+func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (*Output, error) {
 	var input Input
 	if err := json.Unmarshal(event, &input); err != nil {
 		return nil, fmt.Errorf("unmarshal input: %w", err)
 	}
-	logger.Info("starting ingest-active", "s3_key", input.File.S3Key)
+	h.Logger.Info("starting ingest-active", "s3_key", input.File.S3Key)
 
 	start := time.Now()
 	snapshotDate := time.Now().UTC()
 
-	runID, err := db.CreateIngestionRun(ctx, jobType)
+	runID, err := h.Store.CreateIngestionRun(ctx, jobType)
 	if err != nil {
 		return nil, fmt.Errorf("create ingestion run: %w", err)
 	}
 
-	stats, err := runPipeline(ctx, runID, snapshotDate, input.File.S3Key)
+	stats, err := h.runPipeline(ctx, runID, snapshotDate, input.File.S3Key)
 	durationMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
-		db.FailIngestionRun(ctx, runID, err.Error(), durationMs)
+		h.Store.FailIngestionRun(ctx, runID, err.Error(), durationMs)
 		return nil, fmt.Errorf("ingest-active failed: %w", err)
 	}
 
-	if dbErr := db.CompleteIngestionRun(ctx, runID, database.RunStats{
+	if dbErr := h.Store.CompleteIngestionRun(ctx, runID, database.RunStats{
 		Fetched:    stats.recordCount,
 		DurationMs: durationMs,
 	}); dbErr != nil {
-		logger.Error("failed to complete ingestion run", "error", dbErr)
+		h.Logger.Error("failed to complete ingestion run", "error", dbErr)
 	}
 
-	logger.Info("ingest-active complete",
+	h.Logger.Info("ingest-active complete",
 		"run_id", runID,
 		"records", stats.recordCount,
 		"new", stats.newRecords,
@@ -140,11 +153,11 @@ type pipelineStats struct {
 	disappearedRecords int
 }
 
-func runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, s3Key string) (*pipelineStats, error) {
-	downloadURL := fmt.Sprintf("s3://%s/%s", bucket, s3Key)
+func (h *Handler) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, s3Key string) (*pipelineStats, error) {
+	downloadURL := fmt.Sprintf("s3://%s/%s", h.Bucket, s3Key)
 
-	out, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
+	out, err := h.S3.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(h.Bucket),
 		Key:    aws.String(s3Key),
 	})
 	if err != nil {
@@ -152,18 +165,22 @@ func runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, s
 	}
 	defer out.Body.Close()
 
-	gz, err := gzip.NewReader(out.Body)
+	return h.processStream(ctx, runID, snapshotDate, downloadURL, out.Body)
+}
+
+func (h *Handler) processStream(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadURL string, body io.ReadCloser) (*pipelineStats, error) {
+	gz, err := gzip.NewReader(body)
 	if err != nil {
 		return nil, fmt.Errorf("open gzip stream: %w", err)
 	}
 	defer gz.Close()
 
-	result, err := samgov.ParseCSVFromReader(gz, 0, logger)
+	result, err := samgov.ParseCSVFromReader(gz, 0, h.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("parse CSV: %w", err)
 	}
 
-	downloadID, err := db.CreateCSVDownloadEntry(ctx, &database.CSVDownloadEntry{
+	downloadID, err := h.Store.CreateCSVDownloadEntry(ctx, &database.CSVDownloadEntry{
 		RunID:  runID,
 		URL:    downloadURL,
 		Status: "downloading",
@@ -179,47 +196,50 @@ func runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, s
 
 	stats := &pipelineStats{recordCount: len(snapRows)}
 
-	logger.Info("bulk inserting snapshot rows", "count", len(snapRows))
-	if _, err := db.BulkInsertSnapCSV(ctx, runID, snapshotDate, downloadID, snapRows); err != nil {
-		db.FailCSVDownloadEntry(ctx, downloadID, err.Error())
+	h.Logger.Info("bulk inserting snapshot rows", "count", len(snapRows))
+	if _, err := h.Store.BulkInsertSnapCSV(ctx, runID, snapshotDate, downloadID, snapRows); err != nil {
+		h.Store.FailCSVDownloadEntry(ctx, downloadID, err.Error())
 		return nil, fmt.Errorf("bulk insert: %w", err)
 	}
 
-	db.CompleteCSVDownloadEntry(ctx, downloadID, len(snapRows), 0)
+	h.Store.CompleteCSVDownloadEntry(ctx, downloadID, len(snapRows), 0)
 
-	prevRunID, _, prevErr := db.GetLastCompletedRun(ctx, jobType)
+	prevRunID, _, prevErr := h.Store.GetLastCompletedRun(ctx, jobType)
 	if prevErr != nil {
-		logger.Warn("failed to get previous run", "error", prevErr)
+		h.Logger.Warn("failed to get previous run", "error", prevErr)
 	}
 
 	if prevRunID != uuid.Nil {
-		newCount, changedCount, err := db.DetectChanges(ctx, runID, prevRunID, snapshotDate, logger)
+		newCount, changedCount, err := h.Store.DetectChanges(ctx, runID, prevRunID, snapshotDate, h.Logger)
 		if err != nil {
-			logger.Error("change detection failed", "error", err)
+			h.Logger.Error("change detection failed", "error", err)
 		} else {
 			stats.newRecords = newCount
 			stats.changedRecords = changedCount
 		}
 
-		disappearedCount, err := db.DetectDisappearances(ctx, runID, prevRunID, snapshotDate, logger)
+		disappearedCount, err := h.Store.DetectDisappearances(ctx, runID, prevRunID, snapshotDate, h.Logger)
 		if err != nil {
-			logger.Error("disappearance detection failed", "error", err)
+			h.Logger.Error("disappearance detection failed", "error", err)
 		} else {
 			stats.disappearedRecords = disappearedCount
 		}
 
-		reappearedCount, err := db.DetectReappearances(ctx, runID, snapshotDate)
+		reappearedCount, err := h.Store.DetectReappearances(ctx, runID, snapshotDate)
 		if err != nil {
-			logger.Error("reappearance detection failed", "error", err)
+			h.Logger.Error("reappearance detection failed", "error", err)
 		} else if reappearedCount > 0 {
-			logger.Info("reappearances detected", "count", reappearedCount)
+			h.Logger.Info("reappearances detected", "count", reappearedCount)
 		}
 	} else {
-		logger.Info("first run — skipping change detection", "records", len(snapRows))
+		h.Logger.Info("first run — skipping change detection", "records", len(snapRows))
 		stats.newRecords = len(snapRows)
 	}
 
 	return stats, nil
 }
 
-func main() { lambda.Start(handler) }
+func main() {
+	h := &Handler{Store: db, S3: s3Client, Bucket: bucket, Logger: logger}
+	lambda.Start(h.Handle)
+}
