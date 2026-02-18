@@ -1,0 +1,234 @@
+package main
+
+import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/google/uuid"
+	"github.com/handriss/govtrove/pipeline/internal/database"
+	"github.com/handriss/govtrove/pipeline/internal/testutil"
+)
+
+func gzipCSV(csv string) io.ReadCloser {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	gz.Write([]byte(csv))
+	gz.Close()
+	return io.NopCloser(&buf)
+}
+
+type mockS3 struct {
+	GetObjectFn func(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+}
+
+func (m *mockS3) GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	if m.GetObjectFn != nil {
+		return m.GetObjectFn(ctx, params, optFns...)
+	}
+	return nil, errors.New("not implemented")
+}
+
+var _ = Describe("Ingest Active Handler", func() {
+	var (
+		h     *Handler
+		store *testutil.MockStore
+		s3mock *mockS3
+		ctx   context.Context
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		store = &testutil.MockStore{}
+		s3mock = &mockS3{}
+		h = &Handler{
+			Store:  store,
+			S3:     s3mock,
+			Bucket: "test-bucket",
+			Logger: slog.Default(),
+		}
+	})
+
+	buildEvent := func(s3Key string) json.RawMessage {
+		input := Input{PipelineRunID: uuid.New().String()}
+		input.File.Type = "active"
+		input.File.S3Key = s3Key
+		input.File.Source = "active"
+		b, _ := json.Marshal(input)
+		return b
+	}
+
+	csvData := "NoticeId,Title,Type,Active\n" +
+		"OPP-001,Test Opportunity,Solicitation,Yes\n" +
+		"OPP-002,Second Opportunity,Award,No\n"
+
+	Context("processing a new S3 CSV file", func() {
+		BeforeEach(func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+		})
+
+		It("creates an ingestion run, parses CSV, bulk inserts, and reports stats", func() {
+			runID := uuid.New()
+			store.CreateIngestionRunFn = func(_ context.Context, _ string) (uuid.UUID, error) {
+				return runID, nil
+			}
+
+			var insertedCount int
+			store.BulkInsertSnapCSVFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ int64, rows []database.SnapCSVRow) (int64, error) {
+				insertedCount = len(rows)
+				return int64(len(rows)), nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(output.RunID).To(Equal(runID.String()))
+			Expect(output.JobType).To(Equal("snapshot-csv"))
+			Expect(insertedCount).To(Equal(2))
+		})
+
+		It("records download entry with correct metadata", func() {
+			var downloadEntry *database.CSVDownloadEntry
+			store.CreateCSVDownloadEntryFn = func(_ context.Context, e *database.CSVDownloadEntry) (int64, error) {
+				downloadEntry = e
+				return 42, nil
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(downloadEntry).NotTo(BeNil())
+			Expect(downloadEntry.URL).To(ContainSubstring("test-bucket"))
+			Expect(downloadEntry.Status).To(Equal("downloading"))
+		})
+	})
+
+	Context("on the first ever run (no previous run exists)", func() {
+		BeforeEach(func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+			store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
+				return uuid.Nil, time.Time{}, nil
+			}
+		})
+
+		It("skips change detection and counts all records as new", func() {
+			detectChangesCalled := false
+			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
+				detectChangesCalled = true
+				return 0, 0, nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(detectChangesCalled).To(BeFalse())
+		})
+	})
+
+	Context("when a previous run exists", func() {
+		BeforeEach(func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+			store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
+				return uuid.New(), time.Now(), nil
+			}
+		})
+
+		It("runs change detection and reports counts", func() {
+			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
+				return 5, 3, nil
+			}
+			store.DetectDisappearancesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, error) {
+				return 2, nil
+			}
+			store.DetectReappearancesFn = func(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
+				return 1, nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+		})
+	})
+
+	Context("when S3 GetObject fails", func() {
+		It("marks the ingestion run as failed and returns the error", func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return nil, errors.New("access denied")
+			}
+
+			failCalled := false
+			store.FailIngestionRunFn = func(_ context.Context, _ uuid.UUID, errMsg string, _ int) error {
+				failCalled = true
+				Expect(errMsg).To(ContainSubstring("access denied"))
+				return nil
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("access denied"))
+			Expect(failCalled).To(BeTrue())
+		})
+	})
+
+	Context("when bulk insert fails", func() {
+		It("fails the CSV download entry and the ingestion run", func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+			store.BulkInsertSnapCSVFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ int64, _ []database.SnapCSVRow) (int64, error) {
+				return 0, errors.New("disk full")
+			}
+
+			downloadFailed := false
+			store.FailCSVDownloadEntryFn = func(_ context.Context, _ int64, errMsg string) error {
+				downloadFailed = true
+				Expect(errMsg).To(ContainSubstring("disk full"))
+				return nil
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("bulk insert"))
+			Expect(downloadFailed).To(BeTrue())
+		})
+	})
+
+	Context("when change detection fails", func() {
+		It("still completes the run successfully", func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+			store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
+				return uuid.New(), time.Now(), nil
+			}
+			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
+				return 0, 0, errors.New("timeout")
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+		})
+	})
+})
