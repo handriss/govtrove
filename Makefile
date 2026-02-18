@@ -255,15 +255,15 @@ deploy-frontend: frontend-build
 	@echo "Deploying frontend to S3/CloudFront..."
 	@API_URL=$$(cd terraform && terraform output -raw api_url) && \
 	WORKOS_CLIENT_ID=$$(cd terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
-	echo "VITE_API_URL=$$API_URL/api" > frontend/.env.production && \
-	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> frontend/.env.production; fi && \
+	echo "VITE_API_URL=$$API_URL/api" > .env.production && \
+	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> .env.production; fi && \
 	cd frontend && npm run build && \
 	BUCKET=$$(cd ../terraform && terraform output -raw frontend_bucket_name) && \
 	DIST_ID=$$(cd ../terraform && terraform output -raw cloudfront_distribution_id) && \
 	aws s3 sync dist s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
-	rm -f .env.production && \
+	rm -f ../.env.production && \
 	echo "Frontend deployed successfully!"
 
 deploy-api: api-docker-build ecr-login
