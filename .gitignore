@@ -28,6 +28,7 @@ go.work.sum
 # Environment files
 .env
 .env.local
+.env.production
 
 # Terraform
 terraform/.terraform/
