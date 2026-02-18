@@ -21,6 +21,7 @@ func Date(s string) *time.Time {
 		"2006-01-02T15:04:05.000-07:00",
 		"2006-01-02T15:04:05-07:00",
 		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
 		"2006-01-02 15:04:05",
 		"2006-01-02",
 		"01/02/2006 15:04",
@@ -39,6 +40,24 @@ func Date(s string) *time.Time {
 func Active(s string) bool {
 	s = strings.ToLower(strings.TrimSpace(s))
 	return s == "yes" || s == "true" || s == "1"
+}
+
+// DateOnly parses a date string and truncates to midnight UTC.
+// Returns nil for empty or unparseable values.
+func DateOnly(s string) *time.Time {
+	t := Date(s)
+	if t == nil {
+		return nil
+	}
+	truncated := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	return &truncated
+}
+
+func IsSentinelDate(t *time.Time) bool {
+	if t == nil {
+		return false
+	}
+	return t.Year() < 1980
 }
 
 func Amount(s string) *float64 {

@@ -318,6 +318,37 @@ func (db *DB) DetectReappearances(ctx context.Context, currentRunID uuid.UUID, s
 	return int(tag.RowsAffected()), nil
 }
 
+type DataQualityEntry struct {
+	NoticeID     string
+	SnapshotDate time.Time
+	Source       string
+	IssueType    string
+	FieldName    string
+	FieldValue   string
+}
+
+func (db *DB) InsertDataQualityIssues(ctx context.Context, runID uuid.UUID, entries []DataQualityEntry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	batch := &pgx.Batch{}
+	for _, e := range entries {
+		batch.Queue(`
+			INSERT INTO pipeline.snap_data_quality (run_id, notice_id, snapshot_date, source, issue_type, field_name, field_value)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, runID, e.NoticeID, e.SnapshotDate, e.Source, e.IssueType, nilIfEmpty(e.FieldName), nilIfEmpty(e.FieldValue))
+	}
+
+	results := db.pool.SendBatch(ctx, batch)
+	defer results.Close()
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
+			slog.Warn("failed to insert data quality issue", "error", err, "notice_id", entries[i].NoticeID)
+		}
+	}
+}
+
 func nilIfEmpty(s string) *string {
 	if s == "" {
 		return nil

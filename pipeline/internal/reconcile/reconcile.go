@@ -19,7 +19,7 @@ type Opportunity struct {
 
 	PostedDate       *time.Time
 	ResponseDeadline *time.Time
-	ArchiveDate      string // DATE, not TIMESTAMPTZ
+	ArchiveDate      *time.Time
 	ArchiveType      string
 	Active           bool
 
@@ -47,7 +47,7 @@ type Opportunity struct {
 	OfficeCountry string
 
 	AwardNumber string
-	AwardDate   string
+	AwardDate   *time.Time
 	AwardAmount *float64
 	Awardee     string
 
@@ -66,10 +66,21 @@ type Opportunity struct {
 	UILink string
 }
 
+type DataQualityIssue struct {
+	FieldName  string
+	FieldValue string
+	IssueType  string
+}
+
 // FromCSV maps a raw CSV row (map of header→value) into an Opportunity.
-// This is the identity transform — future versions will merge CSV + API.
-func FromCSV(raw map[string]string) Opportunity {
-	return Opportunity{
+// Returns data quality issues for unparseable or sentinel date values.
+func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
+	var issues []DataQualityIssue
+
+	archiveDate := parseDateField(raw["ArchiveDate"], "ArchiveDate", &issues)
+	awardDate := parseDateField(raw["AwardDate"], "AwardDate", &issues)
+
+	opp := Opportunity{
 		NoticeID:           raw["NoticeId"],
 		SolicitationNumber: raw["Sol#"],
 		Title:              raw["Title"],
@@ -80,7 +91,7 @@ func FromCSV(raw map[string]string) Opportunity {
 
 		PostedDate:       parse.Date(raw["PostedDate"]),
 		ResponseDeadline: parse.Date(raw["ResponseDeadLine"]),
-		ArchiveDate:      raw["ArchiveDate"],
+		ArchiveDate:      archiveDate,
 		ArchiveType:      raw["ArchiveType"],
 		Active:           parse.Active(raw["Active"]),
 
@@ -108,7 +119,7 @@ func FromCSV(raw map[string]string) Opportunity {
 		OfficeCountry: raw["CountryCode"],
 
 		AwardNumber: raw["AwardNumber"],
-		AwardDate:   raw["AwardDate"],
+		AwardDate:   awardDate,
 		AwardAmount: parse.Amount(raw["Award$"]),
 		Awardee:     raw["Awardee"],
 
@@ -126,4 +137,30 @@ func FromCSV(raw map[string]string) Opportunity {
 
 		UILink: raw["Link"],
 	}
+
+	return opp, issues
+}
+
+func parseDateField(rawValue, fieldName string, issues *[]DataQualityIssue) *time.Time {
+	if rawValue == "" {
+		return nil
+	}
+	t := parse.DateOnly(rawValue)
+	if t == nil {
+		*issues = append(*issues, DataQualityIssue{
+			FieldName:  fieldName,
+			FieldValue: rawValue,
+			IssueType:  "unparseable_date",
+		})
+		return nil
+	}
+	if parse.IsSentinelDate(t) {
+		*issues = append(*issues, DataQualityIssue{
+			FieldName:  fieldName,
+			FieldValue: rawValue,
+			IssueType:  "sentinel_date",
+		})
+		return nil
+	}
+	return t
 }
