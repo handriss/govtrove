@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,29 +14,33 @@ import (
 
 const upsertBatchSize = 500
 
-func (db *DB) UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (inserted, updated int, err error) {
+func (db *DB) UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (affected int, err error) {
 	for i := 0; i < len(opps); i += upsertBatchSize {
 		end := i + upsertBatchSize
 		if end > len(opps) {
 			end = len(opps)
 		}
-		ins, upd, batchErr := db.upsertOpportunitiesBatch(ctx, runID, snapshotDate, opps[i:end])
+		batchAffected, batchFailed, batchErr := db.upsertOpportunitiesBatch(ctx, runID, snapshotDate, opps[i:end])
 		if batchErr != nil {
-			return inserted, updated, fmt.Errorf("upsert batch %d-%d: %w", i, end, batchErr)
+			return affected, fmt.Errorf("upsert batch %d-%d: %w", i, end, batchErr)
 		}
-		inserted += ins
-		updated += upd
+		if batchFailed > 0 {
+			slog.Warn("batch had row failures", "batch_start", i, "failed", batchFailed)
+		}
+		affected += batchAffected
 	}
-	return inserted, updated, nil
+	return affected, nil
 }
 
-func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (inserted, updated int, err error) {
+func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (affected, failed int, err error) {
 	batch := &pgx.Batch{}
+	var noticeIDs []string
 
 	for _, o := range opps {
 		if o.NoticeID == "" {
 			continue
 		}
+		noticeIDs = append(noticeIDs, o.NoticeID)
 		batch.Queue(`
 			INSERT INTO opportunities (
 				notice_id, solicitation_number, title, description, type, base_type, organization_type,
@@ -117,13 +122,13 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 		`,
 			o.NoticeID, nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description),
 			nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),
-			o.PostedDate, o.ResponseDeadline, nilIfEmpty(o.ArchiveDate), nilIfEmpty(o.ArchiveType), o.Active,
+			o.PostedDate, o.ResponseDeadline, o.ArchiveDate, nilIfEmpty(o.ArchiveType), o.Active,
 			nilIfEmpty(o.SetAsideCode), nilIfEmpty(o.SetAsideDescription), nilIfEmpty(o.NAICSCode), nilIfEmpty(o.ClassificationCode),
 			nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
 			nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
 			nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
 			nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-			nilIfEmpty(o.AwardNumber), nilIfEmpty(o.AwardDate), o.AwardAmount, nilIfEmpty(o.Awardee),
+			nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
 			nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
 			nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
 			nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
@@ -143,18 +148,20 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 	for i := 0; i < batch.Len(); i++ {
 		tag, err := results.Exec()
 		if err != nil {
-			return inserted, updated, fmt.Errorf("exec upsert %d: %w", i, err)
+			noticeID := ""
+			if i < len(noticeIDs) {
+				noticeID = noticeIDs[i]
+			}
+			slog.Warn("upsert row failed", "notice_id", noticeID, "error", err)
+			failed++
+			continue
 		}
-		// INSERT returns RowsAffected=1 for both insert and update via ON CONFLICT.
-		// xmax=0 means insert, xmax!=0 means update — but we can't read that from tag.
-		// Use a heuristic: if the row existed, updated_at trigger fires.
-		// For stats, we just count total and derive later.
 		if tag.RowsAffected() > 0 {
-			inserted++
+			affected++
 		}
 	}
 
-	return inserted, 0, nil
+	return affected, failed, nil
 }
 
 func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {
