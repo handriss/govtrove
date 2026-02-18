@@ -27,7 +27,7 @@ interface ResultsListProps {
   onNaicsChange?: (codes: string[]) => void;
 }
 
-const SORTABLE_COLUMNS: Record<string, string> = {
+export const SORTABLE_COLUMNS: Record<string, string> = {
   'Title': 'title',
   'Agency': 'department',
   'Posted': 'posted_date',
@@ -62,13 +62,13 @@ const US_STATE_CODES = [
   'WV','WI','WY','AS','GU','MP','PR','VI',
 ];
 
-const STATE_FILTER_OPTIONS: FilterOption[] = US_STATE_CODES.map((s) => ({
+export const STATE_FILTER_OPTIONS: FilterOption[] = US_STATE_CODES.map((s) => ({
   value: s,
   label: `${s} — ${STATE_NAMES[s] || s}`,
   searchTerms: STATE_NAMES[s] ? [STATE_NAMES[s]] : undefined,
 }));
 
-const SET_ASIDE_FILTER_OPTIONS: FilterOption[] = [
+export const SET_ASIDE_FILTER_OPTIONS: FilterOption[] = [
   { value: 'SBA', label: 'SBA' },
   { value: 'SBP', label: 'Small Business', searchTerms: ['sbp', 'small business set-aside'] },
   { value: '8A', label: '8(a)', searchTerms: ['8a', 'minority', 'disadvantaged'] },
@@ -85,7 +85,7 @@ const SET_ASIDE_FILTER_OPTIONS: FilterOption[] = [
   { value: 'VSS', label: 'VOSB Sole Source', searchTerms: ['veteran owned', 'sole source'] },
 ];
 
-const DEPT_ALIASES: Record<string, string[]> = {
+export const DEPT_ALIASES: Record<string, string[]> = {
   'DEPT OF DEFENSE': ['dod', 'military', 'pentagon'],
   'DEPT OF THE ARMY': ['army'],
   'DEPT OF THE NAVY': ['navy', 'usn', 'marines', 'usmc'],
@@ -117,7 +117,7 @@ const DEPT_ALIASES: Record<string, string[]> = {
   'FEDERAL EMERGENCY MANAGEMENT AGENCY': ['fema'],
 };
 
-function parseMulti(v: string | undefined): string[] {
+export function parseMulti(v: string | undefined): string[] {
   return v ? v.split(',') : [];
 }
 

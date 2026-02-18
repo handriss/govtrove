@@ -16,8 +16,10 @@ const setAsideColors: Record<string, string> = {
 function getDaysUntilDeadline(deadline: string | undefined) {
   if (!deadline) return null;
   const now = new Date();
-  const deadlineDate = new Date(deadline);
-  return Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = new Date(todayStr + 'T00:00:00');
+  const deadlineDate = new Date(deadline.slice(0, 10) + 'T00:00:00');
+  return Math.round((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function getDeadlineStyle(days: number | null) {

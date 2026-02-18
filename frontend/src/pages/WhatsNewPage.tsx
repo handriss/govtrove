@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Clock } from 'lucide-react';
 import ResultsList from '../components/ResultsList';
+import MobileFilterSheet from '../components/MobileFilterSheet';
 import AuthButton from '../components/AuthButton';
 import { searchOpportunities } from '../services/api';
 import { getWhatsNewSync, getWhatsNew, whatsNewBaseParams } from '../services/whatsNewCache';
 import type { OpportunityListItem } from '../types/api';
 
 const PAGE_SIZE = 25;
+
+const URL_FILTER_KEYS = ['title', 'department', 'set_aside', 'naics_prefix', 'state'] as const;
 
 function compareValues(a: string | undefined | null, b: string | undefined | null, order: string): number {
   if (a == null && b == null) return 0;
@@ -17,14 +20,39 @@ function compareValues(a: string | undefined | null, b: string | undefined | nul
   return order === 'asc' ? cmp : -cmp;
 }
 
+function filtersFromParams(params: URLSearchParams): Record<string, string> {
+  const f: Record<string, string> = {};
+  for (const key of URL_FILTER_KEYS) {
+    const v = params.get(key);
+    if (v) f[key] = v;
+  }
+  return f;
+}
+
 export default function WhatsNewPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const allData = useRef<OpportunityListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sort, setSort] = useState('posted_date');
-  const [order, setOrder] = useState('desc');
-  const [filters, setFilters] = useState<Record<string, string>>({});
-  const [selectedNaics, setSelectedNaics] = useState<string[]>([]);
-  const [page, setPage] = useState(1);
+
+  const sort = searchParams.get('sort') || 'posted_date';
+  const order = searchParams.get('order') || 'desc';
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const selectedNaics = useMemo(() => {
+    const v = searchParams.get('naics');
+    return v ? v.split(',') : [];
+  }, [searchParams]);
+  const page = Number(searchParams.get('page')) || 1;
+
+  const updateParams = useCallback((updates: Record<string, string | null>) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   useEffect(() => {
     const cached = getWhatsNewSync();
@@ -117,33 +145,29 @@ export default function WhatsNewPage() {
   const hasActiveFilters = Object.keys(filters).length > 0 || selectedNaics.length > 0;
 
   const handlePageChange = useCallback((newPage: number) => {
-    setPage(newPage);
-  }, []);
+    updateParams({ page: newPage > 1 ? String(newPage) : null });
+  }, [updateParams]);
 
   const handleSortChange = useCallback((newSort: string, newOrder: string) => {
-    setSort(newSort);
-    setOrder(newOrder);
-    setPage(1);
-  }, []);
+    const isDefault = newSort === 'posted_date' && newOrder === 'desc';
+    updateParams({
+      sort: isDefault ? null : newSort,
+      order: isDefault ? null : newOrder,
+      page: null,
+    });
+  }, [updateParams]);
 
   const handleFilterChange = useCallback((field: string, value: string) => {
-    setFilters((prev) => {
-      const next = { ...prev };
-      if (value) {
-        next[field] = value;
-      } else {
-        delete next[field];
-      }
-      return next;
-    });
-    setPage(1);
-  }, []);
+    updateParams({ [field]: value || null, page: null });
+  }, [updateParams]);
+
+  const handleNaicsChange = useCallback((codes: string[]) => {
+    updateParams({ naics: codes.length > 0 ? codes.join(',') : null, page: null });
+  }, [updateParams]);
 
   const handleResetFilters = useCallback(() => {
-    setFilters({});
-    setSelectedNaics([]);
-    setPage(1);
-  }, []);
+    setSearchParams({}, { replace: true });
+  }, [setSearchParams]);
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -211,8 +235,24 @@ export default function WhatsNewPage() {
           availableSetAsides={setAsideCodes}
           availableStates={stateCodes}
           selectedNaics={selectedNaics}
-          onNaicsChange={(codes) => { setSelectedNaics(codes); setPage(1); }}
+          onNaicsChange={handleNaicsChange}
         />
+        {!loading && (
+          <MobileFilterSheet
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            sort={sort}
+            order={order}
+            onSortChange={handleSortChange}
+            agencies={agencies}
+            availableSetAsides={setAsideCodes}
+            availableStates={stateCodes}
+            selectedNaics={selectedNaics}
+            onNaicsChange={handleNaicsChange}
+            resultCount={totalFiltered}
+            onReset={handleResetFilters}
+          />
+        )}
       </div>
     </div>
   );
