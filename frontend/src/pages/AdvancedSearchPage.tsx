@@ -451,15 +451,15 @@ export default function AdvancedSearchPage() {
 
           {/* Quick Filters Row */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleWhatsNew}
+            <Link
+              to="/whats-new"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
                          border border-accent/30 bg-accent/10 text-accent
                          hover:bg-accent/20 transition-all duration-200"
             >
               <Clock size={14} strokeWidth={1.5} />
               What's New Today?
-            </button>
+            </Link>
             <div className="w-px h-5 bg-dark-800/50 mx-1 hidden sm:block" />
             <SetAsideChips
               selected={filters.setAsides}
@@ -503,42 +503,29 @@ export default function AdvancedSearchPage() {
           {!hasSearched ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] py-12 text-center">
               {savedSearches.length > 0 ? (
-                <>
-                  <div className="w-full max-w-2xl mb-10">
+                <div className="w-full max-w-2xl mb-10 opacity-50 pointer-events-none">
+                  <div className="rounded-xl border border-fuchsia-500 bg-fuchsia-500/10 p-4">
                     <div className="flex items-center gap-2 mb-4">
-                      <Bookmark size={16} className="text-accent" strokeWidth={1.5} />
-                      <h3 className="text-sm font-medium text-dark-200">Saved Searches</h3>
+                      <Bookmark size={16} className="text-fuchsia-400" strokeWidth={1.5} />
+                      <h3 className="text-sm font-medium text-fuchsia-400">Saved Searches — coming soon</h3>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {savedSearches.map((saved) => (
-                        <button
+                        <div
                           key={saved.id}
-                          onClick={() => handleLoadSaved(saved)}
-                          className="group relative text-left p-3 rounded-xl border border-dark-800/50 bg-dark-900/30
-                                     hover:border-dark-700/50 hover:bg-dark-800/30 transition-all duration-200"
+                          className="text-left p-3 rounded-xl border border-dark-800/50 bg-dark-900/30"
                         >
-                          <p className="text-sm font-medium text-dark-200 group-hover:text-dark-50 pr-6">
+                          <p className="text-sm font-medium text-dark-400 pr-6">
                             {saved.name}
                           </p>
                           <p className="text-[11px] text-dark-500 mt-1 font-mono truncate">
                             {saved.params.q || Object.keys(saved.params).join(', ')}
                           </p>
-                          <button
-                            onClick={(e) => handleDeleteSaved(saved.id, e)}
-                            className="absolute top-3 right-3 p-1 text-dark-600 hover:text-red-400
-                                       opacity-0 group-hover:opacity-100 transition-all duration-150"
-                            title="Delete saved search"
-                          >
-                            <Trash2 size={14} strokeWidth={1.5} />
-                          </button>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </div>
-                  <div className="w-full max-w-2xl border-t border-dark-800/30 pt-8">
-                    <p className="text-dark-500 text-sm mb-6">Or start a new search</p>
-                  </div>
-                </>
+                </div>
               ) : (
                 <>
                   <div className="w-16 h-16 rounded-2xl bg-dark-800/30 border border-dark-700/20 flex items-center justify-center mb-6">
@@ -592,49 +579,10 @@ export default function AdvancedSearchPage() {
                     </span>
                   )}
                 </p>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowSaveDialog(!showSaveDialog)}
-                    className="flex items-center gap-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors"
-                  >
-                    <Bookmark size={14} strokeWidth={1.5} />
-                    Save search
-                  </button>
-                  {showSaveDialog && (
-                    <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-dark-900 border border-dark-700/50 rounded-xl shadow-xl z-50">
-                      <input
-                        type="text"
-                        value={saveName}
-                        onChange={(e) => setSaveName(e.target.value)}
-                        placeholder="Name this search..."
-                        className="w-full py-2 px-3 text-sm bg-dark-850/50 border border-dark-700/50 rounded-lg
-                                   text-dark-100 placeholder:text-dark-500
-                                   focus:outline-none focus:border-accent/50 transition-colors duration-200"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveSearch();
-                          if (e.key === 'Escape') setShowSaveDialog(false);
-                        }}
-                      />
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => setShowSaveDialog(false)}
-                          className="flex-1 py-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSaveSearch}
-                          disabled={!saveName.trim()}
-                          className="flex-1 py-1.5 text-xs bg-accent hover:bg-accent-hover text-white rounded-lg
-                                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <span className="flex items-center gap-1.5 text-xs text-fuchsia-400 opacity-50">
+                  <Bookmark size={14} strokeWidth={1.5} />
+                  Save search — coming soon
+                </span>
               </div>
 
               <ResultsList

@@ -7,8 +7,13 @@ import SetAsideChips from '../components/SetAsideChips';
 import AuthButton from '../components/AuthButton';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
+import { preloadWhatsNew } from '../services/whatsNewCache';
 
 const DEFAULT_TYPES = 'Solicitation,Presolicitation,Combined Synopsis/Solicitation,Sources Sought';
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
 
 export default function SimpleSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,6 +28,9 @@ export default function SimpleSearchPage() {
   const [hasSearched, setHasSearched] = useState(initialQuery.length >= 2);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialMount = useRef(true);
+  const hadQuerySearch = useRef(false);
+
+  useEffect(() => { preloadWhatsNew(); }, []);
 
   const updateURL = useCallback((q: string, p: number, sa?: string[]) => {
     const params = new URLSearchParams();
@@ -36,6 +44,7 @@ export default function SimpleSearchPage() {
     q: q || undefined,
     type: DEFAULT_TYPES,
     set_aside: sa.length ? sa.join(',') : undefined,
+    deadline_from: today(),
     sort: q ? 'relevance' : 'posted_date' as const,
     order: 'desc' as const,
     page: pageNum,
@@ -45,6 +54,7 @@ export default function SimpleSearchPage() {
   useEffect(() => {
     if (isInitialMount.current && initialQuery.length >= 2) {
       search(buildParams(initialQuery, initialPage, setAsides));
+      hadQuerySearch.current = true;
       isInitialMount.current = false;
       return;
     }
@@ -53,13 +63,15 @@ export default function SimpleSearchPage() {
     if (debouncedQuery.length >= 2) {
       search(buildParams(debouncedQuery, 1, setAsides));
       updateURL(debouncedQuery, 1, setAsides);
+      hadQuerySearch.current = true;
       setHasSearched(true);
-    } else if (debouncedQuery.length === 0 && hasSearched) {
+    } else if (debouncedQuery.length === 0 && hadQuerySearch.current) {
       reset();
       updateURL('', 1, setAsides);
+      hadQuerySearch.current = false;
       setHasSearched(false);
     }
-  }, [debouncedQuery, search, reset, hasSearched, initialQuery, initialPage, updateURL, buildParams, setAsides]);
+  }, [debouncedQuery, search, reset, initialQuery, initialPage, updateURL, buildParams, setAsides]);
 
   const handlePageChange = (newPage: number) => {
     search(buildParams(debouncedQuery, newPage, setAsides));
@@ -81,22 +93,6 @@ export default function SimpleSearchPage() {
       updateURL(debouncedQuery, 1, newSetAsides);
     }
   }, [hasSearched, results.length, search, buildParams, debouncedQuery, updateURL]);
-
-  const handleWhatsNew = useCallback(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const postedFrom = yesterday.toISOString().split('T')[0];
-    search({
-      type: DEFAULT_TYPES,
-      set_aside: setAsides.length ? setAsides.join(',') : undefined,
-      posted_from: postedFrom,
-      sort: 'posted_date',
-      order: 'desc',
-      page: 1,
-      limit: 25,
-    });
-    setHasSearched(true);
-  }, [search, setAsides]);
 
   const showResults = hasSearched || results.length > 0;
 
@@ -143,15 +139,15 @@ export default function SimpleSearchPage() {
         {!showResults && (
           <div className="text-center space-y-5 animate-in fade-in duration-500">
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                onClick={handleWhatsNew}
+              <Link
+                to="/whats-new"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
                            border border-accent/30 bg-accent/10 text-accent
                            hover:bg-accent/20 transition-all duration-200"
               >
                 <Clock size={14} strokeWidth={1.5} />
                 What's New Today?
-              </button>
+              </Link>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -198,8 +194,14 @@ export default function SimpleSearchPage() {
         <div className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-6 pb-10">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-dark-800/50">
             <p className="text-sm text-dark-400">
-              <span className="text-dark-200 font-medium">{total.toLocaleString()}</span>
-              <span className="ml-1">results</span>
+              {loading ? (
+                <span className="text-dark-500">Searching...</span>
+              ) : (
+                <>
+                  <span className="text-dark-200 font-medium">{total.toLocaleString()}</span>
+                  <span className="ml-1">results</span>
+                </>
+              )}
             </p>
             <Link
               to="/advanced"
