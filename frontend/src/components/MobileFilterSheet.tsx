@@ -178,6 +178,7 @@ export default function MobileFilterSheet({
                   selected={selectedNaics}
                   onChange={onNaicsChange}
                   placeholder="All NAICS codes"
+                  inline
                 />
               </FilterSection>
 
