@@ -11,33 +11,20 @@ const CHIPS = [
   { code: 'HUBZone', label: 'HUBZone', active: 'border-orange-500/30 bg-orange-500/10 text-orange-400' },
 ] as const;
 
-const INACTIVE = 'border-dark-700/50 bg-dark-800/30 text-dark-400 hover:text-dark-300 hover:border-dark-600/50';
-
-export default function SetAsideChips({ selected, onChange }: SetAsideChipsProps) {
-  const toggle = (code: string) => {
-    if (selected.includes(code)) {
-      onChange(selected.filter((s) => s !== code));
-    } else {
-      onChange([...selected, code]);
-    }
-  };
-
+export default function SetAsideChips({ selected: _selected, onChange: _onChange }: SetAsideChipsProps) {
   return (
-    <>
-      {CHIPS.map((chip) => {
-        const isActive = selected.includes(chip.code);
-        return (
-          <button
+    <div className="relative opacity-50 pointer-events-none">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-fuchsia-500 bg-fuchsia-500/10 px-3 py-2">
+        {CHIPS.map((chip) => (
+          <span
             key={chip.code}
-            onClick={() => toggle(chip.code)}
-            className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm border transition-all duration-200 ${
-              isActive ? chip.active : INACTIVE
-            }`}
+            className="inline-flex items-center rounded-full px-3 py-1.5 text-sm border border-dark-700/50 bg-dark-800/30 text-dark-400"
           >
             {chip.label}
-          </button>
-        );
-      })}
-    </>
+          </span>
+        ))}
+        <span className="text-xs text-fuchsia-400 ml-1">Coming soon</span>
+      </div>
+    </div>
   );
 }
