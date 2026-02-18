@@ -16,7 +16,7 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-export function whatsNewParams(pageNum = 1): SearchParams {
+export function whatsNewBaseParams(): SearchParams {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   return {
@@ -25,14 +25,14 @@ export function whatsNewParams(pageNum = 1): SearchParams {
     deadline_from: today(),
     sort: 'posted_date',
     order: 'desc',
-    page: pageNum,
-    limit: 25,
+    page: 1,
+    limit: 2000,
   };
 }
 
 export function preloadWhatsNew(): void {
   if (!isStale() || fetching) return;
-  fetching = searchOpportunities(whatsNewParams())
+  fetching = searchOpportunities(whatsNewBaseParams())
     .then((data) => { cached = data; cachedAt = Date.now(); return data; })
     .catch(() => null as unknown as SearchResult)
     .finally(() => { fetching = null; });
@@ -41,7 +41,7 @@ export function preloadWhatsNew(): void {
 export async function getWhatsNew(): Promise<SearchResult> {
   if (!isStale()) return cached!;
   if (fetching) return fetching;
-  const data = await searchOpportunities(whatsNewParams());
+  const data = await searchOpportunities(whatsNewBaseParams());
   cached = data;
   cachedAt = Date.now();
   return data;
