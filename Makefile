@@ -2,7 +2,7 @@
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	test lambda-build \
+	test test-e2e lambda-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-pipeline deploy-all \
 	run-pipeline pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
@@ -66,6 +66,7 @@ help:
 	@echo "Build:"
 	@echo "  make lambda-build       - Build all 4 pipeline Lambda zips"
 	@echo "  make test               - Run tests"
+	@echo "  make test-e2e           - Run pipeline E2E tests (requires Docker)"
 	@echo ""
 	@echo "Deploy:"
 	@echo "  make ecr-login                  - Login to AWS ECR"
@@ -227,6 +228,11 @@ LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile
 test:
 	cd pipeline && go test -v ./...
 	cd api && go test -v ./...
+
+test-e2e:
+	@mkdir -p .reports
+	cd pipeline && go test -v ./internal/e2e/ -timeout 120s -ginkgo.json-report=../../../.reports/e2e-report.json
+	@echo "Report saved to .reports/e2e-report.json"
 
 lambda-build:
 	@for svc in $(LAMBDA_FUNCTIONS); do \
