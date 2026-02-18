@@ -19,7 +19,6 @@ type Opportunity struct {
 	SetAsideCode       *string    `json:"set_aside_code,omitempty"`
 	SetAsideDesc       *string    `json:"set_aside_description,omitempty"`
 	NAICSCode          *string    `json:"naics_code,omitempty"`
-	NAICSCodes         []string   `json:"naics_codes,omitempty"`
 	ClassificationCode *string    `json:"classification_code,omitempty"`
 	PopStreetAddress   *string    `json:"pop_street_address,omitempty"`
 	PopCity            *string    `json:"pop_city,omitempty"`
