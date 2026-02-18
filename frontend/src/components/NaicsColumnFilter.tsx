@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { NAICS_CODES } from '../data/naicsCodes';
 import type { NaicsCode } from '../data/naicsCodes';
 
@@ -8,6 +8,7 @@ interface Props {
   selected: string[];
   onChange: (codes: string[]) => void;
   placeholder?: string;
+  inline?: boolean;
 }
 
 interface ResultItem {
@@ -61,7 +62,7 @@ const ROLE_STYLE: Record<string, string> = {
 const TITLE_BY_CODE = new Map<string, string>();
 for (const c of NAICS_CODES) TITLE_BY_CODE.set(c.code, c.title);
 
-export default function NaicsColumnFilter({ selected, onChange, placeholder = 'All' }: Props) {
+export default function NaicsColumnFilter({ selected, onChange, placeholder = 'All', inline }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [highlighted, setHighlighted] = useState(-1);
@@ -91,7 +92,7 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (inline || !open) return;
     const onMouseDown = (e: MouseEvent) => {
       const t = e.target as Node;
       if (triggerRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
@@ -114,11 +115,11 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [open]);
+  }, [open, inline]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 0);
-  }, [open]);
+    if (open && !inline) setTimeout(() => inputRef.current?.focus(), 0);
+  }, [open, inline]);
 
   useEffect(() => {
     if (highlighted >= 0 && listRef.current) {
@@ -136,7 +137,7 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
   }, [selected, onChange]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && !inline) {
       setOpen(false);
       setSearch('');
       return;
@@ -152,7 +153,7 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
       e.preventDefault();
       toggleCode(results[highlighted].code.code);
     }
-  }, [results, highlighted, toggleCode]);
+  }, [results, highlighted, toggleCode, inline]);
 
   const display =
     selected.length === 0
@@ -160,6 +161,104 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
       : selected.length === 1
         ? selected[0]
         : `${selected.length} codes`;
+
+  const selectedChips = selected.length > 0 && (
+    <div className={inline ? 'mt-2 space-y-2' : 'p-1.5 border-t border-dark-700/30 space-y-1'}>
+      <div className="flex flex-wrap gap-1 px-1">
+        {selected.map((code) => (
+          <span
+            key={code}
+            className={`inline-flex items-center gap-1 bg-dark-900 border border-dark-700/50 rounded text-dark-300
+                       ${inline ? 'px-2.5 py-1.5 text-xs' : 'px-1.5 py-0.5 text-[10px] gap-0.5'}`}
+          >
+            <span className="font-mono">{code}</span>
+            <span className="text-dark-600">&mdash;</span>
+            <span className="truncate max-w-[160px]">{TITLE_BY_CODE.get(code) || code}</span>
+            <button
+              type="button"
+              onClick={() => toggleCode(code)}
+              className={`text-dark-500 hover:text-dark-200 ${inline ? 'ml-1 p-0.5' : 'ml-0.5'}`}
+            >
+              &times;
+            </button>
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange([])}
+        className={`w-full text-dark-400 hover:text-dark-200 ${inline ? 'text-xs py-1' : 'text-[11px] py-0.5'}`}
+      >
+        Clear all
+      </button>
+    </div>
+  );
+
+  const resultsList = (
+    <div ref={listRef} className={`overflow-y-auto ${inline ? 'max-h-[240px]' : 'flex-1'}`}>
+      {search.trim() === '' ? (
+        <p className={`text-dark-500 px-3 ${inline ? 'text-sm py-3' : 'text-xs py-2'}`}>Type a NAICS code or keyword</p>
+      ) : results.length === 0 ? (
+        <p className={`text-dark-500 px-3 ${inline ? 'text-sm py-3' : 'text-xs py-2'}`}>No matches</p>
+      ) : (
+        results.map((item, i) => {
+          const isSelected = selected.includes(item.code.code);
+          return (
+            <div
+              key={item.code.code}
+              onClick={() => toggleCode(item.code.code)}
+              className={`cursor-pointer flex items-center
+                         ${INDENT[item.code.level] || 'pl-2'}
+                         ${i === highlighted ? 'bg-dark-700/80' : 'hover:bg-dark-700/50'}
+                         ${ROLE_STYLE[item.role] || 'text-dark-300'}
+                         ${inline ? 'px-3 py-2.5 text-sm gap-2' : 'px-2 py-1 text-xs gap-1.5'}`}
+            >
+              {isSelected && (
+                <span className={`text-accent shrink-0 ${inline ? 'text-xs' : 'text-[10px]'}`}>&#10003;</span>
+              )}
+              <span className={`font-mono shrink-0 ${inline ? 'text-xs' : 'text-[10px]'}`}>{item.code.code}</span>
+              <span className={`text-dark-600 ${inline ? 'text-xs' : 'text-[10px]'}`}>&mdash;</span>
+              <span className="truncate">{item.code.title}</span>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
+  if (inline) {
+    return (
+      <div>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-500" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setHighlighted(-1); }}
+            onKeyDown={handleKeyDown}
+            placeholder="Code or keyword..."
+            className={`w-full text-sm bg-dark-800 border rounded-lg pl-9 pr-3 py-2.5
+                       placeholder:text-dark-500 focus:outline-none focus:border-accent/50
+                       ${selected.length > 0 ? 'border-accent/40 text-dark-200' : 'border-dark-700/50 text-dark-200'}`}
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-dark-500 hover:text-dark-300"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {search.trim() && (
+          <div className="mt-2 rounded-lg border border-dark-700/50 bg-dark-800 overflow-hidden">
+            {resultsList}
+          </div>
+        )}
+        {selectedChips}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -198,62 +297,8 @@ export default function NaicsColumnFilter({ selected, onChange, placeholder = 'A
               />
             </div>
           </div>
-          <div ref={listRef} className="overflow-y-auto flex-1">
-            {search.trim() === '' ? (
-              <p className="text-xs text-dark-500 px-3 py-2">Type a NAICS code or keyword</p>
-            ) : results.length === 0 ? (
-              <p className="text-xs text-dark-500 px-3 py-2">No matches</p>
-            ) : (
-              results.map((item, i) => {
-                const isSelected = selected.includes(item.code.code);
-                return (
-                  <div
-                    key={item.code.code}
-                    onClick={() => toggleCode(item.code.code)}
-                    className={`px-2 py-1 cursor-pointer text-xs flex items-center gap-1.5
-                               ${INDENT[item.code.level] || 'pl-2'}
-                               ${i === highlighted ? 'bg-dark-700/80' : 'hover:bg-dark-700/50'}
-                               ${ROLE_STYLE[item.role] || 'text-dark-300'}`}
-                  >
-                    {isSelected && (
-                      <span className="text-accent text-[10px] shrink-0">&#10003;</span>
-                    )}
-                    <span className="font-mono text-[10px] shrink-0">{item.code.code}</span>
-                    <span className="text-dark-600 text-[10px]">&mdash;</span>
-                    <span className="truncate">{item.code.title}</span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-          {selected.length > 0 && (
-            <div className="p-1.5 border-t border-dark-700/30 space-y-1">
-              <div className="flex flex-wrap gap-1 px-1">
-                {selected.map((code) => (
-                  <span
-                    key={code}
-                    className="inline-flex items-center gap-0.5 bg-dark-900 border border-dark-700/50 rounded px-1.5 py-0.5 text-[10px] text-dark-300"
-                  >
-                    <span className="font-mono">{code}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleCode(code)}
-                      className="text-dark-500 hover:text-dark-200 ml-0.5"
-                    >
-                      &times;
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => onChange([])}
-                className="w-full text-[11px] text-dark-400 hover:text-dark-200 py-0.5"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
+          {resultsList}
+          {selectedChips}
         </div>,
         document.body,
       )}
