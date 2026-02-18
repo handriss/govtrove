@@ -29,6 +29,12 @@ function getDeadlineStyle(days: number | null) {
   return { className: 'text-emerald-400', text: `${days}d` };
 }
 
+function formatPostedDate(date: string | undefined) {
+  if (!date) return '\u2014';
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function formatDepartment(dept: string | undefined) {
   if (!dept) return '\u2014';
   const parts = dept.split('.');
@@ -83,6 +89,10 @@ export default function ResultRow({ opportunity, index }: ResultRowProps) {
         <p className="truncate" title={opportunity.department || ''}>
           {formatDepartment(opportunity.department)}
         </p>
+      </td>
+
+      <td className="px-4 py-3.5 text-sm text-dark-400 tabular-nums whitespace-nowrap">
+        {formatPostedDate(opportunity.posted_date)}
       </td>
 
       <td className="px-4 py-3.5">
