@@ -309,7 +309,7 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	if limitStr := q.Get("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 2000 {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 4000 {
 			params.Limit = limit
 		}
 	}

@@ -26,7 +26,7 @@ export function whatsNewBaseParams(): SearchParams {
     sort: 'posted_date',
     order: 'desc',
     page: 1,
-    limit: 2000,
+    limit: 4000,
   };
 }
 
