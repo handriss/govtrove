@@ -21,6 +21,8 @@ export async function searchOpportunities(params: SearchParams = {}): Promise<Se
   if (params.set_aside) searchParams.set('set_aside', params.set_aside);
   if (params.naics) searchParams.set('naics', params.naics);
   if (params.state) searchParams.set('state', params.state);
+  if (params.naics_prefix) searchParams.set('naics_prefix', params.naics_prefix);
+  if (params.department) searchParams.set('department', params.department);
   if (params.posted_from) searchParams.set('posted_from', params.posted_from);
   if (params.posted_to) searchParams.set('posted_to', params.posted_to);
   if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);

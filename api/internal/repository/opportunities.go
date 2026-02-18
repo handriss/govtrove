@@ -116,6 +116,36 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 		argNum++
 	}
 
+	if len(params.SetAsides) > 0 {
+		conditions = append(conditions, fmt.Sprintf("set_aside_code = ANY($%d)", argNum))
+		args = append(args, params.SetAsides)
+		argNum++
+	}
+
+	if len(params.NAICSCodes) > 0 {
+		conditions = append(conditions, fmt.Sprintf("naics_code = ANY($%d)", argNum))
+		args = append(args, params.NAICSCodes)
+		argNum++
+	}
+
+	if params.NAICSPrefix != "" {
+		conditions = append(conditions, fmt.Sprintf("naics_code LIKE $%d", argNum))
+		args = append(args, params.NAICSPrefix+"%")
+		argNum++
+	}
+
+	if params.Department != "" {
+		conditions = append(conditions, fmt.Sprintf("department ILIKE $%d", argNum))
+		args = append(args, "%"+params.Department+"%")
+		argNum++
+	}
+
+	if len(params.States) > 0 {
+		conditions = append(conditions, fmt.Sprintf("pop_state = ANY($%d)", argNum))
+		args = append(args, params.States)
+		argNum++
+	}
+
 	orderClause := r.buildOrderClause(params.Sort, params.Order, params.Query != "")
 
 	offset := (params.Page - 1) * params.Limit
@@ -156,6 +186,16 @@ func (r *OpportunityRepository) buildOrderClause(sort, order string, hasSearch b
 		return "ORDER BY posted_date DESC"
 	case "deadline":
 		return fmt.Sprintf("ORDER BY response_deadline %s NULLS LAST, posted_date DESC", order)
+	case "title":
+		return fmt.Sprintf("ORDER BY title %s, posted_date DESC", order)
+	case "department":
+		return fmt.Sprintf("ORDER BY department %s NULLS LAST, posted_date DESC", order)
+	case "set_aside_code":
+		return fmt.Sprintf("ORDER BY set_aside_code %s NULLS LAST, posted_date DESC", order)
+	case "naics_code":
+		return fmt.Sprintf("ORDER BY naics_code %s NULLS LAST, posted_date DESC", order)
+	case "pop_state":
+		return fmt.Sprintf("ORDER BY pop_state %s NULLS LAST, posted_date DESC", order)
 	case "posted_date":
 		fallthrough
 	default:
