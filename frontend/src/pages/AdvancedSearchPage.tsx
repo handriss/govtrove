@@ -1,12 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark, Clock } from 'lucide-react';
+import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark } from 'lucide-react';
 import QueryBuilder, { buildQueryString, createEmptyGroup } from '../components/QueryBuilder';
 import FilterPanel from '../components/FilterPanel';
 import ResultsList from '../components/ResultsList';
 import AuthButton from '../components/AuthButton';
 import { useSearch } from '../hooks/useSearch';
-import SetAsideChips from '../components/SetAsideChips';
 import type { QueryGroup, AdvancedFilters, SearchParams } from '../types/api';
 
 const SAVED_SEARCHES_KEY = 'govtrove_saved_searches';
@@ -144,6 +143,8 @@ export default function AdvancedSearchPage() {
   const [showFilters, setShowFilters] = useState(false);
   const { results, total, page, totalPages, loading, search } = useSearch();
   const [hasSearched, setHasSearched] = useState(false);
+  const [sort, setSort] = useState(searchParams.get('sort') || '');
+  const [order, setOrder] = useState(searchParams.get('order') || 'desc');
   const [savedSearches] = useState<SavedSearch[]>(loadSavedSearches);
   const examplesRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
@@ -162,7 +163,7 @@ export default function AdvancedSearchPage() {
   ].reduce((a, b) => a + b, 0);
 
   const updateURL = useCallback(
-    (query: string, currentFilters: AdvancedFilters) => {
+    (query: string, currentFilters: AdvancedFilters, s?: string, o?: string) => {
       const params = new URLSearchParams();
       if (query) params.set('q', query);
       if (currentFilters.types.length) params.set('type', currentFilters.types.join(','));
@@ -173,14 +174,18 @@ export default function AdvancedSearchPage() {
       if (currentFilters.postedTo) params.set('posted_to', currentFilters.postedTo);
       if (currentFilters.deadlineFrom) params.set('deadline_from', currentFilters.deadlineFrom);
       if (currentFilters.deadlineTo) params.set('deadline_to', currentFilters.deadlineTo);
+      if (s) params.set('sort', s);
+      if (o && o !== 'desc') params.set('order', o);
       setSearchParams(params, { replace: true });
     },
     [setSearchParams]
   );
 
   const buildSearchParams = useCallback(
-    (pageNum = 1): SearchParams => {
+    (pageNum = 1, s?: string, o?: string): SearchParams => {
       const q = buildQueryString(groups, groupOperator);
+      const activeSort = s ?? sort;
+      const activeOrder = o ?? order;
       return {
         q: q || undefined,
         type: filters.types.length ? filters.types.join(',') : undefined,
@@ -191,21 +196,21 @@ export default function AdvancedSearchPage() {
         posted_to: filters.postedTo,
         deadline_from: filters.deadlineFrom,
         deadline_to: filters.deadlineTo,
-        sort: q ? 'relevance' : 'posted_date',
-        order: 'desc',
+        sort: activeSort || (q ? 'relevance' : 'posted_date'),
+        order: activeOrder || 'desc',
         page: pageNum,
         limit: 25,
       };
     },
-    [groups, groupOperator, filters]
+    [groups, groupOperator, filters, sort, order]
   );
 
   const handleSearch = useCallback(() => {
     const q = buildQueryString(groups, groupOperator);
-    updateURL(q, filters);
+    updateURL(q, filters, sort, order);
     search(buildSearchParams(1));
     setHasSearched(true);
-  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams]);
+  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams, sort, order]);
 
   // Run initial search if URL has explicit params (default types don't count)
   useEffect(() => {
@@ -230,6 +235,14 @@ export default function AdvancedSearchPage() {
     search(buildSearchParams(newPage));
   };
 
+  const handleSortChange = useCallback((newSort: string, newOrder: string) => {
+    setSort(newSort);
+    setOrder(newOrder);
+    const q = buildQueryString(groups, groupOperator);
+    updateURL(q, filters, newSort, newOrder);
+    search(buildSearchParams(1, newSort, newOrder));
+  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams]);
+
   const handleExampleClick = (example: ExampleSearch) => {
     const newParams = new URLSearchParams(example.params);
     setSearchParams(newParams);
@@ -250,8 +263,8 @@ export default function AdvancedSearchPage() {
       posted_to: example.params.posted_to || undefined,
       deadline_from: example.params.deadline_from || undefined,
       deadline_to: example.params.deadline_to || undefined,
-      sort: example.params.q ? 'relevance' : 'posted_date',
-      order: 'desc',
+      sort: sort || (example.params.q ? 'relevance' : 'posted_date'),
+      order: order || 'desc',
       page: 1,
       limit: 25,
     };
@@ -358,23 +371,6 @@ export default function AdvancedSearchPage() {
             </div>
           )}
 
-          {/* Quick Filters Row */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Link
-              to="/whats-new"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
-                         border border-accent/30 bg-accent/10 text-accent
-                         hover:bg-accent/20 transition-all duration-200"
-            >
-              <Clock size={14} strokeWidth={1.5} />
-              What's New Today?
-            </Link>
-            <div className="w-px h-5 bg-dark-800/50 mx-1 hidden sm:block" />
-            <SetAsideChips
-              selected={filters.setAsides}
-              onChange={(setAsides) => setFilters({ ...filters, setAsides })}
-            />
-          </div>
         </div>
       </div>
 
@@ -501,6 +497,9 @@ export default function AdvancedSearchPage() {
                 loading={loading}
                 query={queryString}
                 onPageChange={handlePageChange}
+                sort={sort || (queryString ? 'relevance' : 'posted_date')}
+                order={order}
+                onSortChange={handleSortChange}
               />
             </>
           )}

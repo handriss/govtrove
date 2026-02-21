@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Loader2, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X } from 'lucide-react';
 import ResultRow from './ResultRow';
 import ResultCard from './ResultCard';
 import NoResults from './NoResults';
@@ -145,6 +145,22 @@ function SearchInput({ value, onChange, placeholder }: { value: string; onChange
   );
 }
 
+function TableColGroup() {
+  return (
+    <colgroup>
+      <col className="w-10" />
+      <col style={{ width: '40%' }} />
+      <col style={{ width: '15%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col className="w-12" />
+    </colgroup>
+  );
+}
+
 export default function ResultsList({
   results,
   page,
@@ -185,11 +201,57 @@ export default function ResultsList({
   }, [availableStates]);
 
   if (loading) {
+    const skeletonRows = Array.from({ length: 10 });
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 size={28} className="animate-spin text-accent/70" strokeWidth={1.5} />
-          <span className="text-sm text-dark-400">Searching...</span>
+      <div>
+        {/* Mobile skeleton */}
+        <div className="md:hidden space-y-3">
+          {skeletonRows.map((_, i) => (
+            <div key={i} className="rounded-xl border border-dark-800/50 bg-dark-900/30 p-4 space-y-3 animate-pulse">
+              <div className="h-4 bg-dark-800/60 rounded w-3/4" />
+              <div className="h-3 bg-dark-800/40 rounded w-1/2" />
+              <div className="h-3 bg-dark-800/30 rounded w-full" />
+              <div className="flex gap-3 mt-2">
+                <div className="h-5 bg-dark-800/40 rounded-full w-12" />
+                <div className="h-5 bg-dark-800/40 rounded-full w-10" />
+                <div className="h-5 bg-dark-800/40 rounded-full w-8" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop skeleton */}
+        <div className="hidden md:block rounded-xl border border-dark-800/50 overflow-hidden bg-dark-900/30 backdrop-blur-sm">
+          <table className="w-full min-w-[900px]">
+            <TableColGroup />
+            <thead>
+              <tr className="text-[11px] text-dark-400 uppercase tracking-wider bg-dark-850/50">
+                <th className="px-4 py-3" />
+                {['Title', 'Agency', 'Posted', 'Set-Aside', 'Due', 'NAICS', 'State'].map((label) => (
+                  <th key={label} className="px-4 py-3 text-left font-medium">{label}</th>
+                ))}
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-800/30">
+              {skeletonRows.map((_, i) => (
+                <tr key={i} className="animate-pulse">
+                  <td className="px-4 py-4"><div className="h-2.5 w-2.5 rounded-full bg-dark-800/50" /></td>
+                  <td className="px-4 py-4 space-y-2">
+                    <div className="h-3.5 bg-dark-800/50 rounded" style={{ width: `${55 + (i * 7) % 30}%` }} />
+                    <div className="h-2.5 bg-dark-800/30 rounded w-1/3" />
+                  </td>
+                  <td className="px-4 py-4"><div className="h-3 bg-dark-800/40 rounded" style={{ width: `${50 + (i * 13) % 40}%` }} /></td>
+                  <td className="px-4 py-4"><div className="h-3 bg-dark-800/40 rounded w-14" /></td>
+                  <td className="px-4 py-4"><div className="h-5 bg-dark-800/40 rounded-full w-10" /></td>
+                  <td className="px-4 py-4"><div className="h-3 bg-dark-800/40 rounded w-8" /></td>
+                  <td className="px-4 py-4"><div className="h-3 bg-dark-800/40 rounded w-14" /></td>
+                  <td className="px-4 py-4"><div className="h-3 bg-dark-800/40 rounded w-6" /></td>
+                  <td className="px-4 py-4" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -215,9 +277,10 @@ export default function ResultsList({
       {/* Desktop: table layout */}
       <div className="hidden md:block rounded-xl border border-dark-800/50 overflow-x-auto bg-dark-900/30 backdrop-blur-sm">
         <table className="w-full min-w-[900px]">
+          <TableColGroup />
           <thead>
             <tr className="text-[11px] text-dark-400 uppercase tracking-wider bg-dark-850/50">
-              <th className="px-4 py-3 w-10"></th>
+              <th className="px-4 py-3"></th>
               {['Title', 'Agency', 'Posted', 'Set-Aside', 'Due', 'NAICS', 'State'].map((label) => {
                 const sortField = SORTABLE_COLUMNS[label];
                 const isSortable = onSortChange && sortField;
@@ -242,7 +305,7 @@ export default function ResultsList({
                   </th>
                 );
               })}
-              <th className="px-4 py-3 w-12"></th>
+              <th className="px-4 py-3"></th>
             </tr>
             {onFilterChange && (
               <tr className="bg-dark-850/30">
