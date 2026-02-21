@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, X } from 'lucide-react';
 import ResultRow from './ResultRow';
 import ResultCard from './ResultCard';
@@ -201,6 +201,30 @@ export default function ResultsList({
     return STATE_FILTER_OPTIONS.filter((o) => available.has(o.value));
   }, [availableStates]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener('scroll', updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateScrollState);
+      ro.disconnect();
+    };
+  }, [updateScrollState, loading, results]);
+
   if (loading) {
     const skeletonRows = Array.from({ length: 10 });
     return (
@@ -223,7 +247,7 @@ export default function ResultsList({
 
         {/* Desktop skeleton */}
         <div className="hidden md:block rounded-xl border border-dark-800/50 overflow-hidden bg-dark-900/30 backdrop-blur-sm">
-          <table className="w-full min-w-[900px]">
+          <table className="w-full min-w-[800px]">
             <TableColGroup />
             <thead>
               <tr className="text-[11px] text-dark-400 uppercase tracking-wider bg-dark-850/50">
@@ -276,8 +300,9 @@ export default function ResultsList({
       </div>
 
       {/* Desktop: table layout */}
-      <div className="hidden md:block rounded-xl border border-dark-800/50 overflow-x-auto bg-dark-900/30 backdrop-blur-sm">
-        <table className="w-full min-w-[900px]">
+      <div className="hidden md:block relative">
+        <div ref={scrollRef} className="rounded-xl border border-dark-800/50 overflow-x-auto bg-dark-900/30 backdrop-blur-sm">
+        <table className="w-full min-w-[800px]">
           <TableColGroup />
           <thead>
             <tr className="text-[11px] text-dark-400 uppercase tracking-wider bg-dark-850/50">
@@ -377,6 +402,13 @@ export default function ResultsList({
             )}
           </tbody>
         </table>
+        </div>
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-0 w-6 rounded-l-xl bg-gradient-to-r from-dark-950/80 to-transparent pointer-events-none z-10" />
+        )}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 w-6 rounded-r-xl bg-gradient-to-l from-dark-950/80 to-transparent pointer-events-none z-10" />
+        )}
       </div>
 
       {totalPages > 1 && (

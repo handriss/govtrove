@@ -500,7 +500,7 @@ export default function AdvancedSearchPage() {
         )}
 
         {/* Results Area */}
-        <div className="flex-1 max-w-7xl mx-auto px-6 py-6">
+        <div className="flex-1 max-w-[1400px] mx-auto px-6 py-6">
           {!hasSearched ? (
             <div className="flex flex-col items-center justify-center min-h-[400px] py-12 text-center">
               {savedSearches.length > 0 ? (
