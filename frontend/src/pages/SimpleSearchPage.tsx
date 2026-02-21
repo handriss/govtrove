@@ -301,7 +301,7 @@ export default function SimpleSearchPage() {
 
       {/* Results */}
       {showResults && (
-        <div className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-6 pb-10">
+        <div className="relative z-10 flex-1 max-w-[1400px] w-full mx-auto px-6 pb-10">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-dark-800/50">
             <p className="text-sm text-dark-400">
               {loading ? (
