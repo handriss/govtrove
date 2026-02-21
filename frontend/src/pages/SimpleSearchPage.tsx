@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Sparkles, Clock } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
@@ -15,106 +15,203 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
+function deadlineToDate(preset: string): string | undefined {
+  const days = parseInt(preset, 10);
+  if (!days) return undefined;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
 export default function SimpleSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
   const initialSetAsides = searchParams.get('set_aside')?.split(',').filter(Boolean) || [];
+  const initialDepartment = searchParams.get('department') || '';
+  const initialState = searchParams.get('state') || '';
+  const initialNaics = searchParams.get('naics')?.split(',').filter(Boolean) || [];
 
+  const initialDeadline = searchParams.get('deadline') || '';
   const initialSort = searchParams.get('sort') || '';
   const initialOrder = searchParams.get('order') || 'desc';
 
   const [query, setQuery] = useState(initialQuery);
   const [setAsides, setSetAsides] = useState<string[]>(initialSetAsides);
+  const [department, setDepartment] = useState(initialDepartment);
+  const [stateFilter, setStateFilter] = useState(initialState);
+  const [selectedNaics, setSelectedNaics] = useState<string[]>(initialNaics);
+  const [titleFilter, setTitleFilter] = useState('');
+  const [deadlinePreset, setDeadlinePreset] = useState(initialDeadline);
   const [sort, setSort] = useState(initialSort);
   const [order, setOrder] = useState(initialOrder);
   const debouncedQuery = useDebounce(query, 300);
   const { results, total, page, totalPages, loading, search, reset } = useSearch();
-  const [hasSearched, setHasSearched] = useState(initialQuery.length >= 2);
+  const hasAnyFilter = initialQuery.length >= 2 || initialSetAsides.length > 0 ||
+    initialDepartment !== '' || initialState !== '' || initialNaics.length > 0;
+  const [hasSearched, setHasSearched] = useState(hasAnyFilter);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialMount = useRef(true);
   const hadQuerySearch = useRef(false);
 
   useEffect(() => { preloadWhatsNew(); }, []);
 
-  const updateURL = useCallback((q: string, p: number, sa?: string[], s?: string, o?: string) => {
+  const updateURL = useCallback((q: string, p: number, sa?: string[], s?: string, o?: string, dept?: string, st?: string, naics?: string[], dl?: string) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (p > 1) params.set('page', String(p));
     if (sa && sa.length) params.set('set_aside', sa.join(','));
     if (s) params.set('sort', s);
     if (o && o !== 'desc') params.set('order', o);
+    if (dept) params.set('department', dept);
+    if (st) params.set('state', st);
+    if (naics && naics.length) params.set('naics', naics.join(','));
+    if (dl) params.set('deadline', dl);
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  const buildParams = useCallback((q: string, pageNum: number, sa: string[], s?: string, o?: string) => ({
+  const buildParams = useCallback((q: string, pageNum: number, sa: string[], s?: string, o?: string, dept?: string, st?: string, naics?: string[], dl?: string) => ({
     q: q || undefined,
     type: DEFAULT_TYPES,
     set_aside: sa.length ? sa.join(',') : undefined,
+    department: dept || undefined,
+    state: st || undefined,
+    naics: naics && naics.length ? naics.join(',') : undefined,
     deadline_from: today(),
+    deadline_to: deadlineToDate(dl || ''),
     sort: s || (q ? 'relevance' : 'posted_date'),
     order: o || 'desc',
     page: pageNum,
     limit: 25,
   }), []);
 
+  const hasActiveFilters = useCallback((q: string, sa: string[], dept: string, st: string, naics: string[]) => {
+    return q.length >= 2 || sa.length > 0 || dept !== '' || st !== '' || naics.length > 0;
+  }, []);
+
+  const doSearch = useCallback((q: string, pg: number, sa: string[], s: string, o: string, dept: string, st: string, naics: string[], dl: string) => {
+    search(buildParams(q, pg, sa, s, o, dept, st, naics, dl));
+    updateURL(q, pg, sa, s, o, dept, st, naics, dl);
+    setHasSearched(true);
+  }, [search, buildParams, updateURL]);
+
   useEffect(() => {
-    if (isInitialMount.current && initialQuery.length >= 2) {
-      search(buildParams(initialQuery, initialPage, setAsides, sort, order));
-      hadQuerySearch.current = true;
+    if (isInitialMount.current) {
+      if (hasActiveFilters(initialQuery, setAsides, department, stateFilter, selectedNaics)) {
+        search(buildParams(initialQuery, initialPage, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset));
+        hadQuerySearch.current = initialQuery.length >= 2;
+      }
       isInitialMount.current = false;
       return;
     }
-    isInitialMount.current = false;
 
-    if (debouncedQuery.length >= 2) {
-      search(buildParams(debouncedQuery, 1, setAsides, sort, order));
-      updateURL(debouncedQuery, 1, setAsides, sort, order);
-      hadQuerySearch.current = true;
-      setHasSearched(true);
+    if (hasActiveFilters(debouncedQuery, setAsides, department, stateFilter, selectedNaics)) {
+      doSearch(debouncedQuery, 1, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset);
+      if (debouncedQuery.length >= 2) hadQuerySearch.current = true;
     } else if (debouncedQuery.length === 0 && hadQuerySearch.current) {
       reset();
-      updateURL('', 1, setAsides);
+      updateURL('', 1);
       hadQuerySearch.current = false;
       setHasSearched(false);
     }
-  }, [debouncedQuery, search, reset, initialQuery, initialPage, updateURL, buildParams, setAsides, sort, order]);
+  }, [debouncedQuery, search, reset, initialQuery, initialPage, updateURL, buildParams, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset, doSearch, hasActiveFilters]);
 
   const handlePageChange = (newPage: number) => {
-    search(buildParams(debouncedQuery, newPage, setAsides, sort, order));
-    updateURL(debouncedQuery, newPage, setAsides, sort, order);
+    search(buildParams(debouncedQuery, newPage, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset));
+    updateURL(debouncedQuery, newPage, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset);
   };
 
   const handleSubmit = () => {
-    if (query.length >= 2) {
-      search(buildParams(query, 1, setAsides, sort, order));
-      updateURL(query, 1, setAsides, sort, order);
-      setHasSearched(true);
+    if (hasActiveFilters(query, setAsides, department, stateFilter, selectedNaics)) {
+      doSearch(query, 1, setAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset);
     }
   };
 
   const handleSortChange = useCallback((newSort: string, newOrder: string) => {
     setSort(newSort);
     setOrder(newOrder);
-    if (debouncedQuery.length >= 2 || setAsides.length > 0) {
-      search(buildParams(debouncedQuery, 1, setAsides, newSort, newOrder));
-      updateURL(debouncedQuery, 1, setAsides, newSort, newOrder);
+    if (hasActiveFilters(debouncedQuery, setAsides, department, stateFilter, selectedNaics)) {
+      search(buildParams(debouncedQuery, 1, setAsides, newSort, newOrder, department, stateFilter, selectedNaics, deadlinePreset));
+      updateURL(debouncedQuery, 1, setAsides, newSort, newOrder, department, stateFilter, selectedNaics, deadlinePreset);
     }
-  }, [search, buildParams, debouncedQuery, setAsides, updateURL]);
+  }, [search, buildParams, debouncedQuery, setAsides, updateURL, department, stateFilter, selectedNaics, deadlinePreset, hasActiveFilters]);
 
   const handleSetAsideChange = useCallback((newSetAsides: string[]) => {
     setSetAsides(newSetAsides);
-    if (newSetAsides.length > 0 || debouncedQuery.length >= 2) {
-      search(buildParams(debouncedQuery, 1, newSetAsides, sort, order));
-      updateURL(debouncedQuery, 1, newSetAsides, sort, order);
-      setHasSearched(true);
+    if (hasActiveFilters(debouncedQuery, newSetAsides, department, stateFilter, selectedNaics)) {
+      doSearch(debouncedQuery, 1, newSetAsides, sort, order, department, stateFilter, selectedNaics, deadlinePreset);
     } else {
       reset();
       updateURL('', 1);
       setHasSearched(false);
       hadQuerySearch.current = false;
     }
-  }, [search, reset, buildParams, debouncedQuery, updateURL, sort, order]);
+  }, [debouncedQuery, doSearch, reset, updateURL, sort, order, department, stateFilter, selectedNaics, deadlinePreset, hasActiveFilters]);
+
+  const handleFilterChange = useCallback((field: string, value: string) => {
+    if (field === 'title') {
+      setTitleFilter(value);
+      return;
+    }
+    if (field === 'deadline') {
+      setDeadlinePreset(value);
+      if (hasActiveFilters(debouncedQuery, setAsides, department, stateFilter, selectedNaics)) {
+        doSearch(debouncedQuery, 1, setAsides, sort, order, department, stateFilter, selectedNaics, value);
+      }
+      return;
+    }
+    if (field === 'department') {
+      setDepartment(value);
+      const sa = setAsides, st = stateFilter, n = selectedNaics;
+      if (hasActiveFilters(debouncedQuery, sa, value, st, n)) {
+        doSearch(debouncedQuery, 1, sa, sort, order, value, st, n, deadlinePreset);
+      }
+      return;
+    }
+    if (field === 'set_aside') {
+      const newSa = value ? value.split(',') : [];
+      setSetAsides(newSa);
+      if (hasActiveFilters(debouncedQuery, newSa, department, stateFilter, selectedNaics)) {
+        doSearch(debouncedQuery, 1, newSa, sort, order, department, stateFilter, selectedNaics, deadlinePreset);
+      }
+      return;
+    }
+    if (field === 'state') {
+      setStateFilter(value);
+      const sa = setAsides, n = selectedNaics;
+      if (hasActiveFilters(debouncedQuery, sa, department, value, n)) {
+        doSearch(debouncedQuery, 1, sa, sort, order, department, value, n, deadlinePreset);
+      }
+      return;
+    }
+  }, [debouncedQuery, setAsides, department, stateFilter, selectedNaics, deadlinePreset, sort, order, doSearch, hasActiveFilters]);
+
+  const handleNaicsChange = useCallback((codes: string[]) => {
+    setSelectedNaics(codes);
+    if (hasActiveFilters(debouncedQuery, setAsides, department, stateFilter, codes)) {
+      doSearch(debouncedQuery, 1, setAsides, sort, order, department, stateFilter, codes, deadlinePreset);
+    }
+  }, [debouncedQuery, setAsides, department, stateFilter, deadlinePreset, sort, order, doSearch, hasActiveFilters]);
+
+  const agencies = useMemo(() =>
+    [...new Set(results.map((o) => o.department).filter(Boolean) as string[])].sort(),
+    [results],
+  );
+
+  const columnFilters: Record<string, string> = useMemo(() => ({
+    title: titleFilter,
+    department: department,
+    set_aside: setAsides.join(','),
+    deadline: deadlinePreset,
+    state: stateFilter,
+    naics: selectedNaics.join(','),
+  }), [titleFilter, department, setAsides, deadlinePreset, stateFilter, selectedNaics]);
+
+  const filteredResults = useMemo(() => {
+    if (!titleFilter) return results;
+    const lower = titleFilter.toLowerCase();
+    return results.filter((r) => r.title.toLowerCase().includes(lower));
+  }, [results, titleFilter]);
 
   const showResults = hasSearched || results.length > 0;
 
@@ -200,15 +297,6 @@ export default function SimpleSearchPage() {
             </div>
           </div>
         )}
-
-        {/* Set-aside chips when results are showing */}
-        {showResults && (
-          <div className="w-full max-w-2xl px-6 mb-4">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <SetAsideChips selected={setAsides} onChange={handleSetAsideChange} />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Results */}
@@ -234,7 +322,7 @@ export default function SimpleSearchPage() {
             </Link>
           </div>
           <ResultsList
-            results={results}
+            results={filteredResults}
             page={page}
             totalPages={totalPages}
             loading={loading}
@@ -243,6 +331,11 @@ export default function SimpleSearchPage() {
             sort={sort || (debouncedQuery ? 'relevance' : 'posted_date')}
             order={order}
             onSortChange={handleSortChange}
+            filters={columnFilters}
+            onFilterChange={handleFilterChange}
+            agencies={agencies}
+            selectedNaics={selectedNaics}
+            onNaicsChange={handleNaicsChange}
           />
         </div>
       )}

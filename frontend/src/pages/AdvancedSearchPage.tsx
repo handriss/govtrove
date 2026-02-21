@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, SlidersHorizontal, X, Lightbulb, ChevronDown, Bookmark } from 'lucide-react';
 import QueryBuilder, { buildQueryString, createEmptyGroup } from '../components/QueryBuilder';
@@ -107,6 +107,14 @@ function loadSavedSearches(): SavedSearch[] {
 }
 
 
+function deadlineToDate(preset: string): string | undefined {
+  const days = parseInt(preset, 10);
+  if (!days) return undefined;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
 function parseFiltersFromParams(searchParams: URLSearchParams): AdvancedFilters {
   const hasTypeParam = searchParams.has('type');
   return {
@@ -140,6 +148,9 @@ export default function AdvancedSearchPage() {
   const [groups, setGroups] = useState<QueryGroup[]>(createGroupFromQuery(initialQuery));
   const [groupOperator, setGroupOperator] = useState<'AND' | 'OR'>('AND');
   const [filters, setFilters] = useState<AdvancedFilters>(initialFilters);
+  const [department, setDepartment] = useState(searchParams.get('department') || '');
+  const [titleFilter, setTitleFilter] = useState('');
+  const [deadlinePreset, setDeadlinePreset] = useState(searchParams.get('deadline') || '');
   const [showFilters, setShowFilters] = useState(false);
   const { results, total, page, totalPages, loading, search } = useSearch();
   const [hasSearched, setHasSearched] = useState(false);
@@ -163,7 +174,7 @@ export default function AdvancedSearchPage() {
   ].reduce((a, b) => a + b, 0);
 
   const updateURL = useCallback(
-    (query: string, currentFilters: AdvancedFilters, s?: string, o?: string) => {
+    (query: string, currentFilters: AdvancedFilters, s?: string, o?: string, dept?: string, dl?: string) => {
       const params = new URLSearchParams();
       if (query) params.set('q', query);
       if (currentFilters.types.length) params.set('type', currentFilters.types.join(','));
@@ -174,24 +185,28 @@ export default function AdvancedSearchPage() {
       if (currentFilters.postedTo) params.set('posted_to', currentFilters.postedTo);
       if (currentFilters.deadlineFrom) params.set('deadline_from', currentFilters.deadlineFrom);
       if (currentFilters.deadlineTo) params.set('deadline_to', currentFilters.deadlineTo);
+      if (dept) params.set('department', dept);
       if (s) params.set('sort', s);
       if (o && o !== 'desc') params.set('order', o);
+      if (dl) params.set('deadline', dl);
       setSearchParams(params, { replace: true });
     },
     [setSearchParams]
   );
 
   const buildSearchParams = useCallback(
-    (pageNum = 1, s?: string, o?: string): SearchParams => {
+    (pageNum = 1, s?: string, o?: string, dept?: string): SearchParams => {
       const q = buildQueryString(groups, groupOperator);
       const activeSort = s ?? sort;
       const activeOrder = o ?? order;
+      const activeDept = dept ?? department;
       return {
         q: q || undefined,
         type: filters.types.length ? filters.types.join(',') : undefined,
         set_aside: filters.setAsides.length ? filters.setAsides.join(',') : undefined,
         naics: filters.naicsCodes.length ? filters.naicsCodes.join(',') : undefined,
         state: filters.states.length ? filters.states.join(',') : undefined,
+        department: activeDept || undefined,
         posted_from: filters.postedFrom,
         posted_to: filters.postedTo,
         deadline_from: filters.deadlineFrom,
@@ -202,15 +217,15 @@ export default function AdvancedSearchPage() {
         limit: 25,
       };
     },
-    [groups, groupOperator, filters, sort, order]
+    [groups, groupOperator, filters, sort, order, department]
   );
 
   const handleSearch = useCallback(() => {
     const q = buildQueryString(groups, groupOperator);
-    updateURL(q, filters, sort, order);
+    updateURL(q, filters, sort, order, department, deadlinePreset);
     search(buildSearchParams(1));
     setHasSearched(true);
-  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams, sort, order]);
+  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams, sort, order, department, deadlinePreset]);
 
   // Run initial search if URL has explicit params (default types don't count)
   useEffect(() => {
@@ -239,9 +254,9 @@ export default function AdvancedSearchPage() {
     setSort(newSort);
     setOrder(newOrder);
     const q = buildQueryString(groups, groupOperator);
-    updateURL(q, filters, newSort, newOrder);
+    updateURL(q, filters, newSort, newOrder, department, deadlinePreset);
     search(buildSearchParams(1, newSort, newOrder));
-  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams]);
+  }, [groups, groupOperator, filters, updateURL, search, buildSearchParams, department, deadlinePreset]);
 
   const handleExampleClick = (example: ExampleSearch) => {
     const newParams = new URLSearchParams(example.params);
@@ -280,6 +295,87 @@ export default function AdvancedSearchPage() {
   };
 
 
+
+  const searchWithFilters = useCallback((newFilters: AdvancedFilters, dept?: string, dl?: string) => {
+    const q = buildQueryString(groups, groupOperator);
+    const activeDept = dept ?? department;
+    const activeDl = dl ?? deadlinePreset;
+    updateURL(q, newFilters, sort, order, activeDept, activeDl);
+    const params: SearchParams = {
+      q: q || undefined,
+      type: newFilters.types.length ? newFilters.types.join(',') : undefined,
+      set_aside: newFilters.setAsides.length ? newFilters.setAsides.join(',') : undefined,
+      naics: newFilters.naicsCodes.length ? newFilters.naicsCodes.join(',') : undefined,
+      state: newFilters.states.length ? newFilters.states.join(',') : undefined,
+      department: activeDept || undefined,
+      posted_from: newFilters.postedFrom,
+      posted_to: newFilters.postedTo,
+      deadline_from: newFilters.deadlineFrom,
+      deadline_to: newFilters.deadlineTo,
+      sort: sort || (q ? 'relevance' : 'posted_date'),
+      order: order || 'desc',
+      page: 1,
+      limit: 25,
+    };
+    search(params);
+  }, [groups, groupOperator, department, deadlinePreset, sort, order, updateURL, search]);
+
+  const handleFilterChange = useCallback((field: string, value: string) => {
+    if (field === 'title') {
+      setTitleFilter(value);
+      return;
+    }
+    if (field === 'deadline') {
+      setDeadlinePreset(value);
+      const newFilters = { ...filters, deadlineTo: deadlineToDate(value) };
+      setFilters(newFilters);
+      searchWithFilters(newFilters, undefined, value);
+      return;
+    }
+    if (field === 'department') {
+      setDepartment(value);
+      searchWithFilters(filters, value);
+      return;
+    }
+    if (field === 'set_aside') {
+      const newFilters = { ...filters, setAsides: value ? value.split(',') : [] };
+      setFilters(newFilters);
+      searchWithFilters(newFilters);
+      return;
+    }
+    if (field === 'state') {
+      const newFilters = { ...filters, states: value ? value.split(',') : [] };
+      setFilters(newFilters);
+      searchWithFilters(newFilters);
+      return;
+    }
+  }, [filters, searchWithFilters]);
+
+  const handleNaicsChange = useCallback((codes: string[]) => {
+    const newFilters = { ...filters, naicsCodes: codes };
+    setFilters(newFilters);
+    searchWithFilters(newFilters);
+  }, [filters, searchWithFilters]);
+
+  const agencies = useMemo(() =>
+    [...new Set(results.map((o) => o.department).filter(Boolean) as string[])].sort(),
+    [results],
+  );
+
+  const columnFilters: Record<string, string> = useMemo(() => ({
+    title: titleFilter,
+    department: department,
+    set_aside: filters.setAsides.join(','),
+    deadline: deadlinePreset,
+    state: filters.states.join(','),
+    naics: filters.naicsCodes.join(','),
+  }), [titleFilter, department, filters.setAsides, deadlinePreset, filters.states, filters.naicsCodes]);
+
+  const filteredResults = useMemo(() => {
+    if (!titleFilter) return results;
+    const lower = titleFilter.toLowerCase();
+    return results.filter((r) => r.title.toLowerCase().includes(lower));
+  }, [results, titleFilter]);
 
   const queryString = buildQueryString(groups, groupOperator);
 
@@ -491,7 +587,7 @@ export default function AdvancedSearchPage() {
               </div>
 
               <ResultsList
-                results={results}
+                results={filteredResults}
                 page={page}
                 totalPages={totalPages}
                 loading={loading}
@@ -500,6 +596,11 @@ export default function AdvancedSearchPage() {
                 sort={sort || (queryString ? 'relevance' : 'posted_date')}
                 order={order}
                 onSortChange={handleSortChange}
+                filters={columnFilters}
+                onFilterChange={handleFilterChange}
+                agencies={agencies}
+                selectedNaics={filters.naicsCodes}
+                onNaicsChange={handleNaicsChange}
               />
             </>
           )}
