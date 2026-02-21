@@ -4,6 +4,7 @@ import ResultRow from './ResultRow';
 import ResultCard from './ResultCard';
 import NoResults from './NoResults';
 import MultiSelectFilter from './MultiSelectFilter';
+import DeadlineFilter from './DeadlineFilter';
 import NaicsColumnFilter from './NaicsColumnFilter';
 import type { FilterOption } from './MultiSelectFilter';
 import type { OpportunityListItem } from '../types/api';
@@ -332,8 +333,13 @@ export default function ResultsList({
                     onChange={(sel) => onFilterChange('set_aside', sel.join(','))}
                   />
                 </th>
-                {/* Due — skip */}
-                <th className="px-4 py-2"></th>
+                {/* Due */}
+                <th className="px-4 py-2">
+                  <DeadlineFilter
+                    value={filters?.deadline ?? ''}
+                    onChange={(v) => onFilterChange('deadline', v)}
+                  />
+                </th>
                 {/* NAICS */}
                 <th className="px-4 py-2">
                   {onNaicsChange ? (
