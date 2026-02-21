@@ -21,8 +21,13 @@ export default function SimpleSearchPage() {
   const initialPage = parseInt(searchParams.get('page') || '1', 10);
   const initialSetAsides = searchParams.get('set_aside')?.split(',').filter(Boolean) || [];
 
+  const initialSort = searchParams.get('sort') || '';
+  const initialOrder = searchParams.get('order') || 'desc';
+
   const [query, setQuery] = useState(initialQuery);
   const [setAsides, setSetAsides] = useState<string[]>(initialSetAsides);
+  const [sort, setSort] = useState(initialSort);
+  const [order, setOrder] = useState(initialOrder);
   const debouncedQuery = useDebounce(query, 300);
   const { results, total, page, totalPages, loading, search, reset } = useSearch();
   const [hasSearched, setHasSearched] = useState(initialQuery.length >= 2);
@@ -32,28 +37,30 @@ export default function SimpleSearchPage() {
 
   useEffect(() => { preloadWhatsNew(); }, []);
 
-  const updateURL = useCallback((q: string, p: number, sa?: string[]) => {
+  const updateURL = useCallback((q: string, p: number, sa?: string[], s?: string, o?: string) => {
     const params = new URLSearchParams();
     if (q) params.set('q', q);
     if (p > 1) params.set('page', String(p));
     if (sa && sa.length) params.set('set_aside', sa.join(','));
+    if (s) params.set('sort', s);
+    if (o && o !== 'desc') params.set('order', o);
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  const buildParams = useCallback((q: string, pageNum: number, sa: string[]) => ({
+  const buildParams = useCallback((q: string, pageNum: number, sa: string[], s?: string, o?: string) => ({
     q: q || undefined,
     type: DEFAULT_TYPES,
     set_aside: sa.length ? sa.join(',') : undefined,
     deadline_from: today(),
-    sort: q ? 'relevance' : 'posted_date' as const,
-    order: 'desc' as const,
+    sort: s || (q ? 'relevance' : 'posted_date'),
+    order: o || 'desc',
     page: pageNum,
     limit: 25,
   }), []);
 
   useEffect(() => {
     if (isInitialMount.current && initialQuery.length >= 2) {
-      search(buildParams(initialQuery, initialPage, setAsides));
+      search(buildParams(initialQuery, initialPage, setAsides, sort, order));
       hadQuerySearch.current = true;
       isInitialMount.current = false;
       return;
@@ -61,8 +68,8 @@ export default function SimpleSearchPage() {
     isInitialMount.current = false;
 
     if (debouncedQuery.length >= 2) {
-      search(buildParams(debouncedQuery, 1, setAsides));
-      updateURL(debouncedQuery, 1, setAsides);
+      search(buildParams(debouncedQuery, 1, setAsides, sort, order));
+      updateURL(debouncedQuery, 1, setAsides, sort, order);
       hadQuerySearch.current = true;
       setHasSearched(true);
     } else if (debouncedQuery.length === 0 && hadQuerySearch.current) {
@@ -71,28 +78,43 @@ export default function SimpleSearchPage() {
       hadQuerySearch.current = false;
       setHasSearched(false);
     }
-  }, [debouncedQuery, search, reset, initialQuery, initialPage, updateURL, buildParams, setAsides]);
+  }, [debouncedQuery, search, reset, initialQuery, initialPage, updateURL, buildParams, setAsides, sort, order]);
 
   const handlePageChange = (newPage: number) => {
-    search(buildParams(debouncedQuery, newPage, setAsides));
-    updateURL(debouncedQuery, newPage, setAsides);
+    search(buildParams(debouncedQuery, newPage, setAsides, sort, order));
+    updateURL(debouncedQuery, newPage, setAsides, sort, order);
   };
 
   const handleSubmit = () => {
     if (query.length >= 2) {
-      search(buildParams(query, 1, setAsides));
-      updateURL(query, 1, setAsides);
+      search(buildParams(query, 1, setAsides, sort, order));
+      updateURL(query, 1, setAsides, sort, order);
       setHasSearched(true);
     }
   };
 
+  const handleSortChange = useCallback((newSort: string, newOrder: string) => {
+    setSort(newSort);
+    setOrder(newOrder);
+    if (debouncedQuery.length >= 2 || setAsides.length > 0) {
+      search(buildParams(debouncedQuery, 1, setAsides, newSort, newOrder));
+      updateURL(debouncedQuery, 1, setAsides, newSort, newOrder);
+    }
+  }, [search, buildParams, debouncedQuery, setAsides, updateURL]);
+
   const handleSetAsideChange = useCallback((newSetAsides: string[]) => {
     setSetAsides(newSetAsides);
-    if (hasSearched || results.length > 0) {
-      search(buildParams(debouncedQuery, 1, newSetAsides));
-      updateURL(debouncedQuery, 1, newSetAsides);
+    if (newSetAsides.length > 0 || debouncedQuery.length >= 2) {
+      search(buildParams(debouncedQuery, 1, newSetAsides, sort, order));
+      updateURL(debouncedQuery, 1, newSetAsides, sort, order);
+      setHasSearched(true);
+    } else {
+      reset();
+      updateURL('', 1);
+      setHasSearched(false);
+      hadQuerySearch.current = false;
     }
-  }, [hasSearched, results.length, search, buildParams, debouncedQuery, updateURL]);
+  }, [search, reset, buildParams, debouncedQuery, updateURL, sort, order]);
 
   const showResults = hasSearched || results.length > 0;
 
@@ -218,6 +240,9 @@ export default function SimpleSearchPage() {
             loading={loading}
             query={query}
             onPageChange={handlePageChange}
+            sort={sort || (debouncedQuery ? 'relevance' : 'posted_date')}
+            order={order}
+            onSortChange={handleSortChange}
           />
         </div>
       )}

@@ -24,7 +24,8 @@ function getDaysUntilDeadline(deadline: string | undefined) {
 
 function getDeadlineStyle(days: number | null) {
   if (days === null) return { className: 'text-dark-500', text: '\u2014' };
-  if (days <= 0) return { className: 'text-dark-500', text: 'Closed' };
+  if (days < 0) return { className: 'text-dark-500', text: 'Closed' };
+  if (days === 0) return { className: 'text-red-400', text: 'Today' };
   if (days <= 7) return { className: 'text-red-400', text: `${days}d left` };
   if (days <= 14) return { className: 'text-amber-400', text: `${days}d left` };
   return { className: 'text-emerald-400', text: `${days}d left` };
