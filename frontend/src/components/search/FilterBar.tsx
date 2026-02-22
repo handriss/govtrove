@@ -8,6 +8,7 @@ import {
   SimpleToggleFilter,
   FilterChipBar,
   NaicsTreeSelector,
+  PscTreeSelector,
   NOTICE_TYPE_OPTIONS,
 } from '../filters';
 import { useDropdownPosition } from '../filters/useDropdownPosition';
@@ -103,7 +104,7 @@ export default function FilterBar({
         setFilter('activeOnly', true);
         return;
       }
-      if (value && (key === 'naics' || key === 'setAside' || key === 'noticeType')) {
+      if (value && (key === 'naics' || key === 'psc' || key === 'setAside' || key === 'noticeType')) {
         removeFilter(key, value);
       } else {
         clearFilter(key);
@@ -147,6 +148,13 @@ export default function FilterBar({
           label="NAICS"
           loading={facetsLoading}
         />
+        <PscTreeSelector
+          selected={filters.psc}
+          onChange={(sel) => setFilter('psc', sel)}
+          facets={facets?.psc}
+          label="PSC"
+          loading={facetsLoading}
+        />
         <SearchableDropdownFilter
           label="Set-Aside"
           options={setAsideOptions}
@@ -162,6 +170,7 @@ export default function FilterBar({
           onSelectionChange={(sel) => setFilter('department', sel[0] || '')}
           searchPlaceholder="Search agencies..."
           loading={facetsLoading}
+          disabled
         />
         <EnhancedDeadlineFilter
           deadlinePreset={filters.deadlinePreset}

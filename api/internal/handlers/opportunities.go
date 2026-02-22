@@ -284,6 +284,12 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	params.NAICSPrefix = q.Get("naics_prefix")
+
+	if pscStr := q.Get("psc"); pscStr != "" {
+		params.PSCCodes = strings.Split(pscStr, ",")
+	}
+	params.PSCPrefix = q.Get("psc_prefix")
+
 	params.Department = q.Get("department")
 
 	if stateStr := q.Get("state"); stateStr != "" {
