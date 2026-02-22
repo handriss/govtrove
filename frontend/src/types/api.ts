@@ -120,3 +120,32 @@ export interface SearchParams {
 export interface StatusResponse {
   last_synced_at: string | null;
 }
+
+export interface FieldChange {
+  field_name: string;
+  old_value?: string;
+  new_value?: string;
+}
+
+export interface SolicitationHistoryItem {
+  id: number;
+  notice_id: string;
+  title: string;
+  type?: string;
+  base_type?: string;
+  posted_date?: string;
+  response_deadline?: string;
+  award_date?: string;
+  award_amount?: number;
+  awardee_name?: string;
+  active: boolean;
+  is_current: boolean;
+  changes?: FieldChange[];
+}
+
+export interface SolicitationHistory {
+  solicitation_number: string;
+  total_notices: number;
+  notices: SolicitationHistoryItem[];
+  truncated: boolean;
+}

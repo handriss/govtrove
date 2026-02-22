@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -85,6 +85,12 @@ export async function getStatus(): Promise<StatusResponse> {
   if (!response.ok) {
     throw new Error(`Failed to fetch status: ${response.statusText}`);
   }
+  return response.json();
+}
+
+export async function getSolicitationHistory(id: number): Promise<SolicitationHistory | null> {
+  const response = await fetch(`${API_BASE}/opportunities/${id}/history`);
+  if (!response.ok) return null;
   return response.json();
 }
 
