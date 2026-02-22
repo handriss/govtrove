@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { LogIn, LogOut, User, Star } from 'lucide-react';
+import { LogIn, LogOut, User, Star, Bell } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 
 export default function AuthButton() {
@@ -75,6 +75,15 @@ export default function AuthButton() {
             >
               <Star size={14} strokeWidth={1.5} />
               Saved
+            </Link>
+            <Link
+              to="/notifications"
+              onClick={() => setMenuOpen(false)}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-dark-300 hover:text-dark-50 hover:bg-dark-800/50 transition-colors"
+            >
+              <Bell size={14} strokeWidth={1.5} />
+              Notifications
+              <span className="ml-auto text-[10px] uppercase tracking-wider text-dark-600 bg-dark-800/50 px-1.5 py-0.5 rounded">Soon</span>
             </Link>
             <button
               onClick={() => {

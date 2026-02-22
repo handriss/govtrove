@@ -7,6 +7,7 @@ import WhatsNewPage from './pages/WhatsNewPage';
 import OpportunityDetail from './pages/OpportunityDetail';
 import ProfilePage from './pages/ProfilePage';
 import SavedPage from './pages/SavedPage';
+import NotificationsPage from './pages/NotificationsPage';
 import PreviewBanner from './components/PreviewBanner';
 import Footer from './components/Footer';
 
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="/opportunity/:id" element={<OpportunityDetail />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/saved" element={<SavedPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/callback" element={<AuthCallback />} />
         <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
         <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
