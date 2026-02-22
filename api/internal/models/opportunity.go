@@ -115,3 +115,32 @@ type FacetResult struct {
 	Total  int                     `json:"total"`
 	Facets map[string][]FacetValue `json:"facets"`
 }
+
+type SolicitationHistoryItem struct {
+	ID               int           `json:"id"`
+	NoticeID         string        `json:"notice_id"`
+	Title            string        `json:"title"`
+	Type             *string       `json:"type,omitempty"`
+	BaseType         *string       `json:"base_type,omitempty"`
+	PostedDate       *time.Time    `json:"posted_date,omitempty"`
+	ResponseDeadline *time.Time    `json:"response_deadline,omitempty"`
+	AwardDate        *time.Time    `json:"award_date,omitempty"`
+	AwardAmount      *float64      `json:"award_amount,omitempty"`
+	AwardeeName      *string       `json:"awardee_name,omitempty"`
+	Active           bool          `json:"active"`
+	IsCurrent        bool          `json:"is_current"`
+	Changes          []FieldChange `json:"changes,omitempty"`
+}
+
+type FieldChange struct {
+	FieldName string  `json:"field_name"`
+	OldValue  *string `json:"old_value,omitempty"`
+	NewValue  *string `json:"new_value,omitempty"`
+}
+
+type SolicitationHistory struct {
+	SolicitationNumber string                    `json:"solicitation_number"`
+	TotalNotices       int                       `json:"total_notices"`
+	Notices            []SolicitationHistoryItem  `json:"notices"`
+	Truncated          bool                      `json:"truncated"`
+}

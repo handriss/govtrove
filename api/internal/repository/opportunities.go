@@ -348,6 +348,110 @@ func (r *OpportunityRepository) GetFacetCounts(ctx context.Context, params model
 	return &models.FacetResult{Total: total, Facets: facets}, nil
 }
 
+func (r *OpportunityRepository) GetSolicitationHistory(ctx context.Context, opportunityID int) (*models.SolicitationHistory, error) {
+	var solNum *string
+	err := r.pool.QueryRow(ctx,
+		"SELECT solicitation_number FROM opportunities WHERE id = $1", opportunityID,
+	).Scan(&solNum)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("looking up solicitation_number: %w", err)
+	}
+	if solNum == nil || *solNum == "" {
+		return nil, nil
+	}
+
+	var totalNotices int
+	err = r.pool.QueryRow(ctx,
+		"SELECT COUNT(*) FROM opportunities WHERE solicitation_number = $1", *solNum,
+	).Scan(&totalNotices)
+	if err != nil {
+		return nil, fmt.Errorf("counting notices: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, notice_id, title, type, base_type, posted_date, response_deadline,
+		       award_date, award_amount, awardee_name, active
+		FROM opportunities
+		WHERE solicitation_number = $1
+		ORDER BY posted_date ASC NULLS LAST
+		LIMIT 50
+	`, *solNum)
+	if err != nil {
+		return nil, fmt.Errorf("querying sibling notices: %w", err)
+	}
+	defer rows.Close()
+
+	var items []models.SolicitationHistoryItem
+	var noticeIDs []string
+	for rows.Next() {
+		var item models.SolicitationHistoryItem
+		err := rows.Scan(
+			&item.ID, &item.NoticeID, &item.Title, &item.Type, &item.BaseType,
+			&item.PostedDate, &item.ResponseDeadline,
+			&item.AwardDate, &item.AwardAmount, &item.AwardeeName, &item.Active,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scanning notice row: %w", err)
+		}
+		if item.ID == opportunityID {
+			item.IsCurrent = true
+		}
+		items = append(items, item)
+		noticeIDs = append(noticeIDs, item.NoticeID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating notice rows: %w", err)
+	}
+
+	if len(noticeIDs) > 0 {
+		changeRows, err := r.pool.Query(ctx, `
+			SELECT notice_id, field_name, old_value, new_value
+			FROM pipeline.snap_changes
+			WHERE notice_id = ANY($1)
+			  AND change_type = 'modified'
+			  AND field_name NOT IN ('content_hash', '_record')
+			ORDER BY notice_id, detected_date ASC
+		`, noticeIDs)
+		if err != nil {
+			return nil, fmt.Errorf("querying snap_changes: %w", err)
+		}
+		defer changeRows.Close()
+
+		changeMap := make(map[string][]models.FieldChange)
+		for changeRows.Next() {
+			var noticeID, fieldName string
+			var oldVal, newVal *string
+			if err := changeRows.Scan(&noticeID, &fieldName, &oldVal, &newVal); err != nil {
+				return nil, fmt.Errorf("scanning change row: %w", err)
+			}
+			changeMap[noticeID] = append(changeMap[noticeID], models.FieldChange{
+				FieldName: fieldName,
+				OldValue:  oldVal,
+				NewValue:  newVal,
+			})
+		}
+		if err := changeRows.Err(); err != nil {
+			return nil, fmt.Errorf("iterating change rows: %w", err)
+		}
+
+		for i := range items {
+			if changes, ok := changeMap[items[i].NoticeID]; ok {
+				items[i].Changes = changes
+			}
+		}
+	}
+
+	return &models.SolicitationHistory{
+		SolicitationNumber: *solNum,
+		TotalNotices:       totalNotices,
+		Notices:            items,
+		Truncated:          totalNotices > 50,
+	}, nil
+}
+
 func (r *OpportunityRepository) getFacet(ctx context.Context, params models.SearchParams, exclude, selectCol, labelCol string, limit int) ([]models.FacetValue, error) {
 	conditions, args, _ := buildFilterConditions(params, exclude, 1)
 	where := strings.Join(conditions, " AND ")
