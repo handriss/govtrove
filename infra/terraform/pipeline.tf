@@ -12,8 +12,8 @@ data "archive_file" "lambda" {
   for_each = toset(local.lambda_functions)
 
   type        = "zip"
-  source_file = "${path.module}/../bin/lambda/${each.key}/bootstrap"
-  output_path = "${path.module}/../bin/lambda/${each.key}.zip"
+  source_file = "${path.module}/../../bin/lambda/${each.key}/bootstrap"
+  output_path = "${path.module}/../../bin/lambda/${each.key}.zip"
 }
 
 # --- Lambda Functions ---

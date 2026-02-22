@@ -96,16 +96,16 @@ help:
 # ============================================================================
 
 dev-up:
-	docker compose up
+	docker compose -f infra/docker-compose.yml up
 
 dev-up-d:
-	docker compose up -d
+	docker compose -f infra/docker-compose.yml up -d
 
 dev-down:
-	docker compose down
+	docker compose -f infra/docker-compose.yml down
 
 dev-clean:
-	docker compose down -v
+	docker compose -f infra/docker-compose.yml down -v
 
 dev: dev-up-d migrate-up api-run-d frontend-dev-d
 	@echo ""
@@ -128,21 +128,21 @@ install-migrate:
 	@which migrate > /dev/null || go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 migrate-up: install-migrate
-	migrate -path ./migrations -database "$(LOCAL_DB_URL)" up
+	migrate -path ./infra/migrations -database "$(LOCAL_DB_URL)" up
 
 migrate-down: install-migrate
-	migrate -path ./migrations -database "$(LOCAL_DB_URL)" down
+	migrate -path ./infra/migrations -database "$(LOCAL_DB_URL)" down
 
 migrate-neon: install-migrate
 	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
 		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
 		exit 1; \
 	fi
-	migrate -path ./migrations -database "$(NEON_DATABASE_URL)" up
+	migrate -path ./infra/migrations -database "$(NEON_DATABASE_URL)" up
 
 migrate-create: install-migrate
 	@read -p "Migration name: " name; \
-	migrate create -ext sql -dir ./migrations -seq $$name
+	migrate create -ext sql -dir ./infra/migrations -seq $$name
 
 # ============================================================================
 # API Service
@@ -253,13 +253,13 @@ ecr-login:
 
 deploy-frontend: frontend-build
 	@echo "Deploying frontend to S3/CloudFront..."
-	@API_URL=$$(cd terraform && terraform output -raw api_url) && \
-	WORKOS_CLIENT_ID=$$(cd terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
+	@API_URL=$$(cd infra/terraform && terraform output -raw api_url) && \
+	WORKOS_CLIENT_ID=$$(cd infra/terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
 	echo "VITE_API_URL=$$API_URL/api" > .env.production && \
 	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> .env.production; fi && \
 	cd frontend && npm run build && \
-	BUCKET=$$(cd ../terraform && terraform output -raw frontend_bucket_name) && \
-	DIST_ID=$$(cd ../terraform && terraform output -raw cloudfront_distribution_id) && \
+	BUCKET=$$(cd ../infra/terraform && terraform output -raw frontend_bucket_name) && \
+	DIST_ID=$$(cd ../infra/terraform && terraform output -raw cloudfront_distribution_id) && \
 	aws s3 sync dist s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
@@ -268,8 +268,8 @@ deploy-frontend: frontend-build
 
 deploy-api: api-docker-build ecr-login
 	@echo "Deploying API to App Runner..."
-	@ECR_URL=$$(cd terraform && terraform output -raw ecr_api_repository_url) && \
-	ARN=$$(cd terraform && terraform output -raw apprunner_service_arn) && \
+	@ECR_URL=$$(cd infra/terraform && terraform output -raw ecr_api_repository_url) && \
+	ARN=$$(cd infra/terraform && terraform output -raw apprunner_service_arn) && \
 	docker tag govtrove-api:latest $$ECR_URL:latest && \
 	docker push $$ECR_URL:latest && \
 	echo "Triggering App Runner deployment..." && \
@@ -290,8 +290,8 @@ deploy-pipeline: lambda-build
 
 deploy-landing:
 	@echo "Deploying landing page to S3/CloudFront..."
-	@BUCKET=$$(cd terraform && terraform output -raw landing_bucket_name) && \
-	DIST_ID=$$(cd terraform && terraform output -raw landing_distribution_id) && \
+	@BUCKET=$$(cd infra/terraform && terraform output -raw landing_bucket_name) && \
+	DIST_ID=$$(cd infra/terraform && terraform output -raw landing_distribution_id) && \
 	aws s3 sync landing s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
@@ -307,7 +307,7 @@ deploy-all: deploy-api deploy-pipeline deploy-frontend deploy-landing
 
 run-pipeline:
 	@echo "Starting Step Functions pipeline execution..."
-	@ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn) && \
+	@ARN=$$(cd infra/terraform && terraform output -raw pipeline_state_machine_arn) && \
 	aws stepfunctions start-execution \
 		--state-machine-arn $$ARN \
 		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
@@ -315,7 +315,7 @@ run-pipeline:
 
 pipeline-status:
 	@echo "=== Recent Pipeline Executions ==="
-	@ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn) && \
+	@ARN=$$(cd infra/terraform && terraform output -raw pipeline_state_machine_arn) && \
 	aws stepfunctions list-executions \
 		--state-machine-arn $$ARN \
 		--max-results 5 \
@@ -325,7 +325,7 @@ pipeline-status:
 
 pipeline-dlq-status:
 	@echo "=== Pipeline DLQ Depth ==="
-	@DLQ_URL=$$(cd terraform && terraform output -raw pipeline_dlq_url) && \
+	@DLQ_URL=$$(cd infra/terraform && terraform output -raw pipeline_dlq_url) && \
 	COUNT=$$(aws sqs get-queue-attributes --queue-url "$$DLQ_URL" \
 		--attribute-names ApproximateNumberOfMessages \
 		--query 'Attributes.ApproximateNumberOfMessages' --output text \
@@ -341,13 +341,13 @@ logs-pipeline:
 	aws logs tail /aws/lambda/govtrove-$(SVC) --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
 
 logs-api:
-	@SERVICE_ARN=$$(cd terraform && terraform output -raw apprunner_service_arn) && \
+	@SERVICE_ARN=$$(cd infra/terraform && terraform output -raw apprunner_service_arn) && \
 	SERVICE_ID=$$(echo $$SERVICE_ARN | rev | cut -d'/' -f1 | rev) && \
 	aws logs tail /aws/apprunner/govtrove-api/$$SERVICE_ID/application --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
 
 status:
 	@echo "=== App Runner API ===" && \
-	ARN=$$(cd terraform && terraform output -raw apprunner_service_arn 2>/dev/null) && \
+	ARN=$$(cd infra/terraform && terraform output -raw apprunner_service_arn 2>/dev/null) && \
 	if [ -n "$$ARN" ]; then \
 		aws apprunner describe-service --service-arn $$ARN \
 			--query 'Service.{Status:Status,URL:ServiceUrl,Updated:UpdatedAt}' \
@@ -357,7 +357,7 @@ status:
 	fi
 	@echo ""
 	@echo "=== CloudFront Frontend ===" && \
-	DIST_ID=$$(cd terraform && terraform output -raw cloudfront_distribution_id 2>/dev/null) && \
+	DIST_ID=$$(cd infra/terraform && terraform output -raw cloudfront_distribution_id 2>/dev/null) && \
 	if [ -n "$$DIST_ID" ]; then \
 		aws cloudfront get-distribution --id $$DIST_ID \
 			--query 'Distribution.{Status:Status,DomainName:DomainName}' \
@@ -367,7 +367,7 @@ status:
 	fi
 	@echo ""
 	@echo "=== Recent Pipeline Executions ===" && \
-	SFN_ARN=$$(cd terraform && terraform output -raw pipeline_state_machine_arn 2>/dev/null) && \
+	SFN_ARN=$$(cd infra/terraform && terraform output -raw pipeline_state_machine_arn 2>/dev/null) && \
 	if [ -n "$$SFN_ARN" ]; then \
 		aws stepfunctions list-executions \
 			--state-machine-arn $$SFN_ARN \
@@ -383,25 +383,25 @@ status:
 # ============================================================================
 
 tf-init:
-	cd terraform && terraform init
+	cd infra/terraform && terraform init
 
 tf-plan:
-	cd terraform && terraform plan
+	cd infra/terraform && terraform plan
 
 tf-apply:
-	cd terraform && terraform apply
+	cd infra/terraform && terraform apply
 
 tf-output:
-	cd terraform && terraform output
+	cd infra/terraform && terraform output
 
 tf-destroy:
-	cd terraform && terraform destroy
+	cd infra/terraform && terraform destroy
 
 tf-fmt:
-	cd terraform && terraform fmt
+	cd infra/terraform && terraform fmt
 
 tf-validate:
-	cd terraform && terraform validate
+	cd infra/terraform && terraform validate
 
 # ============================================================================
 # Cleanup
@@ -411,4 +411,4 @@ clean:
 	rm -rf bin/
 	rm -rf .logs/
 	rm -rf frontend/node_modules frontend/dist
-	docker compose down -v
+	docker compose -f infra/docker-compose.yml down -v

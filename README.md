@@ -253,7 +253,7 @@ terraform output ecr_api_repository_url     # API ECR
 ## Environment Variables
 
 **Local Development:**
-- Uses `docker-compose.yml` defaults
+- Uses `infra/docker-compose.yml` defaults
 - No `.env` file needed for basic dev
 
 **Production (set in Terraform/AWS):**
@@ -276,11 +276,15 @@ govtrove/
 │   └── internal/         # Handlers, repository, config
 ├── frontend/             # React frontend
 │   └── src/
-├── ingestion/            # Go ingestion service
-│   ├── cmd/ingest/       # Main entrypoint
+├── pipeline/             # Go pipeline Lambdas (data ingestion)
+│   ├── cmd/lambda/       # Lambda entrypoints
 │   └── internal/         # SAM.gov client, DB operations
-├── migrations/           # SQL migrations
-├── terraform/            # Infrastructure as code
-├── docker-compose.yml    # Local development
+├── landing/              # Static landing page
+├── infra/                # Infrastructure
+│   ├── terraform/        # Infrastructure as code
+│   ├── migrations/       # SQL migrations
+│   ├── cf-functions/     # CloudFront functions
+│   └── docker-compose.yml
+├── docs/                 # Documentation
 └── Makefile              # All commands
 ```
