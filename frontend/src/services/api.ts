@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -164,4 +164,88 @@ export async function createAccountRequest(
     const text = await response.text();
     throw new Error(text || response.statusText);
   }
+}
+
+// --- Saved Opportunities ---
+
+export async function getSavedOpportunities(token: string): Promise<number[]> {
+  const response = await fetch(`${API_BASE}/saved/opportunities`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`Failed to fetch saved opportunities: ${response.statusText}`);
+  const data = await response.json();
+  return data.opportunity_ids;
+}
+
+export async function saveOpportunity(token: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/opportunities`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ opportunity_id: id }),
+  });
+  if (!response.ok) throw new Error(`Failed to save opportunity: ${response.statusText}`);
+}
+
+export async function unsaveOpportunity(token: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/opportunities`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ opportunity_id: id }),
+  });
+  if (!response.ok) throw new Error(`Failed to unsave opportunity: ${response.statusText}`);
+}
+
+export async function bulkSaveOpportunities(token: string, ids: number[]): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/opportunities/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ opportunity_ids: ids }),
+  });
+  if (!response.ok) throw new Error(`Failed to bulk save opportunities: ${response.statusText}`);
+}
+
+// --- Saved Searches ---
+
+export async function getSavedSearches(token: string): Promise<SavedSearch[]> {
+  const response = await fetch(`${API_BASE}/saved/searches`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`Failed to fetch saved searches: ${response.statusText}`);
+  return response.json();
+}
+
+export async function createSavedSearch(
+  token: string,
+  name: string,
+  filters: object,
+): Promise<SavedSearch> {
+  const response = await fetch(`${API_BASE}/saved/searches`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, filters }),
+  });
+  if (!response.ok) throw new Error(`Failed to create saved search: ${response.statusText}`);
+  return response.json();
+}
+
+export async function updateSavedSearch(
+  token: string,
+  id: number,
+  data: { name?: string; filters?: object },
+): Promise<SavedSearch> {
+  const response = await fetch(`${API_BASE}/saved/searches/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`Failed to update saved search: ${response.statusText}`);
+  return response.json();
+}
+
+export async function deleteSavedSearch(token: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/searches/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`Failed to delete saved search: ${response.statusText}`);
 }
