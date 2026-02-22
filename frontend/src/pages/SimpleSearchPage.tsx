@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
-import SetAsideChips from '../components/SetAsideChips';
+import QuickFilterChips from '../components/QuickFilterChips';
 import AuthButton from '../components/AuthButton';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
@@ -24,6 +24,13 @@ export default function SimpleSearchPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialSearch = useRef(true);
+  const lastSearchedRef = useRef('');
+
+  // Snapshot the first opportunity count so it stays stable in hero mode
+  const [heroTotal, setHeroTotal] = useState(0);
+  useEffect(() => {
+    if (facetTotal > 0 && heroTotal === 0) setHeroTotal(facetTotal);
+  }, [facetTotal, heroTotal]);
 
   const [pageSize, setPageSize] = useState(() => {
     const stored = localStorage.getItem(PAGE_SIZE_KEY);
@@ -32,11 +39,19 @@ export default function SimpleSearchPage() {
 
   useEffect(() => { preloadWhatsNew(); }, []);
 
-  const searchParamsSerialized = useMemo(
-    () => JSON.stringify(fs.toSearchParams()),
-    [fs.toSearchParams],
-  );
-  const debouncedParams = useDebounce(searchParamsSerialized, 300);
+  // Non-keyword search params — auto-search fires when these change
+  const autoSearchKey = useMemo(() => {
+    const p = fs.toSearchParams();
+    delete p.q;
+    return JSON.stringify(p);
+  }, [fs.toSearchParams]);
+  const debouncedAutoSearch = useDebounce(autoSearchKey, 300);
+
+  // Explicit search trigger (Enter key, chip clicks)
+  const [searchTrigger, setSearchTrigger] = useState(0);
+  const triggerSearch = useCallback(() => {
+    setSearchTrigger(t => t + 1);
+  }, []);
 
   const hasActiveFilters = useMemo(() => {
     const f = fs.filters;
@@ -53,22 +68,29 @@ export default function SimpleSearchPage() {
     );
   }, [fs.filters]);
 
-  // Debounced auto-search
+  // Reset results when all filters are cleared
   useEffect(() => {
-    if (!hasActiveFilters) {
-      if (hasSearched && !fs.filters.keyword) {
-        reset();
-        setHasSearched(false);
-      }
-      return;
+    if (!hasActiveFilters && hasSearched) {
+      reset();
+      setHasSearched(false);
+      lastSearchedRef.current = '';
     }
+  }, [hasActiveFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const params = JSON.parse(debouncedParams);
+  // Auto-search: fires on non-keyword filter changes or explicit trigger (Enter, chip click)
+  useEffect(() => {
+    if (!hasActiveFilters) return;
+
+    const params = fs.toSearchParams();
     params.limit = pageSize;
+    const key = JSON.stringify(params);
+    if (key === lastSearchedRef.current) return;
+    lastSearchedRef.current = key;
+
     search(params);
     setHasSearched(true);
     isInitialSearch.current = false;
-  }, [debouncedParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedAutoSearch, searchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial search on mount if URL has filters
   useEffect(() => {
@@ -76,6 +98,7 @@ export default function SimpleSearchPage() {
     if (hasActiveFilters) {
       const params = fs.toSearchParams();
       params.limit = pageSize;
+      lastSearchedRef.current = JSON.stringify(params);
       search(params);
       setHasSearched(true);
     }
@@ -83,17 +106,8 @@ export default function SimpleSearchPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(() => {
-    if (hasActiveFilters) {
-      const params = fs.toSearchParams();
-      params.limit = pageSize;
-      search(params);
-      setHasSearched(true);
-    }
-  }, [hasActiveFilters, fs, search, pageSize]);
-
-  const handleSetAsideChange = useCallback((newSetAsides: string[]) => {
-    fs.setFilter('setAside', newSetAsides);
-  }, [fs]);
+    if (hasActiveFilters) triggerSearch();
+  }, [hasActiveFilters, triggerSearch]);
 
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);
@@ -119,13 +133,20 @@ export default function SimpleSearchPage() {
       <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'pt-[25vh]'}`}>
         {/* Logo */}
         <Link to="/" className={`mb-8 transition-all duration-500 ${showResults ? 'mb-6' : 'mb-10'}`}>
-          <h1 className={`font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-200 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
+          <h1 className={`text-center font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-200 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
             GovTrove
           </h1>
           {!showResults && (
-            <p className="text-center text-dark-400 text-sm mt-2 tracking-wide">
-              Government Contract Intelligence
-            </p>
+            <>
+              <p className="text-center text-dark-400 text-sm mt-2 tracking-wide">
+                Government Contract Intelligence
+              </p>
+              {heroTotal > 0 && (
+                <p className="text-center text-dark-500 text-xs mt-1">
+                  {heroTotal.toLocaleString()} active opportunities
+                </p>
+              )}
+            </>
           )}
         </Link>
 
@@ -142,6 +163,7 @@ export default function SimpleSearchPage() {
                 size="large"
                 placeholder="Search contracts, solicitations, awards..."
                 autoFocus
+                showSubmitButton
               />
             </div>
 
@@ -158,24 +180,7 @@ export default function SimpleSearchPage() {
                 </Link>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <SetAsideChips selected={fs.filters.setAside} onChange={handleSetAsideChange} />
-              </div>
-
-              <div className="flex items-center gap-6 text-xs text-dark-500">
-                <span className="flex items-center gap-2">
-                  <kbd className="px-2 py-0.5 bg-dark-800/50 rounded text-dark-400 font-mono">"quotes"</kbd>
-                  <span>exact phrase</span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <kbd className="px-2 py-0.5 bg-dark-800/50 rounded text-dark-400 font-mono">OR</kbd>
-                  <span>alternatives</span>
-                </span>
-                <span className="flex items-center gap-2">
-                  <kbd className="px-2 py-0.5 bg-dark-800/50 rounded text-dark-400 font-mono">-minus</kbd>
-                  <span>exclude</span>
-                </span>
-              </div>
+              <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
             </div>
           </>
         )}
