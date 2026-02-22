@@ -18,10 +18,12 @@ import {
   Phone,
   AlignLeft,
   Pilcrow,
+  GitBranch,
 } from 'lucide-react';
-import { getOpportunity, trackEvent } from '../services/api';
+import { getOpportunity, getSolicitationHistory, trackEvent } from '../services/api';
 import { formatDescription } from '../utils/formatDescription';
-import type { Opportunity } from '../types/api';
+import SolicitationTimeline from '../components/SolicitationTimeline';
+import type { Opportunity, SolicitationHistory } from '../types/api';
 
 const typeLabels: Record<string, string> = {
   o: 'Solicitation',
@@ -197,6 +199,7 @@ export default function OpportunityDetail() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [formatted, setFormatted] = useState(() => localStorage.getItem('govtrove_format_desc') !== 'false');
+  const [history, setHistory] = useState<SolicitationHistory | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -215,6 +218,12 @@ export default function OpportunityDetail() {
       trackEvent({ event_type: 'page', opportunity_id: opportunity.id });
     }
   }, [opportunity?.id]);
+
+  useEffect(() => {
+    if (opportunity?.solicitation_number) {
+      getSolicitationHistory(opportunity.id).then(setHistory);
+    }
+  }, [opportunity?.id, opportunity?.solicitation_number]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -443,6 +452,17 @@ export default function OpportunityDetail() {
               <InfoRow label="Classification Code" value={opportunity.classification_code || '—'} mono />
             </dl>
           </Section>
+
+          {/* Solicitation History */}
+          {history && history.total_notices > 1 && (
+            <Section
+              icon={GitBranch}
+              title={`Solicitation History (${history.total_notices})`}
+              defaultOpen={history.total_notices <= 10}
+            >
+              <SolicitationTimeline history={history} currentId={opportunity.id} />
+            </Section>
+          )}
 
           {/* Contracting Office */}
           <Section icon={Building2} title="Contracting Office" defaultOpen={true}>
