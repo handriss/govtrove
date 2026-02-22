@@ -102,3 +102,14 @@ type FilterOption struct {
 	Label string `json:"label,omitempty"`
 	Count int    `json:"count"`
 }
+
+type FacetValue struct {
+	Value string `json:"value"`
+	Label string `json:"label,omitempty"`
+	Count int    `json:"count"`
+}
+
+type FacetResult struct {
+	Total  int                     `json:"total"`
+	Facets map[string][]FacetValue `json:"facets"`
+}

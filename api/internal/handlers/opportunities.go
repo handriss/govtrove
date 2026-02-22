@@ -39,6 +39,18 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, result)
 }
 
+func (h *OpportunityHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
+	params := h.parseSearchParams(r)
+	result, err := h.repo.GetFacetCounts(r.Context(), params)
+	if err != nil {
+		h.logger.Error("get facets failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	h.writeJSON(w, http.StatusOK, result)
+}
+
 func (h *OpportunityHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
