@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthKitProvider } from '@workos-inc/authkit-react';
 import { AuthProvider, useAppAuth } from './contexts/AuthContext';
+import { SearchLayoutProvider, useSearchLayout } from './contexts/SearchLayoutContext';
+import Navigation from './components/navigation/Navigation';
 import SimpleSearchPage from './pages/SimpleSearchPage';
 import WhatsNewPage from './pages/WhatsNewPage';
 import OpportunityDetail from './pages/OpportunityDetail';
@@ -33,21 +35,28 @@ function AuthCallback() {
   return <Navigate to="/" replace />;
 }
 
-function AppRoutes() {
+function AppContent() {
+  const { heroMode } = useSearchLayout();
+  const { pathname } = useLocation();
+  const hideLogo = pathname === '/' && heroMode;
+
   return (
     <>
       <PreviewBanner />
-      <Routes>
-        <Route path="/" element={<SimpleSearchPage />} />
-        <Route path="/whats-new" element={<WhatsNewPage />} />
-        <Route path="/opportunity/:id" element={<OpportunityDetail />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/saved" element={<SavedPage />} />
-        <Route path="/callback" element={<AuthCallback />} />
-        <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
-        <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
-        <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
-      </Routes>
+      <Navigation hideLogo={hideLogo} />
+      <main className="pb-16 md:pb-0">
+        <Routes>
+          <Route path="/" element={<SimpleSearchPage />} />
+          <Route path="/whats-new" element={<WhatsNewPage />} />
+          <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/saved" element={<SavedPage />} />
+          <Route path="/callback" element={<AuthCallback />} />
+          <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
+          <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
+          <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
+        </Routes>
+      </main>
       <Footer />
     </>
   );
@@ -58,7 +67,9 @@ function App() {
     <AuthKitProvider clientId={WORKOS_CLIENT_ID} redirectUri={REDIRECT_URI} devMode>
       <Router>
         <AuthProvider>
-          <AppRoutes />
+          <SearchLayoutProvider>
+            <AppContent />
+          </SearchLayoutProvider>
         </AuthProvider>
       </Router>
     </AuthKitProvider>
