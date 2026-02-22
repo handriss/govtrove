@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { Search, Filter, ChevronUp, ChevronDown } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Search, Filter, ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
 import SearchInput from '../SearchInput';
 import {
   SearchableDropdownFilter,
@@ -9,6 +10,7 @@ import {
   NaicsTreeSelector,
   NOTICE_TYPE_OPTIONS,
 } from '../filters';
+import { useDropdownPosition } from '../filters/useDropdownPosition';
 import { SET_ASIDE_FILTER_OPTIONS } from '../ResultsList';
 import AdvancedFilterBuilder from '../filters/AdvancedFilterBuilder';
 import MoreFiltersPanel from './MoreFiltersPanel';
@@ -124,6 +126,7 @@ export default function FilterBar({
             placeholder="Search contracts, solicitations, awards..."
           />
         </div>
+        <SearchHelpButton />
         <button
           type="button"
           onClick={onSearch}
@@ -236,6 +239,62 @@ export default function FilterBar({
         onClearAll={clearAllFilters}
       />
     </div>
+  );
+}
+
+function SearchHelpButton() {
+  const { open, pos, triggerRef, dropdownRef, toggleDropdown } = useDropdownPosition({ minWidth: 300 });
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggleDropdown}
+        aria-expanded={open}
+        aria-label="Search help"
+        className="hidden md:flex items-center justify-center w-10 h-10 rounded-xl
+          text-dark-400 hover:text-dark-200 hover:bg-dark-800 transition-colors shrink-0"
+      >
+        <HelpCircle size={18} />
+      </button>
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
+          className="bg-dark-800 border border-dark-700 rounded-xl shadow-xl p-4 z-50 text-sm"
+        >
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1.5">Search tips</h3>
+              <ul className="space-y-1 text-dark-400">
+                <li className="flex gap-2">
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">"exact phrase"</kbd>
+                  <span>matches words in exact order</span>
+                </li>
+                <li className="flex gap-2">
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">word1 OR word2</kbd>
+                  <span>match either term</span>
+                </li>
+                <li className="flex gap-2">
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">-word</kbd>
+                  <span>exclude a single word</span>
+                </li>
+              </ul>
+            </div>
+            <div className="border-t border-dark-700 pt-2">
+              <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1">What's searched</h3>
+              <p className="text-dark-400">Title, description, and solicitation number.</p>
+            </div>
+            <div className="border-t border-dark-700 pt-2">
+              <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1">Filters</h3>
+              <p className="text-dark-400">Use the filter bar to narrow by NAICS, set-aside, agency, deadline, and more.</p>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 
