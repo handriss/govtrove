@@ -61,6 +61,7 @@ export default function SimpleSearchPage() {
       f.department !== '' ||
       f.state !== '' ||
       f.naics.length > 0 ||
+      f.psc.length > 0 ||
       f.noticeType.length > 0 ||
       f.deadlinePreset !== '' ||
       f.postedFrom !== '' ||
