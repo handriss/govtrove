@@ -160,6 +160,7 @@ func main() {
 	r.Route("/api", func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Get("/opportunities", oppHandler.Search)
+		r.Get("/opportunities/facets", oppHandler.GetFacets)
 		r.Get("/opportunities/{id}", oppHandler.GetByID)
 		r.Get("/filters", oppHandler.GetFilters)
 		r.Post("/events", eventHandler.Create)

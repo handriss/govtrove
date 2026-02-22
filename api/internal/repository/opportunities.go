@@ -73,10 +73,13 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 	}, nil
 }
 
-func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
+// buildFilterConditions builds WHERE conditions from search params.
+// exclude skips one dimension so facet counts aren't self-filtered:
+// "set_aside", "type", "department", "naics", "state"
+func buildFilterConditions(params models.SearchParams, exclude string, argStart int) ([]string, []any, int) {
 	var conditions []string
 	var args []any
-	argNum := 1
+	argNum := argStart
 
 	conditions = append(conditions, "active = true")
 
@@ -86,7 +89,7 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 		argNum++
 	}
 
-	if len(params.Types) > 0 {
+	if len(params.Types) > 0 && exclude != "type" {
 		conditions = append(conditions, fmt.Sprintf("type = ANY($%d)", argNum))
 		args = append(args, params.Types)
 		argNum++
@@ -116,35 +119,41 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 		argNum++
 	}
 
-	if len(params.SetAsides) > 0 {
+	if len(params.SetAsides) > 0 && exclude != "set_aside" {
 		conditions = append(conditions, fmt.Sprintf("set_aside_code = ANY($%d)", argNum))
 		args = append(args, params.SetAsides)
 		argNum++
 	}
 
-	if len(params.NAICSCodes) > 0 {
+	if len(params.NAICSCodes) > 0 && exclude != "naics" {
 		conditions = append(conditions, fmt.Sprintf("naics_code = ANY($%d)", argNum))
 		args = append(args, params.NAICSCodes)
 		argNum++
 	}
 
-	if params.NAICSPrefix != "" {
+	if params.NAICSPrefix != "" && exclude != "naics" {
 		conditions = append(conditions, fmt.Sprintf("naics_code LIKE $%d", argNum))
 		args = append(args, params.NAICSPrefix+"%")
 		argNum++
 	}
 
-	if params.Department != "" {
+	if params.Department != "" && exclude != "department" {
 		conditions = append(conditions, fmt.Sprintf("department ILIKE $%d", argNum))
 		args = append(args, "%"+params.Department+"%")
 		argNum++
 	}
 
-	if len(params.States) > 0 {
+	if len(params.States) > 0 && exclude != "state" {
 		conditions = append(conditions, fmt.Sprintf("pop_state = ANY($%d)", argNum))
 		args = append(args, params.States)
 		argNum++
 	}
+
+	return conditions, args, argNum
+}
+
+func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
+	conditions, args, argNum := buildFilterConditions(params, "", 1)
 
 	orderClause := r.buildOrderClause(params.Sort, params.Order, params.Query != "")
 
@@ -287,4 +296,82 @@ func (r *OpportunityRepository) getResourceLinks(ctx context.Context, opportunit
 
 func (r *OpportunityRepository) GetFilterOptions(ctx context.Context) (*models.FilterOptions, error) {
 	return &models.FilterOptions{}, nil
+}
+
+func (r *OpportunityRepository) GetFacetCounts(ctx context.Context, params models.SearchParams) (*models.FacetResult, error) {
+	// Total count with all filters applied
+	conditions, args, _ := buildFilterConditions(params, "", 1)
+	where := strings.Join(conditions, " AND ")
+
+	var total int
+	err := r.pool.QueryRow(ctx, fmt.Sprintf("SELECT COUNT(*) FROM opportunities WHERE %s", where), args...).Scan(&total)
+	if err != nil {
+		return nil, fmt.Errorf("counting total: %w", err)
+	}
+
+	type facetSpec struct {
+		key       string
+		exclude   string
+		selectCol string
+		labelCol  string
+		limit     int
+	}
+	specs := []facetSpec{
+		{"set_aside", "set_aside", "set_aside_code", "set_aside_description", 0},
+		{"notice_type", "type", "type", "", 0},
+		{"agency", "department", "department", "", 50},
+		{"naics", "naics", "naics_code", "", 50},
+	}
+
+	facets := make(map[string][]models.FacetValue, len(specs))
+	for _, s := range specs {
+		vals, err := r.getFacet(ctx, params, s.exclude, s.selectCol, s.labelCol, s.limit)
+		if err != nil {
+			return nil, fmt.Errorf("facet %s: %w", s.key, err)
+		}
+		facets[s.key] = vals
+	}
+
+	return &models.FacetResult{Total: total, Facets: facets}, nil
+}
+
+func (r *OpportunityRepository) getFacet(ctx context.Context, params models.SearchParams, exclude, selectCol, labelCol string, limit int) ([]models.FacetValue, error) {
+	conditions, args, _ := buildFilterConditions(params, exclude, 1)
+	where := strings.Join(conditions, " AND ")
+
+	selectExpr := selectCol
+	groupBy := selectCol
+	if labelCol != "" {
+		selectExpr = fmt.Sprintf("%s, %s", selectCol, labelCol)
+		groupBy = fmt.Sprintf("%s, %s", selectCol, labelCol)
+	}
+
+	q := fmt.Sprintf(
+		"SELECT %s, COUNT(*) AS cnt FROM opportunities WHERE %s AND %s IS NOT NULL GROUP BY %s ORDER BY cnt DESC",
+		selectExpr, where, selectCol, groupBy,
+	)
+	if limit > 0 {
+		q += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.FacetValue
+	for rows.Next() {
+		var fv models.FacetValue
+		if labelCol != "" {
+			err = rows.Scan(&fv.Value, &fv.Label, &fv.Count)
+		} else {
+			err = rows.Scan(&fv.Value, &fv.Count)
+		}
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, fv)
+	}
+	return result, rows.Err()
 }
