@@ -52,6 +52,15 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       });
     }
 
+    for (const code of filters.psc) {
+      result.push({
+        id: `psc:${code}`,
+        filterKey: 'psc',
+        value: code,
+        label: `PSC ${code}`,
+      });
+    }
+
     for (const code of filters.setAside) {
       result.push({
         id: `setAside:${code}`,

@@ -71,6 +71,8 @@ type SearchParams struct {
 	SetAsides    []string
 	NAICSCodes   []string
 	NAICSPrefix  string
+	PSCCodes     []string
+	PSCPrefix    string
 	States       []string
 	Department   string
 	PostedFrom   *time.Time

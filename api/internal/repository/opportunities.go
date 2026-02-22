@@ -137,6 +137,18 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
+	if len(params.PSCCodes) > 0 && exclude != "psc" {
+		conditions = append(conditions, fmt.Sprintf("classification_code = ANY($%d)", argNum))
+		args = append(args, params.PSCCodes)
+		argNum++
+	}
+
+	if params.PSCPrefix != "" && exclude != "psc" {
+		conditions = append(conditions, fmt.Sprintf("classification_code LIKE $%d", argNum))
+		args = append(args, params.PSCPrefix+"%")
+		argNum++
+	}
+
 	if params.Department != "" && exclude != "department" {
 		conditions = append(conditions, fmt.Sprintf("department ILIKE $%d", argNum))
 		args = append(args, "%"+params.Department+"%")
@@ -321,6 +333,7 @@ func (r *OpportunityRepository) GetFacetCounts(ctx context.Context, params model
 		{"notice_type", "type", "type", "", 0},
 		{"agency", "department", "department", "", 50},
 		{"naics", "naics", "naics_code", "", 50},
+		{"psc", "psc", "classification_code", "", 50},
 	}
 
 	facets := make(map[string][]models.FacetValue, len(specs))

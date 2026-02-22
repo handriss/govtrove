@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import {
   NaicsTreeSelector,
+  PscTreeSelector,
   SearchableDropdownFilter,
   EnhancedDeadlineFilter,
   SimpleToggleFilter,
@@ -156,6 +157,17 @@ export default function SearchMobileFilters({
             />
           </FilterSection>
 
+          {/* PSC */}
+          <FilterSection label="PSC">
+            <PscTreeSelector
+              selected={filters.psc}
+              onChange={(sel) => setFilter('psc', sel)}
+              facets={facets?.psc}
+              inline
+              loading={facetsLoading}
+            />
+          </FilterSection>
+
           {/* Set-Aside */}
           <FilterSection label="Set-Aside">
             <SearchableDropdownFilter
@@ -168,6 +180,7 @@ export default function SearchMobileFilters({
             />
           </FilterSection>
 
+
           {/* Agency */}
           <FilterSection label="Agency">
             <SearchableDropdownFilter
@@ -177,6 +190,7 @@ export default function SearchMobileFilters({
               onSelectionChange={(sel) => setFilter('department', sel[0] || '')}
               searchPlaceholder="Search agencies..."
               loading={facetsLoading}
+              disabled
             />
           </FilterSection>
 

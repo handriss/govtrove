@@ -93,6 +93,7 @@ export interface FacetResult {
     notice_type: FacetValue[];
     agency: FacetValue[];
     naics: FacetValue[];
+    psc: FacetValue[];
   };
 }
 
@@ -102,6 +103,8 @@ export interface SearchParams {
   set_aside?: string;
   naics?: string;
   naics_prefix?: string;
+  psc?: string;
+  psc_prefix?: string;
   state?: string;
   department?: string;
   posted_from?: string;

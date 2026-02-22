@@ -1,10 +1,13 @@
 import { useReducer, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { expandToLeafCodes } from '../components/filters/naicsTree';
+import { expandPscToLeafCodes } from '../components/filters/pscTree';
 import type { SearchParams } from '../types/api';
 
 export interface FilterState {
   keyword: string;
   naics: string[];
+  psc: string[];
   setAside: string[];
   department: string;
   state: string;
@@ -23,6 +26,7 @@ export interface FilterState {
 const DEFAULTS: FilterState = {
   keyword: '',
   naics: [],
+  psc: [],
   setAside: [],
   department: '',
   state: '',
@@ -43,8 +47,8 @@ const SORT_STORAGE_KEY = 'govtrove_sort';
 type Action =
   | { type: 'SET'; key: keyof FilterState; value: FilterState[keyof FilterState] }
   | { type: 'SET_MANY'; partial: Partial<FilterState> }
-  | { type: 'ADD'; key: 'naics' | 'setAside' | 'noticeType'; value: string }
-  | { type: 'REMOVE'; key: 'naics' | 'setAside' | 'noticeType'; value: string }
+  | { type: 'ADD'; key: 'naics' | 'psc' | 'setAside' | 'noticeType'; value: string }
+  | { type: 'REMOVE'; key: 'naics' | 'psc' | 'setAside' | 'noticeType'; value: string }
   | { type: 'CLEAR'; key: keyof FilterState }
   | { type: 'CLEAR_ALL' }
   | { type: 'INIT'; state: FilterState };
@@ -98,6 +102,7 @@ function reducer(state: FilterState, action: Action): FilterState {
 const URL_MAP: [keyof FilterState, string][] = [
   ['keyword', 'q'],
   ['naics', 'naics'],
+  ['psc', 'psc'],
   ['setAside', 'set_aside'],
   ['department', 'department'],
   ['state', 'state'],
@@ -113,7 +118,7 @@ const URL_MAP: [keyof FilterState, string][] = [
   ['page', 'page'],
 ];
 
-const ARRAY_FIELDS = new Set<keyof FilterState>(['naics', 'setAside', 'noticeType']);
+const ARRAY_FIELDS = new Set<keyof FilterState>(['naics', 'psc', 'setAside', 'noticeType']);
 
 function parseStateFromURL(urlParams: URLSearchParams): FilterState {
   const state = { ...DEFAULTS };
@@ -211,8 +216,8 @@ function deadlinePresetToDate(preset: string): string | undefined {
 export interface UseFilterStateReturn {
   filters: FilterState;
   setFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
-  addFilter: (key: 'naics' | 'setAside' | 'noticeType', value: string) => void;
-  removeFilter: (key: 'naics' | 'setAside' | 'noticeType', value: string) => void;
+  addFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => void;
+  removeFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => void;
   clearFilter: (key: keyof FilterState) => void;
   clearAllFilters: () => void;
   setFilters: (partial: Partial<FilterState>) => void;
@@ -271,11 +276,11 @@ export function useFilterState(): UseFilterStateReturn {
     dispatch({ type: 'SET', key, value: value as FilterState[keyof FilterState] });
   }, []);
 
-  const addFilter = useCallback((key: 'naics' | 'setAside' | 'noticeType', value: string) => {
+  const addFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => {
     dispatch({ type: 'ADD', key, value });
   }, []);
 
-  const removeFilter = useCallback((key: 'naics' | 'setAside' | 'noticeType', value: string) => {
+  const removeFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => {
     dispatch({ type: 'REMOVE', key, value });
   }, []);
 
@@ -295,6 +300,7 @@ export function useFilterState(): UseFilterStateReturn {
     let count = 0;
     if (filters.keyword) count++;
     if (filters.naics.length) count++;
+    if (filters.psc.length) count++;
     if (filters.setAside.length) count++;
     if (filters.department) count++;
     if (filters.state) count++;
@@ -310,7 +316,8 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.keyword) p.q = filters.keyword;
     if (filters.noticeType.length) p.type = filters.noticeType.join(',');
     if (filters.setAside.length) p.set_aside = filters.setAside.join(',');
-    if (filters.naics.length) p.naics = filters.naics.join(',');
+    if (filters.naics.length) p.naics = expandToLeafCodes(filters.naics).join(',');
+    if (filters.psc.length) p.psc = expandPscToLeafCodes(filters.psc).join(',');
     if (filters.state) p.state = filters.state;
     if (filters.department) p.department = filters.department;
     if (filters.postedFrom) p.posted_from = filters.postedFrom;
