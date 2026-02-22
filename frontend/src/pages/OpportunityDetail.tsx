@@ -16,8 +16,11 @@ import {
   Users,
   Mail,
   Phone,
+  AlignLeft,
+  Pilcrow,
 } from 'lucide-react';
 import { getOpportunity, trackEvent } from '../services/api';
+import { formatDescription } from '../utils/formatDescription';
 import type { Opportunity } from '../types/api';
 
 const typeLabels: Record<string, string> = {
@@ -193,6 +196,7 @@ export default function OpportunityDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [formatted, setFormatted] = useState(() => localStorage.getItem('govtrove_format_desc') !== 'false');
 
   useEffect(() => {
     if (!id) return;
@@ -401,8 +405,20 @@ export default function OpportunityDetail() {
           {/* Description */}
           {opportunity.description && (
             <Section icon={FileText} title="Description" defaultOpen={true}>
+              <div className="flex items-center justify-end mb-2">
+                <button
+                  onClick={() => {
+                    setFormatted(!formatted);
+                    localStorage.setItem('govtrove_format_desc', String(!formatted));
+                  }}
+                  className="text-xs text-dark-500 hover:text-dark-300 transition-colors flex items-center gap-1"
+                >
+                  {formatted ? <AlignLeft size={12} /> : <Pilcrow size={12} />}
+                  {formatted ? 'Raw text' : 'Format text'}
+                </button>
+              </div>
               <div className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap">
-                {opportunity.description}
+                {formatted ? formatDescription(opportunity.description) : opportunity.description}
               </div>
             </Section>
           )}
