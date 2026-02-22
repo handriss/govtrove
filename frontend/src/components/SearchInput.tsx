@@ -9,10 +9,11 @@ interface SearchInputProps {
   loading?: boolean;
   size?: 'default' | 'large';
   autoFocus?: boolean;
+  showSubmitButton?: boolean;
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ value, onChange, onSubmit, placeholder = 'Search opportunities...', loading, size = 'default', autoFocus }, ref) => {
+  ({ value, onChange, onSubmit, placeholder = 'Search opportunities...', loading, size = 'default', autoFocus, showSubmitButton }, ref) => {
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
         onSubmit?.();
@@ -20,6 +21,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     };
 
     const isLarge = size === 'large';
+    const hasSubmit = showSubmitButton && onSubmit;
 
     return (
       <div className="relative w-full group">
@@ -53,7 +55,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             focus:bg-dark-900
             hover:border-dark-600/50 hover:bg-dark-900/90
             ${isLarge
-              ? 'py-5 pl-14 pr-14 text-lg rounded-2xl'
+              ? `py-5 pl-14 text-lg rounded-2xl ${hasSubmit ? 'pr-20' : 'pr-14'}`
               : 'py-3 pl-12 pr-12 text-sm rounded-xl'
             }
           `}
@@ -66,11 +68,21 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               text-dark-500 hover:text-dark-200
               transition-all duration-200
               hover:scale-110 active:scale-95
-              ${isLarge ? 'right-5' : 'right-4'}
+              ${isLarge ? (hasSubmit ? 'right-12' : 'right-5') : 'right-4'}
             `}
             title="Clear"
           >
             <X size={isLarge ? 20 : 16} strokeWidth={1.5} />
+          </button>
+        )}
+        {hasSubmit && (
+          <button
+            onClick={onSubmit}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl
+              text-dark-500 hover:text-dark-300 transition-colors"
+            aria-label="Search"
+          >
+            <Search size={18} strokeWidth={1.5} />
           </button>
         )}
       </div>
