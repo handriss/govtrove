@@ -162,6 +162,7 @@ func main() {
 		r.Get("/opportunities", oppHandler.Search)
 		r.Get("/opportunities/facets", oppHandler.GetFacets)
 		r.Get("/opportunities/{id}", oppHandler.GetByID)
+		r.Get("/opportunities/{id}/history", oppHandler.GetSolicitationHistory)
 		r.Get("/filters", oppHandler.GetFilters)
 		r.Post("/events", eventHandler.Create)
 		r.Get("/status", statusHandler.GetStatus)

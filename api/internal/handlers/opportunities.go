@@ -74,6 +74,35 @@ func (h *OpportunityHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, opp)
 }
 
+func (h *OpportunityHandler) GetSolicitationHistory(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	history, err := h.repo.GetSolicitationHistory(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get solicitation history failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if history == nil {
+		h.writeJSON(w, http.StatusOK, map[string]any{
+			"solicitation_number": "",
+			"total_notices":      0,
+			"notices":            []any{},
+			"truncated":          false,
+		})
+		return
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	h.writeJSON(w, http.StatusOK, history)
+}
+
 func (h *OpportunityHandler) GetFilters(w http.ResponseWriter, r *http.Request) {
 	options, err := h.repo.GetFilterOptions(r.Context())
 	if err != nil {
