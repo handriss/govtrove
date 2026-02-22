@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -46,6 +46,28 @@ export async function getOpportunity(id: number): Promise<Opportunity> {
       throw new Error('Opportunity not found');
     }
     throw new Error(`Failed to fetch opportunity: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function getFacetCounts(params: SearchParams = {}, signal?: AbortSignal): Promise<FacetResult> {
+  const searchParams = new URLSearchParams();
+
+  if (params.q) searchParams.set('q', params.q);
+  if (params.type) searchParams.set('type', params.type);
+  if (params.set_aside) searchParams.set('set_aside', params.set_aside);
+  if (params.naics) searchParams.set('naics', params.naics);
+  if (params.naics_prefix) searchParams.set('naics_prefix', params.naics_prefix);
+  if (params.state) searchParams.set('state', params.state);
+  if (params.department) searchParams.set('department', params.department);
+  if (params.posted_from) searchParams.set('posted_from', params.posted_from);
+  if (params.posted_to) searchParams.set('posted_to', params.posted_to);
+  if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);
+  if (params.deadline_to) searchParams.set('deadline_to', params.deadline_to);
+
+  const response = await fetch(`${API_BASE}/opportunities/facets?${searchParams}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Facets failed: ${response.statusText}`);
   }
   return response.json();
 }
