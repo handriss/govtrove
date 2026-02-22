@@ -151,10 +151,14 @@ function parseStateFromURL(urlParams: URLSearchParams): FilterState {
   return state;
 }
 
+const SECONDARY_FIELDS = new Set<keyof FilterState>(['sort', 'sortDir', 'page']);
+
 function stateToURL(state: FilterState): URLSearchParams {
   const params = new URLSearchParams();
 
+  // First pass: collect non-secondary params
   for (const [field, param] of URL_MAP) {
+    if (SECONDARY_FIELDS.has(field)) continue;
     const value = state[field];
     const def = DEFAULTS[field];
 
@@ -166,6 +170,21 @@ function stateToURL(state: FilterState): URLSearchParams {
       if (value !== def) params.set(param, String(value));
     } else if (value && value !== def) {
       params.set(param, value);
+    }
+  }
+
+  // Only include sort/order/page when there are actual search params
+  if (params.size > 0) {
+    for (const [field, param] of URL_MAP) {
+      if (!SECONDARY_FIELDS.has(field)) continue;
+      const value = state[field];
+      const def = DEFAULTS[field];
+
+      if (typeof value === 'number') {
+        if (value !== def) params.set(param, String(value));
+      } else if (value && value !== def) {
+        params.set(param, value as string);
+      }
     }
   }
 
@@ -226,7 +245,10 @@ export function useFilterState(): UseFilterStateReturn {
     const newStr = newParams.toString();
     if (currentStr === newStr) return;
 
-    setSearchParams(newParams, { replace: true });
+    // Push a new history entry when going from empty to having params (first search),
+    // so the landing page stays in browser history. Replace for subsequent changes.
+    const replace = currentStr !== '' || newStr === '';
+    setSearchParams(newParams, { replace });
   }, [filters, searchParams, setSearchParams]);
 
   // Persist sort preference
