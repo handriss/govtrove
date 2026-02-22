@@ -5,7 +5,7 @@ import ResultCard from './ResultCard';
 import NoResults from './NoResults';
 import MultiSelectFilter from './MultiSelectFilter';
 import DeadlineFilter from './DeadlineFilter';
-import NaicsColumnFilter from './NaicsColumnFilter';
+import NaicsTreeSelector from './filters/NaicsTreeSelector';
 import type { FilterOption } from './MultiSelectFilter';
 import type { OpportunityListItem } from '../types/api';
 
@@ -368,9 +368,10 @@ export default function ResultsList({
                 {/* NAICS */}
                 <th className="px-4 py-2">
                   {onNaicsChange ? (
-                    <NaicsColumnFilter
+                    <NaicsTreeSelector
                       selected={selectedNaics || []}
                       onChange={onNaicsChange}
+                      compact
                     />
                   ) : (
                     <SearchInput value={filters?.naics_prefix ?? ''} onChange={(v) => onFilterChange('naics_prefix', v)} placeholder="e.g. 33" />

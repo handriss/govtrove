@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import MultiSelectFilter from './MultiSelectFilter';
-import NaicsColumnFilter from './NaicsColumnFilter';
+import NaicsTreeSelector from './filters/NaicsTreeSelector';
 import type { FilterOption } from './MultiSelectFilter';
 import {
   SORTABLE_COLUMNS,
@@ -113,10 +113,10 @@ export default function MobileFilterSheet({
           />
 
           {/* Sheet */}
-          <div className="relative mt-12 flex-1 flex flex-col bg-dark-900 rounded-t-2xl overflow-hidden animate-slide-up">
+          <div role="dialog" aria-modal="true" aria-labelledby="mobile-filters-title" className="relative mt-12 flex-1 flex flex-col bg-dark-900 rounded-t-2xl overflow-hidden animate-slide-up">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-dark-800/50">
-              <h3 className="text-base font-medium text-dark-100">Filters</h3>
+              <h3 id="mobile-filters-title" className="text-base font-medium text-dark-100">Filters</h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -174,10 +174,9 @@ export default function MobileFilterSheet({
 
               {/* NAICS */}
               <FilterSection label="NAICS">
-                <NaicsColumnFilter
+                <NaicsTreeSelector
                   selected={selectedNaics}
                   onChange={onNaicsChange}
-                  placeholder="All NAICS codes"
                   inline
                 />
               </FilterSection>

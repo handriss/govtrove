@@ -80,6 +80,22 @@ export interface FilterOptions {
   states: FilterOption[];
 }
 
+export interface FacetValue {
+  value: string;
+  label?: string;
+  count: number;
+}
+
+export interface FacetResult {
+  total: number;
+  facets: {
+    set_aside: FacetValue[];
+    notice_type: FacetValue[];
+    agency: FacetValue[];
+    naics: FacetValue[];
+  };
+}
+
 export interface SearchParams {
   q?: string;
   type?: string;
@@ -100,27 +116,4 @@ export interface SearchParams {
 
 export interface StatusResponse {
   last_synced_at: string | null;
-}
-
-export interface QueryTerm {
-  id: string;
-  value: string;
-  type: 'include' | 'exclude' | 'phrase';
-}
-
-export interface QueryGroup {
-  id: string;
-  operator: 'AND' | 'OR';
-  terms: QueryTerm[];
-}
-
-export interface AdvancedFilters {
-  types: string[];
-  setAsides: string[];
-  naicsCodes: string[];
-  states: string[];
-  postedFrom?: string;
-  postedTo?: string;
-  deadlineFrom?: string;
-  deadlineTo?: string;
 }
