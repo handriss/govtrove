@@ -4,7 +4,6 @@ import { AuthKitProvider } from '@workos-inc/authkit-react';
 import { AuthProvider } from './contexts/AuthContext';
 import SimpleSearchPage from './pages/SimpleSearchPage';
 import WhatsNewPage from './pages/WhatsNewPage';
-import AdvancedSearchPage from './pages/AdvancedSearchPage';
 import OpportunityDetail from './pages/OpportunityDetail';
 import ProfilePage from './pages/ProfilePage';
 import PreviewBanner from './components/PreviewBanner';
@@ -27,7 +26,6 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<SimpleSearchPage />} />
         <Route path="/whats-new" element={<WhatsNewPage />} />
-        <Route path="/advanced" element={<AdvancedSearchPage />} />
         <Route path="/opportunity/:id" element={<OpportunityDetail />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/callback" element={<SimpleSearchPage />} />
