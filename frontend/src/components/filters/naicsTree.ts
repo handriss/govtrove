@@ -163,6 +163,33 @@ export function searchNaicsCodes(query: string): SearchResult[] {
   return results;
 }
 
+/** Check if any ancestor of a code is in the selected set. */
+export function isAncestorSelected(code: string, selectedSet: Set<string>): boolean {
+  // Check range sector parent (e.g., "31-33" covers codes starting with 31/32/33)
+  const rangeCode = PREFIX_TO_RANGE.get(code.slice(0, 2));
+  if (rangeCode && selectedSet.has(rangeCode)) return true;
+  // Check numeric prefix ancestors
+  for (let len = 2; len < code.length; len++) {
+    const prefix = code.slice(0, len);
+    if (selectedSet.has(prefix)) return true;
+  }
+  return false;
+}
+
+/** Expand any parent codes in the selection to their leaf codes (for API queries). */
+export function expandToLeafCodes(codes: string[]): string[] {
+  const result: string[] = [];
+  for (const code of codes) {
+    const node = NODE_BY_CODE.get(code);
+    if (node && node.leafCodes.length > 0 && node.level !== 6) {
+      result.push(...node.leafCodes);
+    } else {
+      result.push(code);
+    }
+  }
+  return result;
+}
+
 export function getAncestorCodes(code: string): string[] {
   const ancestors: string[] = [];
   // Check for range sector parent (e.g. "31-33" for codes starting with 31/32/33)
