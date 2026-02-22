@@ -3,6 +3,7 @@ import { X, Plus, RotateCcw, ChevronDown } from 'lucide-react';
 import SearchableDropdownFilter from './SearchableDropdownFilter';
 import SimpleToggleFilter from './SimpleToggleFilter';
 import NaicsTreeSelector from './NaicsTreeSelector';
+import PscTreeSelector from './PscTreeSelector';
 import { NOTICE_TYPE_OPTIONS, STATE_NAMES } from './constants';
 import { SET_ASIDE_FILTER_OPTIONS } from '../ResultsList';
 import type { FilterState, UseFilterStateReturn } from '../../hooks/useFilterState';
@@ -42,6 +43,15 @@ const FIELD_DEFS: FieldDef[] = [
     key: 'naics',
     label: 'NAICS Code',
     filterKeys: ['naics'],
+    type: 'multi-value',
+    operators: [{ value: 'is_any_of', label: 'is any of' }],
+    defaultOperator: 'is_any_of',
+    supported: true,
+  },
+  {
+    key: 'psc',
+    label: 'PSC Code',
+    filterKeys: ['psc'],
     type: 'multi-value',
     operators: [{ value: 'is_any_of', label: 'is any of' }],
     defaultOperator: 'is_any_of',
@@ -181,6 +191,8 @@ function isFieldActive(fieldKey: string, filters: FilterState): boolean {
   switch (fieldKey) {
     case 'naics':
       return filters.naics.length > 0;
+    case 'psc':
+      return filters.psc.length > 0;
     case 'setAside':
       return filters.setAside.length > 0;
     case 'department':
@@ -478,6 +490,7 @@ export default function AdvancedFilterBuilder({
                     setFilter={setFilter}
                     setFilters={setFilters}
                     naicsFacets={facets?.naics}
+                    pscFacets={facets?.psc}
                     setAsideOptions={setAsideOptions}
                     agencyOptions={agencyOptions}
                     noticeTypeOptions={noticeTypeOptions}
@@ -537,6 +550,7 @@ interface RowValueInputProps {
   setFilter: UseFilterStateReturn['setFilter'];
   setFilters: UseFilterStateReturn['setFilters'];
   naicsFacets?: FacetValue[];
+  pscFacets?: FacetValue[];
   setAsideOptions: Array<{ value: string; label: string; count?: number }>;
   agencyOptions: Array<{ value: string; label: string; count?: number }>;
   noticeTypeOptions: Array<{ value: string; label: string; count?: number }>;
@@ -549,6 +563,7 @@ function RowValueInput({
   setFilter,
   setFilters,
   naicsFacets,
+  pscFacets,
   setAsideOptions,
   agencyOptions,
   noticeTypeOptions,
@@ -569,6 +584,17 @@ function RowValueInput({
           onChange={(sel) => setFilter('naics', sel)}
           facets={naicsFacets}
           label="Select NAICS"
+          loading={facetsLoading}
+        />
+      );
+
+    case 'psc':
+      return (
+        <PscTreeSelector
+          selected={filters.psc}
+          onChange={(sel) => setFilter('psc', sel)}
+          facets={pscFacets}
+          label="Select PSC"
           loading={facetsLoading}
         />
       );

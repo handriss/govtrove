@@ -137,10 +137,7 @@ export default memo(function OpportunityCard({
   opportunity: opp,
   keyword,
   isSaved,
-  isSelected,
-  anySelected,
   onToggleSave,
-  onToggleSelect,
 }: OpportunityCardProps) {
   const badge = getUrgencyBadge(opp.posted_date, opp.response_deadline);
   const days = getDaysUntilDeadline(opp.response_deadline);
@@ -176,22 +173,6 @@ export default memo(function OpportunityCard({
       >
         {/* PRIMARY: Title row */}
         <div className="flex items-start gap-2">
-          {/* Checkbox */}
-          <div
-            className={`flex items-center pt-0.5 shrink-0 transition-opacity duration-150
-              ${anySelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          >
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={() => onToggleSelect(opp.id)}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSelect(opp.id); }}
-              className="w-4 h-4 rounded border-dark-600 bg-dark-800 text-accent
-                focus:ring-accent/30 focus:ring-offset-0 cursor-pointer"
-              aria-label={`Select ${opp.title} for bulk actions`}
-            />
-          </div>
-
           {/* Star */}
           <button
             type="button"
