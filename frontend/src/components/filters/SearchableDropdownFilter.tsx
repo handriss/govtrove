@@ -10,6 +10,7 @@ interface SearchableDropdownFilterProps {
   onSelectionChange: (selected: string[]) => void;
   searchPlaceholder?: string;
   loading?: boolean;
+  disabled?: boolean;
 }
 
 const ITEM_HEIGHT = 28;
@@ -35,6 +36,7 @@ export default function SearchableDropdownFilter({
   onSelectionChange,
   searchPlaceholder = 'Search...',
   loading,
+  disabled,
 }: SearchableDropdownFilterProps) {
   const [pending, setPending] = useState<string[]>(selected);
   const [search, setSearch] = useState('');
@@ -138,12 +140,15 @@ export default function SearchableDropdownFilter({
       <button
         ref={triggerRef}
         type="button"
-        onClick={toggleDropdown}
+        onClick={disabled ? undefined : toggleDropdown}
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border cursor-pointer transition-colors
-          ${active
-            ? 'bg-accent/10 border-accent/40 text-accent'
-            : 'bg-dark-800 border-dark-700/50 text-dark-200 hover:border-dark-600'
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border transition-colors
+          ${disabled
+            ? 'bg-dark-800/50 border-dark-700/30 text-dark-500 cursor-not-allowed opacity-50'
+            : active
+              ? 'bg-accent/10 border-accent/40 text-accent cursor-pointer'
+              : 'bg-dark-800 border-dark-700/50 text-dark-200 hover:border-dark-600 cursor-pointer'
           }`}
       >
         <span className="truncate">{triggerLabel}</span>

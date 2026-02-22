@@ -8,6 +8,7 @@ import {
   aggregateFacetCounts,
   searchNaicsCodes,
   getAncestorCodes,
+  isAncestorSelected,
 } from './naicsTree';
 import type { NaicsTreeNode } from './naicsTree';
 import type { FacetValue } from '../../types/api';
@@ -38,13 +39,17 @@ const ROLE_STYLE: Record<string, string> = {
   child: 'text-dark-300',
 };
 
+function isCovered(code: string, selectedSet: Set<string>): boolean {
+  return selectedSet.has(code) || isAncestorSelected(code, selectedSet);
+}
+
 function getCheckState(node: NaicsTreeNode, selectedSet: Set<string>): CheckState {
-  if (node.level === 6) {
-    return selectedSet.has(node.code) ? 'checked' : 'unchecked';
-  }
+  if (isCovered(node.code, selectedSet)) return 'checked';
+  if (node.level === 6) return 'unchecked';
+
   let count = 0;
   for (const leaf of node.leafCodes) {
-    if (selectedSet.has(leaf)) count++;
+    if (isCovered(leaf, selectedSet)) count++;
   }
   if (count === 0) return 'unchecked';
   if (count === node.leafCodes.length) return 'checked';
@@ -100,11 +105,15 @@ export default function NaicsTreeSelector({
     (node: NaicsTreeNode) => {
       const state = getCheckState(node, selectedSet);
       if (state === 'checked') {
-        const leafSet = new Set(node.leafCodes);
-        onChange(selected.filter((c) => !leafSet.has(c)));
+        // Remove this code and any children/descendants that are selected
+        const toRemove = new Set([node.code, ...node.leafCodes]);
+        onChange(selected.filter((c) => !toRemove.has(c)));
       } else {
-        const toAdd = node.leafCodes.filter((c) => !selectedSet.has(c));
-        onChange([...selected, ...toAdd]);
+        // Add just this code (not expanded to leaves)
+        // Also remove any descendant leaf codes that are now redundant
+        const leafSet = new Set(node.leafCodes);
+        const cleaned = selected.filter((c) => !leafSet.has(c));
+        onChange([...cleaned, node.code]);
       }
     },
     [selected, selectedSet, onChange],
