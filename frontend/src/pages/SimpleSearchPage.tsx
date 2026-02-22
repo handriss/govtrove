@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock } from 'lucide-react';
+import { Clock, Bookmark, X } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import QuickFilterChips from '../components/QuickFilterChips';
 import AuthButton from '../components/AuthButton';
@@ -9,8 +9,10 @@ import SearchMobileFilters from '../components/search/SearchMobileFilters';
 import { useFilterState } from '../hooks/useFilterState';
 import { useFacetCounts } from '../hooks/useFacetCounts';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
+import { useSavedSearches } from '../hooks/useSavedSearches';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
+import { useAppAuth } from '../contexts/AuthContext';
 import { preloadWhatsNew } from '../services/whatsNewCache';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
@@ -20,8 +22,13 @@ export default function SimpleSearchPage() {
   const { facets, total: facetTotal, isLoading: facetsLoading } = useFacetCounts(fs.toFacetParams());
   const { results, total, page, totalPages, loading, error, search, reset } = useSearch();
   const saved = useSavedOpportunities();
+  const { isAuthenticated } = useAppAuth();
+  const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [savingSearch, setSavingSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialSearch = useRef(true);
   const lastSearchedRef = useRef('');
@@ -116,6 +123,25 @@ export default function SimpleSearchPage() {
     fs.setFilter('page', 1);
   }, [fs]);
 
+  const handleSaveSearch = useCallback(async () => {
+    if (!saveSearchName.trim()) return;
+    setSavingSearch(true);
+    try {
+      const { sort, sortDir, page: _page, ...filterData } = fs.filters;
+      await saveCurrentSearch(saveSearchName.trim(), filterData);
+      setSaveSearchOpen(false);
+      setSaveSearchName('');
+    } catch {
+      // ignore
+    } finally {
+      setSavingSearch(false);
+    }
+  }, [saveSearchName, fs.filters, saveCurrentSearch]);
+
+  const handleSavedSearchClick = useCallback((filters: Record<string, unknown>) => {
+    fs.setFilters(filters as Partial<typeof fs.filters>);
+  }, [fs]);
+
   const showResults = hasSearched || results.length > 0;
 
   return (
@@ -205,6 +231,80 @@ export default function SimpleSearchPage() {
             total={facetTotal || total}
             onMobileFiltersOpen={() => setMobileFiltersOpen(true)}
           />
+
+          {/* Saved search pills + save button */}
+          {(savedSearches.length > 0 || (isAuthenticated && hasActiveFilters)) && (
+            <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide">
+              {savedSearches.map((ss) => (
+                <button
+                  key={ss.id}
+                  onClick={() => handleSavedSearchClick(ss.filters)}
+                  className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
+                             border border-dark-700/50 bg-dark-800/30 text-dark-300
+                             hover:border-dark-600/50 hover:text-dark-100 transition-all whitespace-nowrap shrink-0"
+                >
+                  {ss.name}
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); deleteSearch(ss.id); }}
+                    className="opacity-0 group-hover:opacity-100 text-dark-500 hover:text-red-400 transition-opacity"
+                  >
+                    <X size={12} />
+                  </span>
+                </button>
+              ))}
+              {isAuthenticated && hasActiveFilters && (
+                <div className="relative shrink-0">
+                  <button
+                    onClick={() => setSaveSearchOpen(!saveSearchOpen)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
+                               border border-accent/30 bg-accent/10 text-accent
+                               hover:bg-accent/20 transition-all whitespace-nowrap"
+                    title="Save current search"
+                  >
+                    <Bookmark size={12} />
+                    Save Search
+                  </button>
+                  {saveSearchOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-64 bg-dark-900 border border-dark-700/50 rounded-xl shadow-xl z-50 p-3">
+                      <input
+                        type="text"
+                        value={saveSearchName}
+                        onChange={(e) => setSaveSearchName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSearch(); }}
+                        placeholder="Name this search..."
+                        className="w-full px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg
+                                   text-dark-100 placeholder-dark-500 focus:outline-none focus:border-accent/50"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          onClick={() => { setSaveSearchOpen(false); setSaveSearchName(''); }}
+                          className="px-3 py-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveSearch}
+                          disabled={!saveSearchName.trim() || savingSearch}
+                          className="px-3 py-1.5 text-xs bg-accent/20 text-accent rounded-lg
+                                     hover:bg-accent/30 disabled:opacity-50 transition-all"
+                        >
+                          {savingSearch ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!isAuthenticated && hasActiveFilters && (
+                <span className="text-xs text-dark-600 whitespace-nowrap shrink-0" title="Sign in to save searches">
+                  Sign in to save searches
+                </span>
+              )}
+            </div>
+          )}
+
           <SearchResults
             results={results}
             total={facetTotal || total}

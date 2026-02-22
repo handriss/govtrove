@@ -122,6 +122,8 @@ func main() {
 	contactRepo := repository.NewContactRepository(pool)
 	accountRequestRepo := repository.NewAccountRequestRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
+	savedOppRepo := repository.NewSavedOpportunityRepository(pool)
+	savedSearchRepo := repository.NewSavedSearchRepository(pool)
 
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
@@ -130,6 +132,8 @@ func main() {
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, logger)
+	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger)
+	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -147,7 +151,7 @@ func main() {
 	}
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
@@ -178,6 +182,16 @@ func main() {
 				r.Post("/auth/sync", authHandler.Sync)
 				r.Post("/account/requests", accountRequestHandler.Create)
 				r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
+
+				r.Get("/saved/opportunities", savedOppHandler.List)
+				r.Post("/saved/opportunities", savedOppHandler.Add)
+				r.Post("/saved/opportunities/bulk", savedOppHandler.BulkAdd)
+				r.Delete("/saved/opportunities", savedOppHandler.Remove)
+
+				r.Get("/saved/searches", savedSearchHandler.List)
+				r.Post("/saved/searches", savedSearchHandler.Create)
+				r.Put("/saved/searches/{id}", savedSearchHandler.Update)
+				r.Delete("/saved/searches/{id}", savedSearchHandler.Delete)
 			})
 		}
 	})

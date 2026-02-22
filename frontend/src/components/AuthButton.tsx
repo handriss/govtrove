@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut, User, Star } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 
 export default function AuthButton() {
@@ -67,6 +67,14 @@ export default function AuthButton() {
             >
               <User size={14} strokeWidth={1.5} />
               Profile
+            </Link>
+            <Link
+              to="/saved"
+              onClick={() => setMenuOpen(false)}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-dark-300 hover:text-dark-50 hover:bg-dark-800/50 transition-colors"
+            >
+              <Star size={14} strokeWidth={1.5} />
+              Saved
             </Link>
             <button
               onClick={() => {

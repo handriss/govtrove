@@ -149,3 +149,11 @@ export interface SolicitationHistory {
   notices: SolicitationHistoryItem[];
   truncated: boolean;
 }
+
+export interface SavedSearch {
+  id: number;
+  name: string;
+  filters: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
