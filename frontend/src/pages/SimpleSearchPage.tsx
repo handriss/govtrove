@@ -234,39 +234,41 @@ export default function SimpleSearchPage() {
 
           {/* Saved search pills + save button */}
           {(savedSearches.length > 0 || (isAuthenticated && hasActiveFilters)) && (
-            <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide">
-              {savedSearches.map((ss) => (
-                <button
-                  key={ss.id}
-                  onClick={() => handleSavedSearchClick(ss.filters)}
-                  className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
-                             border border-dark-700/50 bg-dark-800/30 text-dark-300
-                             hover:border-dark-600/50 hover:text-dark-100 transition-all whitespace-nowrap shrink-0"
-                >
-                  {ss.name}
-                  <span
-                    role="button"
-                    onClick={(e) => { e.stopPropagation(); deleteSearch(ss.id); }}
-                    className="opacity-0 group-hover:opacity-100 text-dark-500 hover:text-red-400 transition-opacity"
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 min-w-0">
+                {savedSearches.map((ss) => (
+                  <button
+                    key={ss.id}
+                    onClick={() => handleSavedSearchClick(ss.filters)}
+                    className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
+                               border border-dark-700/50 bg-dark-800/30 text-dark-300
+                               hover:border-dark-600/50 hover:text-dark-100 transition-all whitespace-nowrap shrink-0"
                   >
-                    <X size={12} />
-                  </span>
-                </button>
-              ))}
+                    {ss.name}
+                    <span
+                      role="button"
+                      onClick={(e) => { e.stopPropagation(); deleteSearch(ss.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-dark-500 hover:text-red-400 transition-opacity"
+                    >
+                      <X size={12} />
+                    </span>
+                  </button>
+                ))}
+              </div>
               {isAuthenticated && hasActiveFilters && (
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setSaveSearchOpen(!saveSearchOpen)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
-                               border border-accent/30 bg-accent/10 text-accent
-                               hover:bg-accent/20 transition-all whitespace-nowrap"
+                               border border-dark-600/50 text-dark-400
+                               hover:border-dark-500/50 hover:text-dark-200 transition-all whitespace-nowrap"
                     title="Save current search"
                   >
                     <Bookmark size={12} />
                     Save Search
                   </button>
                   {saveSearchOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-64 bg-dark-900 border border-dark-700/50 rounded-xl shadow-xl z-50 p-3">
+                    <div className="absolute top-full right-0 mt-2 w-64 bg-dark-900 border border-dark-700/50 rounded-xl shadow-xl z-50 p-3">
                       <input
                         type="text"
                         value={saveSearchName}
