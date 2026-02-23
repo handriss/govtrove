@@ -122,6 +122,71 @@ resource "aws_cloudwatch_metric_alarm" "api_request_spike" {
   }
 }
 
+# --- App Runner error rate alarms ---
+
+resource "aws_cloudwatch_metric_alarm" "api_5xx" {
+  alarm_name          = "${var.project_name}-api-5xx-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "5xxStatusResponses"
+  namespace           = "AWS/AppRunner"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 5
+  alarm_description   = "API returning >5 server errors per 5 minutes"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    ServiceName = aws_apprunner_service.api.service_name
+    ServiceId   = aws_apprunner_service.api.service_id
+  }
+
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
+  tags = {
+    Name = "${var.project_name}-api-5xx-errors"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_4xx" {
+  alarm_name          = "${var.project_name}-api-4xx-errors"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "4xxStatusResponses"
+  namespace           = "AWS/AppRunner"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 50
+  alarm_description   = "API returning >50 client errors per 5 minutes for 2 consecutive periods"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    ServiceName = aws_apprunner_service.api.service_name
+    ServiceId   = aws_apprunner_service.api.service_id
+  }
+
+  alarm_actions = [aws_sns_topic.notifications.arn]
+  ok_actions    = [aws_sns_topic.notifications.arn]
+
+  tags = {
+    Name = "${var.project_name}-api-4xx-errors"
+  }
+}
+
+# --- Log group retention ---
+
+resource "aws_cloudwatch_log_group" "lambda_pipeline" {
+  for_each = toset(local.lambda_functions)
+
+  name              = "/aws/lambda/${var.project_name}-${each.key}"
+  retention_in_days = 14
+
+  tags = {
+    Name = "${var.project_name}-${each.key}-logs"
+  }
+}
+
 # --- Cost Anomaly Detection ---
 
 resource "aws_ce_anomaly_monitor" "cost" {
