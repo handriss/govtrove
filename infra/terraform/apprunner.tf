@@ -123,6 +123,7 @@ resource "aws_apprunner_service" "api" {
           ALLOWED_ORIGINS = var.domain_name != "" ? "https://app.${var.domain_name},https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
           SNS_TOPIC_ARN   = aws_sns_topic.notifications.arn
           AWS_REGION      = var.aws_region
+          ADMIN_EMAILS    = var.admin_emails
         }
       }
     }
