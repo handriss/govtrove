@@ -1,2 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /profile
+Disallow: /saved
+Disallow: /notifications
+Disallow: /callback
+
+Sitemap: https://app.govtrove.com/sitemap.xml
