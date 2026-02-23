@@ -13,6 +13,7 @@ type Config struct {
 	AWSRegion      string `envconfig:"AWS_REGION" default:"us-east-1"`
 	WorkOSClientID string `envconfig:"WORKOS_CLIENT_ID"`
 	WorkOSAPIKey   string `envconfig:"WORKOS_API_KEY"`
+	AdminEmails    string `envconfig:"ADMIN_EMAILS"`
 }
 
 func Load() (*Config, error) {
