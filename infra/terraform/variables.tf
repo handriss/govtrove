@@ -99,6 +99,13 @@ variable "lambda_timeout" {
   default     = 900
 }
 
+# Admin
+variable "admin_emails" {
+  description = "Comma-separated list of admin email addresses"
+  type        = string
+  default     = ""
+}
+
 # API
 variable "api_port" {
   description = "Port the API service listens on"
