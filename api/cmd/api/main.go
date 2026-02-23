@@ -161,8 +161,29 @@ func main() {
 	r.Get("/health", healthHandler.Check)
 	r.Get("/og/opportunities/{id}/card.png", oppHandler.GetOGImage)
 	r.Get("/og/opportunities/{id}", oppHandler.GetOGCard)
+	var adminEmails []string
+	if cfg.AdminEmails != "" {
+		for _, e := range strings.Split(cfg.AdminEmails, ",") {
+			if trimmed := strings.TrimSpace(e); trimmed != "" {
+				adminEmails = append(adminEmails, trimmed)
+			}
+		}
+	}
+
+	emailLookup := func(ctx context.Context, workosID string) (string, error) {
+		user, err := userRepo.GetByWorkOSID(ctx, workosID)
+		if err != nil {
+			return "", err
+		}
+		if user == nil {
+			return "", nil
+		}
+		return user.Email, nil
+	}
+
 	r.Route("/api", func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, time.Minute))
+		r.Use(authmw.MaxBodySize(1 << 20))
 		r.Get("/opportunities", oppHandler.Search)
 		r.Get("/opportunities/facets", oppHandler.GetFacets)
 		r.Get("/opportunities/{id}", oppHandler.GetByID)
@@ -181,7 +202,11 @@ func main() {
 				r.Get("/me", userHandler.GetMe)
 				r.Post("/auth/sync", authHandler.Sync)
 				r.Post("/account/requests", accountRequestHandler.Create)
-				r.Get("/admin/analytics", analyticsHandler.GetAnalytics)
+
+				r.Route("/admin", func(r chi.Router) {
+					r.Use(authmw.RequireAdmin(adminEmails, emailLookup))
+					r.Get("/analytics", analyticsHandler.GetAnalytics)
+				})
 
 				r.Get("/saved/opportunities", savedOppHandler.List)
 				r.Post("/saved/opportunities", savedOppHandler.Add)

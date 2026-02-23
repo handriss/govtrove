@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -79,8 +80,18 @@ func (h *SavedSearchHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	input.Name = strings.TrimSpace(input.Name)
+	if len(input.Name) > 200 {
+		input.Name = input.Name[:200]
+	}
+
 	if input.Name == "" || len(input.Filters) == 0 {
 		http.Error(w, "Name and filters are required", http.StatusBadRequest)
+		return
+	}
+	if len(input.Filters) > 10*1024 {
+		http.Error(w, "Filters too large", http.StatusBadRequest)
 		return
 	}
 
@@ -103,7 +114,7 @@ func (h *SavedSearchHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-	if err != nil {
+	if err != nil || id <= 0 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
@@ -111,6 +122,22 @@ func (h *SavedSearchHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var input models.UpdateSavedSearchInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if input.Name != nil {
+		trimmed := strings.TrimSpace(*input.Name)
+		if trimmed == "" {
+			http.Error(w, "Name cannot be empty", http.StatusBadRequest)
+			return
+		}
+		if len(trimmed) > 200 {
+			trimmed = trimmed[:200]
+		}
+		input.Name = &trimmed
+	}
+	if input.Filters != nil && len(*input.Filters) > 10*1024 {
+		http.Error(w, "Filters too large", http.StatusBadRequest)
 		return
 	}
 
@@ -136,7 +163,7 @@ func (h *SavedSearchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
-	if err != nil {
+	if err != nil || id <= 0 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}

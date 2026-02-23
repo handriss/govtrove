@@ -54,7 +54,7 @@ func (h *OpportunityHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
 func (h *OpportunityHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	if err != nil || id <= 0 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
@@ -77,7 +77,7 @@ func (h *OpportunityHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *OpportunityHandler) GetSolicitationHistory(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	if err != nil || id <= 0 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
@@ -289,11 +289,25 @@ func (h *OpportunityHandler) renderOGFallback(w http.ResponseWriter, idStr strin
 	}
 }
 
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
+}
+
+func capSlice(s []string, max int) []string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
+}
+
 func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchParams {
 	q := r.URL.Query()
 
 	params := models.SearchParams{
-		Query:  q.Get("q"),
+		Query:  truncate(q.Get("q"), 500),
 		Sort:   q.Get("sort"),
 		Order:  q.Get("order"),
 		Page:   1,
@@ -301,28 +315,28 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	if typeStr := q.Get("type"); typeStr != "" {
-		params.Types = strings.Split(typeStr, ",")
+		params.Types = capSlice(strings.Split(typeStr, ","), 50)
 	}
 
 	if setAsideStr := q.Get("set_aside"); setAsideStr != "" {
-		params.SetAsides = strings.Split(setAsideStr, ",")
+		params.SetAsides = capSlice(strings.Split(setAsideStr, ","), 50)
 	}
 
 	if naicsStr := q.Get("naics"); naicsStr != "" {
-		params.NAICSCodes = strings.Split(naicsStr, ",")
+		params.NAICSCodes = capSlice(strings.Split(naicsStr, ","), 50)
 	}
 
-	params.NAICSPrefix = q.Get("naics_prefix")
+	params.NAICSPrefix = truncate(q.Get("naics_prefix"), 10)
 
 	if pscStr := q.Get("psc"); pscStr != "" {
-		params.PSCCodes = strings.Split(pscStr, ",")
+		params.PSCCodes = capSlice(strings.Split(pscStr, ","), 50)
 	}
-	params.PSCPrefix = q.Get("psc_prefix")
+	params.PSCPrefix = truncate(q.Get("psc_prefix"), 10)
 
-	params.Department = q.Get("department")
+	params.Department = truncate(q.Get("department"), 200)
 
 	if stateStr := q.Get("state"); stateStr != "" {
-		params.States = strings.Split(stateStr, ",")
+		params.States = capSlice(strings.Split(stateStr, ","), 50)
 	}
 
 	if postedFrom := q.Get("posted_from"); postedFrom != "" {
@@ -354,9 +368,12 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 			params.Page = page
 		}
 	}
+	if params.Page > 10000 {
+		params.Page = 10000
+	}
 
 	if limitStr := q.Get("limit"); limitStr != "" {
-		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 4000 {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 && limit <= 100 {
 			params.Limit = limit
 		}
 	}

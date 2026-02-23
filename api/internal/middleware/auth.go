@@ -54,6 +54,38 @@ func OptionalAuth(jwks keyfunc.Keyfunc) func(http.Handler) http.Handler {
 	}
 }
 
+type EmailLookup func(ctx context.Context, workosID string) (string, error)
+
+func RequireAdmin(adminEmails []string, lookupEmail EmailLookup) func(http.Handler) http.Handler {
+	allowed := make(map[string]bool, len(adminEmails))
+	for _, e := range adminEmails {
+		allowed[strings.ToLower(strings.TrimSpace(e))] = true
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			workosID := UserIDFromContext(r.Context())
+			if workosID == "" {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			email, err := lookupEmail(r.Context(), workosID)
+			if err != nil || email == "" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			if !allowed[strings.ToLower(email)] {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func validateToken(r *http.Request, jwks keyfunc.Keyfunc) (string, bool) {
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {

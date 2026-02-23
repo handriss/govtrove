@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
@@ -38,9 +39,19 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" {
-		http.Error(w, "Email is required", http.StatusBadRequest)
+	req.Email = strings.TrimSpace(req.Email)
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.LastName = strings.TrimSpace(req.LastName)
+
+	if req.Email == "" || len(req.Email) > 320 || !emailRegex.MatchString(req.Email) {
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
 		return
+	}
+	if len(req.FirstName) > 200 {
+		req.FirstName = req.FirstName[:200]
+	}
+	if len(req.LastName) > 200 {
+		req.LastName = req.LastName[:200]
 	}
 
 	user, err := h.repo.Upsert(r.Context(), &models.UpsertUserInput{

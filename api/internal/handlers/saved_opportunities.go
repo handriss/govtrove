@@ -73,7 +73,7 @@ func (h *SavedOpportunityHandler) Add(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		OpportunityID int `json:"opportunity_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OpportunityID == 0 {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OpportunityID <= 0 {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -96,7 +96,7 @@ func (h *SavedOpportunityHandler) Remove(w http.ResponseWriter, r *http.Request)
 	var req struct {
 		OpportunityID int `json:"opportunity_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OpportunityID == 0 {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OpportunityID <= 0 {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -123,6 +123,19 @@ func (h *SavedOpportunityHandler) BulkAdd(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	if len(req.OpportunityIDs) > 100 {
+		http.Error(w, "Maximum 100 opportunities per request", http.StatusBadRequest)
+		return
+	}
+
+	valid := req.OpportunityIDs[:0]
+	for _, id := range req.OpportunityIDs {
+		if id > 0 {
+			valid = append(valid, id)
+		}
+	}
+	req.OpportunityIDs = valid
+
 	if len(req.OpportunityIDs) == 0 {
 		w.WriteHeader(http.StatusCreated)
 		return
