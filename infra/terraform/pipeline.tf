@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile"]
+  lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile", "generate-alerts"]
 }
 
 # --- Lambda Zip Archives ---
@@ -142,12 +142,13 @@ resource "aws_sfn_state_machine" "pipeline" {
   role_arn = aws_iam_role.sfn_pipeline.arn
 
   definition = templatefile("${path.module}/step-functions.asl.json", {
-    download_csvs_arn     = aws_lambda_function.pipeline["download-csvs"].arn
-    ingest_active_arn     = aws_lambda_function.pipeline["ingest-active"].arn
-    ingest_archived_arn   = aws_lambda_function.pipeline["ingest-archived"].arn
-    reconcile_arn         = aws_lambda_function.pipeline["reconcile"].arn
-    sns_notifications_arn = aws_sns_topic.notifications.arn
-    sqs_dlq_url           = aws_sqs_queue.pipeline_dlq.url
+    download_csvs_arn      = aws_lambda_function.pipeline["download-csvs"].arn
+    ingest_active_arn      = aws_lambda_function.pipeline["ingest-active"].arn
+    ingest_archived_arn    = aws_lambda_function.pipeline["ingest-archived"].arn
+    reconcile_arn          = aws_lambda_function.pipeline["reconcile"].arn
+    generate_alerts_arn    = aws_lambda_function.pipeline["generate-alerts"].arn
+    sns_notifications_arn  = aws_sns_topic.notifications.arn
+    sqs_dlq_url            = aws_sqs_queue.pipeline_dlq.url
   })
 
   tags = {

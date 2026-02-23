@@ -56,7 +56,7 @@ help:
 	@echo "  make pipeline-status              - Show recent pipeline executions"
 	@echo "  make pipeline-dlq-status          - Check DLQ depth"
 	@echo "  make logs-pipeline SVC=<name>     - Tail logs for pipeline Lambda"
-	@echo "  (Lambda functions: download-csvs, ingest-active, ingest-archived, reconcile)"
+	@echo "  (Lambda functions: download-csvs, ingest-active, ingest-archived, reconcile, generate-alerts)"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -223,7 +223,7 @@ frontend-build:
 # Build
 # ============================================================================
 
-LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile
+LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile generate-alerts
 
 test:
 	cd pipeline && go test -v ./...

@@ -170,6 +170,36 @@
           "Next": "MarkFailedReconcile"
         }
       ],
+      "Next": "GenerateAlerts"
+    },
+
+    "GenerateAlerts": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${generate_alerts_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "search_alerts.$": "$.Payload.search_alerts",
+        "opportunity_alerts.$": "$.Payload.opportunity_alerts"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedAlerts"
+        }
+      ],
       "Next": "NotifySuccess"
     },
 
@@ -201,6 +231,13 @@
     "MarkFailedReconcile": {
       "Type": "Pass",
       "Result": "Reconcile",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedAlerts": {
+      "Type": "Pass",
+      "Result": "GenerateAlerts",
       "ResultPath": "$.failed_step",
       "Next": "SendToDLQ"
     },
