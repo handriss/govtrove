@@ -13,6 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/getsentry/sentry-go"
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -32,6 +33,17 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
+	}
+
+	if cfg.SentryDSN != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:              cfg.SentryDSN,
+			Environment:      "production",
+			AttachStacktrace: true,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "sentry init failed: %v\n", err)
+		}
+		defer sentry.Flush(2 * time.Second)
 	}
 
 	logLevel := slog.LevelInfo
@@ -141,8 +153,9 @@ func main() {
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(authmw.SentryMiddleware)
 	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(authmw.SentryRecoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
@@ -235,6 +248,7 @@ func main() {
 		<-sigChan
 
 		logger.Info("shutting down server")
+		sentry.Flush(2 * time.Second)
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer shutdownCancel()
 		server.Shutdown(shutdownCtx)
