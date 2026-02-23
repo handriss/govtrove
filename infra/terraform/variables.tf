@@ -113,6 +113,27 @@ variable "api_port" {
   default     = 8080
 }
 
+# Sentry
+variable "sentry_dsn" {
+  description = "Sentry DSN for API error monitoring (optional)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "sentry_pipeline_dsn" {
+  description = "Sentry DSN for pipeline Lambda error monitoring (optional)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "sentry_frontend_dsn" {
+  description = "Sentry DSN for frontend error monitoring (optional, not sensitive — baked into JS bundle)"
+  type        = string
+  default     = ""
+}
+
 # Domain (optional, for future custom domain support)
 variable "domain_name" {
   description = "Custom domain name for the application (optional)"
