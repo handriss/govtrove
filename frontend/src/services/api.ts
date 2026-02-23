@@ -2,6 +2,14 @@ import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResp
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+export const AUTH_ERROR_EVENT = 'govtrove:auth-error';
+
+function checkAuth(response: Response): void {
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent(AUTH_ERROR_EVENT));
+  }
+}
+
 export interface GovTroveUser {
   id: number;
   workos_id: string;
@@ -133,6 +141,7 @@ export async function syncUser(
     body: JSON.stringify(data),
   });
   if (!response.ok) {
+    checkAuth(response);
     throw new Error(`Sync failed: ${response.statusText}`);
   }
   return response.json();
@@ -143,6 +152,7 @@ export async function getMe(token: string): Promise<GovTroveUser> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
+    checkAuth(response);
     throw new Error(`Get me failed: ${response.statusText}`);
   }
   return response.json();
@@ -161,6 +171,7 @@ export async function createAccountRequest(
     body: JSON.stringify({ request_type: requestType }),
   });
   if (!response.ok) {
+    checkAuth(response);
     const text = await response.text();
     throw new Error(text || response.statusText);
   }
@@ -172,7 +183,7 @@ export async function getSavedOpportunities(token: string): Promise<number[]> {
   const response = await fetch(`${API_BASE}/saved/opportunities`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error(`Failed to fetch saved opportunities: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch saved opportunities: ${response.statusText}`); }
   const data = await response.json();
   return data.opportunity_ids;
 }
@@ -183,7 +194,7 @@ export async function saveOpportunity(token: string, id: number): Promise<void> 
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ opportunity_id: id }),
   });
-  if (!response.ok) throw new Error(`Failed to save opportunity: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to save opportunity: ${response.statusText}`); }
 }
 
 export async function unsaveOpportunity(token: string, id: number): Promise<void> {
@@ -192,7 +203,7 @@ export async function unsaveOpportunity(token: string, id: number): Promise<void
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ opportunity_id: id }),
   });
-  if (!response.ok) throw new Error(`Failed to unsave opportunity: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to unsave opportunity: ${response.statusText}`); }
 }
 
 export async function bulkSaveOpportunities(token: string, ids: number[]): Promise<void> {
@@ -201,7 +212,7 @@ export async function bulkSaveOpportunities(token: string, ids: number[]): Promi
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ opportunity_ids: ids }),
   });
-  if (!response.ok) throw new Error(`Failed to bulk save opportunities: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to bulk save opportunities: ${response.statusText}`); }
 }
 
 // --- Saved Searches ---
@@ -210,7 +221,7 @@ export async function getSavedSearches(token: string): Promise<SavedSearch[]> {
   const response = await fetch(`${API_BASE}/saved/searches`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error(`Failed to fetch saved searches: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch saved searches: ${response.statusText}`); }
   return response.json();
 }
 
@@ -224,7 +235,7 @@ export async function createSavedSearch(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ name, filters }),
   });
-  if (!response.ok) throw new Error(`Failed to create saved search: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to create saved search: ${response.statusText}`); }
   return response.json();
 }
 
@@ -238,7 +249,7 @@ export async function updateSavedSearch(
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error(`Failed to update saved search: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to update saved search: ${response.statusText}`); }
   return response.json();
 }
 
@@ -247,5 +258,5 @@ export async function deleteSavedSearch(token: string, id: number): Promise<void
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error(`Failed to delete saved search: ${response.statusText}`);
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete saved search: ${response.statusText}`); }
 }

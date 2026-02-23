@@ -8,6 +8,7 @@ import OpportunityDetail from './pages/OpportunityDetail';
 import ProfilePage from './pages/ProfilePage';
 import SavedPage from './pages/SavedPage';
 import NotificationsPage from './pages/NotificationsPage';
+import NotFoundPage from './pages/NotFoundPage';
 import PreviewBanner from './components/PreviewBanner';
 import Footer from './components/Footer';
 
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
         <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
         <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
     </>

@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useState, useRef, type ReactNode } from 'react';
 import { useAuth } from '@workos-inc/authkit-react';
-import { syncUser, getMe, type GovTroveUser } from '../services/api';
+import { syncUser, getMe, AUTH_ERROR_EVENT, type GovTroveUser } from '../services/api';
 
 interface AuthContextValue {
   user: ReturnType<typeof useAuth>['user'];
@@ -60,6 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => { cancelled = true; };
   }, [auth.user?.id]);
+
+  const handleAuthError = useCallback(() => {
+    setGovtroveUser(null);
+    syncedForUser.current = null;
+    auth.signOut();
+  }, [auth.signOut]);
+
+  useEffect(() => {
+    window.addEventListener(AUTH_ERROR_EVENT, handleAuthError);
+    return () => window.removeEventListener(AUTH_ERROR_EVENT, handleAuthError);
+  }, [handleAuthError]);
 
   return (
     <AuthContext.Provider
