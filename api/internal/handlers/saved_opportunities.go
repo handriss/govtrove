@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
 
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
+	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -43,15 +47,15 @@ func (h *SavedOpportunityHandler) resolveUserID(w http.ResponseWriter, r *http.R
 	return user.ID, true
 }
 
-func (h *SavedOpportunityHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *SavedOpportunityHandler) ListIDs(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.resolveUserID(w, r)
 	if !ok {
 		return
 	}
 
-	ids, err := h.repo.List(r.Context(), userID)
+	ids, err := h.repo.ListIDs(r.Context(), userID)
 	if err != nil {
-		h.logger.Error("failed to list saved opportunities", "error", err)
+		h.logger.Error("failed to list saved opportunity ids", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -61,7 +65,46 @@ func (h *SavedOpportunityHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "private, max-age=30")
 	json.NewEncoder(w).Encode(map[string][]int{"opportunity_ids": ids})
+}
+
+func (h *SavedOpportunityHandler) ListWithDetails(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	sort := r.URL.Query().Get("sort")
+	activeOnly := r.URL.Query().Get("active_only") == "true"
+
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+		page = p
+	}
+	limit := 25
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 && l <= 100 {
+		limit = l
+	}
+
+	details, total, err := h.repo.ListWithDetails(r.Context(), userID, sort, activeOnly, page, limit)
+	if err != nil {
+		h.logger.Error("failed to list saved opportunities with details", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if details == nil {
+		details = []models.SavedOpportunityDetail{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"opportunities": details,
+		"total":         total,
+		"page":          page,
+		"limit":         limit,
+	})
 }
 
 func (h *SavedOpportunityHandler) Add(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +153,27 @@ func (h *SavedOpportunityHandler) Remove(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *SavedOpportunityHandler) RemoveByOpportunityID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	opportunityID, err := strconv.Atoi(chi.URLParam(r, "opportunityId"))
+	if err != nil || opportunityID <= 0 {
+		http.Error(w, "Invalid opportunity ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.RemoveByOpportunityID(r.Context(), userID, opportunityID); err != nil {
+		h.logger.Error("failed to remove saved opportunity by opportunity id", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *SavedOpportunityHandler) BulkAdd(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.resolveUserID(w, r)
 	if !ok {
@@ -148,4 +212,37 @@ func (h *SavedOpportunityHandler) BulkAdd(w http.ResponseWriter, r *http.Request
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *SavedOpportunityHandler) UpdateNotes(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Notes string `json:"notes"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Notes) > 5000 {
+		http.Error(w, "Notes too long", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.UpdateNotes(r.Context(), id, userID, req.Notes); err != nil {
+		h.logger.Error("failed to update notes", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
