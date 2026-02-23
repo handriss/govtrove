@@ -35,6 +35,7 @@ resource "aws_lambda_function" "pipeline" {
       DATABASE_URL_SECRET_ARN = aws_secretsmanager_secret.database_url.arn
       S3_BUCKET               = aws_s3_bucket.data.id
       AWS_REGION_NAME         = var.aws_region
+      SENTRY_DSN              = var.sentry_pipeline_dsn
     }
   }
 

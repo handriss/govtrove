@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 	"github.com/handriss/govtrove/pipeline/internal/database"
 	"github.com/handriss/govtrove/pipeline/internal/ingest"
@@ -37,6 +38,14 @@ func init() {
 	secretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
 	if secretARN == "" {
 		return
+	}
+
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      "production",
+			AttachStacktrace: true,
+		})
 	}
 
 	bucket = os.Getenv("S3_BUCKET")
@@ -104,7 +113,13 @@ type Handler struct {
 	Logger *slog.Logger
 }
 
-func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (*Output, error) {
+func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
+	defer func() {
+		if retErr != nil {
+			sentry.CaptureException(retErr)
+		}
+		sentry.Flush(2 * time.Second)
+	}()
 	var input Input
 	if err := json.Unmarshal(event, &input); err != nil {
 		return nil, fmt.Errorf("unmarshal input: %w", err)

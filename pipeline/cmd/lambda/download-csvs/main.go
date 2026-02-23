@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/getsentry/sentry-go"
 	"github.com/handriss/govtrove/pipeline/internal/bulkcsv"
 	"github.com/handriss/govtrove/pipeline/internal/config"
 	"github.com/handriss/govtrove/pipeline/internal/database"
@@ -34,6 +35,14 @@ func init() {
 	secretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
 	if secretARN == "" {
 		return
+	}
+
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      "production",
+			AttachStacktrace: true,
+		})
 	}
 
 	cfg.S3Bucket = os.Getenv("S3_BUCKET")
@@ -94,7 +103,13 @@ type Handler struct {
 	Logger   *slog.Logger
 }
 
-func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (*Output, error) {
+func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
+	defer func() {
+		if retErr != nil {
+			sentry.CaptureException(retErr)
+		}
+		sentry.Flush(2 * time.Second)
+	}()
 	start := time.Now()
 
 	runID, err := h.Store.CreatePipelineRun(ctx, "download-csvs", nil)
