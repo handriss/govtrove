@@ -255,8 +255,10 @@ deploy-frontend: frontend-build
 	@echo "Deploying frontend to S3/CloudFront..."
 	@API_URL=$$(cd infra/terraform && terraform output -raw api_url) && \
 	WORKOS_CLIENT_ID=$$(cd infra/terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
+	SENTRY_DSN=$$(cd infra/terraform && terraform output -raw sentry_frontend_dsn 2>/dev/null || echo "") && \
 	echo "VITE_API_URL=$$API_URL/api" > .env.production && \
 	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> .env.production; fi && \
+	if [ -n "$$SENTRY_DSN" ]; then echo "VITE_SENTRY_DSN=$$SENTRY_DSN" >> .env.production; fi && \
 	cd frontend && npm run build && \
 	BUCKET=$$(cd ../infra/terraform && terraform output -raw frontend_bucket_name) && \
 	DIST_ID=$$(cd ../infra/terraform && terraform output -raw cloudfront_distribution_id) && \

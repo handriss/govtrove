@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
 import { AuthKitProvider } from '@workos-inc/authkit-react';
 import { AuthProvider, useAppAuth } from './contexts/AuthContext';
 import SimpleSearchPage from './pages/SimpleSearchPage';
@@ -35,9 +36,26 @@ function AuthCallback() {
   return <Navigate to="/" replace />;
 }
 
+function ErrorFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center max-w-md px-4">
+        <h1 className="text-2xl font-bold text-dark-900 mb-2">Something went wrong</h1>
+        <p className="text-dark-500 mb-4">An unexpected error occurred. Please try refreshing the page.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        >
+          Refresh page
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
-    <>
+    <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <PreviewBanner />
       <Routes>
         <Route path="/" element={<SimpleSearchPage />} />
@@ -53,7 +71,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Footer />
-    </>
+    </Sentry.ErrorBoundary>
   );
 }
 

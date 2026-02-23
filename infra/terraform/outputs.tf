@@ -127,3 +127,8 @@ output "pipeline_dlq_url" {
   description = "SQS DLQ URL for pipeline failures"
   value       = aws_sqs_queue.pipeline_dlq.url
 }
+
+output "sentry_frontend_dsn" {
+  description = "Sentry DSN for frontend (used by deploy-frontend)"
+  value       = var.sentry_frontend_dsn
+}
