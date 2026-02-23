@@ -154,6 +154,62 @@ export interface SavedSearch {
   id: number;
   name: string;
   filters: Record<string, unknown>;
+  alert_enabled: boolean;
+  last_checked_at?: string;
+  last_match_count: number;
+  total_result_count?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface SavedOpportunityDetail {
+  id: number;
+  opportunity_id: number;
+  notice_id: string;
+  solicitation_number?: string;
+  notes?: string;
+  created_at: string;
+  title: string;
+  description?: string;
+  type?: string;
+  department?: string;
+  posted_date?: string;
+  response_deadline?: string;
+  set_aside_code?: string;
+  set_aside_description?: string;
+  naics_code?: string;
+  pop_state?: string;
+  active: boolean;
+  has_updates: boolean;
+}
+
+export interface SavedOpportunitiesResponse {
+  opportunities: SavedOpportunityDetail[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UserUpdate {
+  id: string;
+  user_id: number;
+  update_type: 'saved_search_matches' | 'opportunity_amended' | 'opportunity_changed';
+  source_id?: number;
+  opportunity_ids?: number[];
+  summary: string;
+  details?: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface UserUpdateCount {
+  unread: number;
+  total: number;
+}
+
+export interface UserUpdatesResponse {
+  updates: UserUpdate[];
+  total: number;
+  page: number;
+  limit: number;
 }

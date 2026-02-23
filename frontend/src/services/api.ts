@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, UserUpdatesResponse, UserUpdateCount } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -180,12 +180,28 @@ export async function createAccountRequest(
 // --- Saved Opportunities ---
 
 export async function getSavedOpportunities(token: string): Promise<number[]> {
-  const response = await fetch(`${API_BASE}/saved/opportunities`, {
+  const response = await fetch(`${API_BASE}/saved/opportunities/ids`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch saved opportunities: ${response.statusText}`); }
   const data = await response.json();
   return data.opportunity_ids;
+}
+
+export async function getSavedOpportunitiesWithDetails(
+  token: string,
+  params: { sort?: string; active_only?: boolean; page?: number; limit?: number } = {},
+): Promise<SavedOpportunitiesResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.sort) searchParams.set('sort', params.sort);
+  if (params.active_only) searchParams.set('active_only', 'true');
+  if (params.page) searchParams.set('page', String(params.page));
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  const response = await fetch(`${API_BASE}/saved/opportunities?${searchParams}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch saved opportunities: ${response.statusText}`); }
+  return response.json();
 }
 
 export async function saveOpportunity(token: string, id: number): Promise<void> {
@@ -206,6 +222,14 @@ export async function unsaveOpportunity(token: string, id: number): Promise<void
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to unsave opportunity: ${response.statusText}`); }
 }
 
+export async function unsaveByOpportunityId(token: string, opportunityId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/opportunities/by-opportunity/${opportunityId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to unsave opportunity: ${response.statusText}`); }
+}
+
 export async function bulkSaveOpportunities(token: string, ids: number[]): Promise<void> {
   const response = await fetch(`${API_BASE}/saved/opportunities/bulk`, {
     method: 'POST',
@@ -213,6 +237,15 @@ export async function bulkSaveOpportunities(token: string, ids: number[]): Promi
     body: JSON.stringify({ opportunity_ids: ids }),
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to bulk save opportunities: ${response.statusText}`); }
+}
+
+export async function updateSavedOpportunityNotes(token: string, id: number, notes: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/saved/opportunities/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ notes }),
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to update notes: ${response.statusText}`); }
 }
 
 // --- Saved Searches ---
@@ -259,4 +292,65 @@ export async function deleteSavedSearch(token: string, id: number): Promise<void
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete saved search: ${response.statusText}`); }
+}
+
+export async function runSavedSearch(
+  token: string,
+  id: number,
+): Promise<{ search: SavedSearch; results: SearchResult }> {
+  const response = await fetch(`${API_BASE}/saved/searches/${id}/run`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to run saved search: ${response.statusText}`); }
+  return response.json();
+}
+
+// --- User Updates ---
+
+export async function getUpdates(
+  token: string,
+  params: { unread_only?: boolean; page?: number; limit?: number } = {},
+): Promise<UserUpdatesResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.unread_only) searchParams.set('unread_only', 'true');
+  if (params.page) searchParams.set('page', String(params.page));
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  const response = await fetch(`${API_BASE}/updates?${searchParams}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch updates: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function getUpdatesCount(token: string): Promise<UserUpdateCount> {
+  const response = await fetch(`${API_BASE}/updates/count`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch updates count: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function markUpdateRead(token: string, id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/updates/${id}/read`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark update read: ${response.statusText}`); }
+}
+
+export async function markAllUpdatesRead(token: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/updates/read-all`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark all updates read: ${response.statusText}`); }
+}
+
+export async function deleteUpdate(token: string, id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/updates/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete update: ${response.statusText}`); }
 }
