@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppAuth } from '../contexts/AuthContext';
 import {
-  getSavedOpportunities,
+  getSavedOpportunities as getSavedOpportunityIds,
   saveOpportunity,
   unsaveOpportunity,
   bulkSaveOpportunities,
@@ -58,7 +58,7 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
     (async () => {
       try {
         const token = await getAccessToken();
-        const ids = await getSavedOpportunities(token);
+        const ids = await getSavedOpportunityIds(token);
         if (cancelled) return;
 
         const serverSet = new Set(ids);

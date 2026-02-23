@@ -2,9 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, LogOut, User, Star, Bell } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
+import { useUpdatesCount } from '../hooks/useUpdates';
 
 export default function AuthButton() {
   const { user, isLoading, isAuthenticated, signIn, signOut } = useAppAuth();
+  const { count } = useUpdatesCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -44,11 +46,17 @@ export default function AuthButton() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 text-accent
+        className="relative w-8 h-8 rounded-full bg-accent/20 border border-accent/30 text-accent
                    text-sm font-medium flex items-center justify-center
                    hover:bg-accent/30 transition-all duration-200"
       >
         {initial}
+        {count.unread > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white
+                           text-[10px] font-bold rounded-full flex items-center justify-center">
+            {count.unread > 99 ? '99+' : count.unread}
+          </span>
+        )}
       </button>
 
       {menuOpen && (
@@ -83,7 +91,11 @@ export default function AuthButton() {
             >
               <Bell size={14} strokeWidth={1.5} />
               Notifications
-              <span className="ml-auto text-[10px] uppercase tracking-wider text-dark-600 bg-dark-800/50 px-1.5 py-0.5 rounded">Soon</span>
+              {count.unread > 0 && (
+                <span className="ml-auto text-[10px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {count.unread > 99 ? '99+' : count.unread}
+                </span>
+              )}
             </Link>
             <button
               onClick={() => {

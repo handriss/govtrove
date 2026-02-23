@@ -11,9 +11,12 @@ import {
 export interface UseSavedSearchesReturn {
   savedSearches: SavedSearch[];
   loading: boolean;
-  saveCurrentSearch: (name: string, filters: Record<string, unknown>) => Promise<void>;
+  saveCurrentSearch: (name: string, filters: Record<string, unknown>, alertEnabled?: boolean) => Promise<void>;
   deleteSearch: (id: number) => Promise<void>;
   renameSearch: (id: number, name: string) => Promise<void>;
+  toggleAlert: (id: number, enabled: boolean) => Promise<void>;
+  updateFilters: (id: number, filters: Record<string, unknown>) => Promise<void>;
+  refetch: () => Promise<void>;
 }
 
 export function useSavedSearches(): UseSavedSearchesReturn {
@@ -21,6 +24,16 @@ export function useSavedSearches(): UseSavedSearchesReturn {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(false);
   const fetchedRef = useRef(false);
+
+  const fetchSearches = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const searches = await getSavedSearches(token);
+      setSavedSearches(searches);
+    } catch {
+      // Silently fail
+    }
+  }, [getAccessToken]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -50,9 +63,9 @@ export function useSavedSearches(): UseSavedSearchesReturn {
     return () => { cancelled = true; };
   }, [isAuthenticated, getAccessToken]);
 
-  const saveCurrentSearch = useCallback(async (name: string, filters: Record<string, unknown>) => {
+  const saveCurrentSearch = useCallback(async (name: string, filters: Record<string, unknown>, alertEnabled?: boolean) => {
     const token = await getAccessToken();
-    const search = await createSavedSearch(token, name, filters);
+    const search = await createSavedSearch(token, name, { ...filters, ...(alertEnabled !== undefined ? { alert_enabled: alertEnabled } : {}) });
     setSavedSearches((prev) => [search, ...prev]);
   }, [getAccessToken]);
 
@@ -62,16 +75,9 @@ export function useSavedSearches(): UseSavedSearchesReturn {
       const token = await getAccessToken();
       await deleteSavedSearchAPI(token, id);
     } catch {
-      // Refetch to restore state
-      try {
-        const token = await getAccessToken();
-        const searches = await getSavedSearches(token);
-        setSavedSearches(searches);
-      } catch {
-        // Give up
-      }
+      await fetchSearches();
     }
-  }, [getAccessToken]);
+  }, [getAccessToken, fetchSearches]);
 
   const renameSearch = useCallback(async (id: number, name: string) => {
     const token = await getAccessToken();
@@ -79,5 +85,22 @@ export function useSavedSearches(): UseSavedSearchesReturn {
     setSavedSearches((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }, [getAccessToken]);
 
-  return { savedSearches, loading, saveCurrentSearch, deleteSearch, renameSearch };
+  const toggleAlert = useCallback(async (id: number, enabled: boolean) => {
+    setSavedSearches((prev) => prev.map((s) => (s.id === id ? { ...s, alert_enabled: enabled } : s)));
+    try {
+      const token = await getAccessToken();
+      const updated = await updateSavedSearch(token, id, { alert_enabled: enabled } as Record<string, unknown>);
+      setSavedSearches((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch {
+      setSavedSearches((prev) => prev.map((s) => (s.id === id ? { ...s, alert_enabled: !enabled } : s)));
+    }
+  }, [getAccessToken]);
+
+  const updateFilters = useCallback(async (id: number, filters: Record<string, unknown>) => {
+    const token = await getAccessToken();
+    const updated = await updateSavedSearch(token, id, { filters });
+    setSavedSearches((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  }, [getAccessToken]);
+
+  return { savedSearches, loading, saveCurrentSearch, deleteSearch, renameSearch, toggleAlert, updateFilters, refetch: fetchSearches };
 }
