@@ -176,3 +176,33 @@ func (h *SavedSearchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *SavedSearchHandler) Run(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	search, result, err := h.repo.Run(r.Context(), id, userID)
+	if err != nil {
+		h.logger.Error("failed to run saved search", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if search == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"search":  search,
+		"results": result,
+	})
+}
