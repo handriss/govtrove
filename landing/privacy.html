@@ -117,7 +117,7 @@
             text-align: center;
         }
     </style>
-    <script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"></script>
+    <script>if(!localStorage.getItem('govtrove_notrack'))document.write('<script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"><\/script>')</script>
 </head>
 <body>
     <nav class="nav">
@@ -136,7 +136,7 @@
     <main class="content">
         <div class="container">
             <h1>Privacy Policy</h1>
-            <p class="last-updated">Last updated: February 11, 2026</p>
+            <p class="last-updated">Last updated: February 23, 2026</p>
 
             <div class="draft-callout">
                 Draft — This policy is under review and may change before public launch.
@@ -178,8 +178,9 @@
                 <li>Error logs and performance data</li>
             </ul>
 
-            <h3>1.5 Data We Do Not Collect</h3>
-            <p>We do not use tracking cookies, third-party analytics services, or advertising pixels. We do not collect data about your activity outside of GovTrove. See Section 8 (Cookies) for details.</p>
+            <h3>1.5 Analytics</h3>
+            <p>We use <a href="https://counter.dev" target="_blank" rel="noopener">Counter.dev</a>, a privacy-focused, cookie-free analytics service, to collect aggregate page view statistics. Counter.dev does not use cookies, does not track you across websites, and does not collect any personally identifiable information. It records only basic, anonymous page view counts.</p>
+            <p>We do not use tracking cookies, advertising pixels, or any analytics service that profiles individual users. We do not collect data about your activity outside of GovTrove. See Section 8 (Cookies) for details.</p>
 
             <h2>2. Why We Collect Your Data</h2>
             <p>We use your personal data for the following purposes:</p>
@@ -264,6 +265,12 @@
                         <td>Database hosting (PostgreSQL)</td>
                         <td>All service data</td>
                         <td>United States</td>
+                    </tr>
+                    <tr>
+                        <td>Counter.dev</td>
+                        <td>Privacy-focused, cookie-free page view analytics</td>
+                        <td>Anonymous page view counts only (no personal data)</td>
+                        <td>Germany</td>
                     </tr>
                 </tbody>
             </table>
