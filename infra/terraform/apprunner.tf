@@ -124,6 +124,7 @@ resource "aws_apprunner_service" "api" {
           SNS_TOPIC_ARN   = aws_sns_topic.notifications.arn
           AWS_REGION      = var.aws_region
           ADMIN_EMAILS    = var.admin_emails
+          SENTRY_DSN      = var.sentry_dsn
         }
       }
     }
