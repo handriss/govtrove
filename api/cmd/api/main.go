@@ -136,6 +136,7 @@ func main() {
 	userRepo := repository.NewUserRepository(pool)
 	savedOppRepo := repository.NewSavedOpportunityRepository(pool)
 	savedSearchRepo := repository.NewSavedSearchRepository(pool)
+	userUpdateRepo := repository.NewUserUpdateRepository(pool)
 
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger)
 	eventHandler := handlers.NewEventHandler(eventRepo, logger)
@@ -146,6 +147,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(userRepo, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger)
+	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -221,15 +223,25 @@ func main() {
 					r.Get("/analytics", analyticsHandler.GetAnalytics)
 				})
 
-				r.Get("/saved/opportunities", savedOppHandler.List)
+				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
+				r.Get("/saved/opportunities/ids", savedOppHandler.ListIDs)
 				r.Post("/saved/opportunities", savedOppHandler.Add)
 				r.Post("/saved/opportunities/bulk", savedOppHandler.BulkAdd)
+				r.Put("/saved/opportunities/{id}", savedOppHandler.UpdateNotes)
 				r.Delete("/saved/opportunities", savedOppHandler.Remove)
+				r.Delete("/saved/opportunities/by-opportunity/{opportunityId}", savedOppHandler.RemoveByOpportunityID)
 
 				r.Get("/saved/searches", savedSearchHandler.List)
 				r.Post("/saved/searches", savedSearchHandler.Create)
 				r.Put("/saved/searches/{id}", savedSearchHandler.Update)
 				r.Delete("/saved/searches/{id}", savedSearchHandler.Delete)
+				r.Post("/saved/searches/{id}/run", savedSearchHandler.Run)
+
+				r.Get("/updates", userUpdateHandler.List)
+				r.Get("/updates/count", userUpdateHandler.Count)
+				r.Put("/updates/{id}/read", userUpdateHandler.MarkRead)
+				r.Put("/updates/read-all", userUpdateHandler.MarkAllRead)
+				r.Delete("/updates/{id}", userUpdateHandler.Delete)
 			})
 		}
 	})
