@@ -223,7 +223,7 @@ frontend-build:
 # Build
 # ============================================================================
 
-LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile generate-alerts
+LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile generate-alerts ingest-api
 
 test:
 	cd pipeline && go test -v ./...

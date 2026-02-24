@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/handriss/govtrove/pipeline/internal/samgov"
 )
 
 type SAMGovRequest struct {
@@ -134,4 +136,19 @@ func (db *DB) UpdateSAMGovRequestResponseSize(ctx context.Context, requestID int
 		return fmt.Errorf("failed to update SAM.gov request response size: %w", err)
 	}
 	return nil
+}
+
+// RecordAPIRequest implements samgov.RequestRecorder by bridging to RecordSAMGovRequest.
+func (db *DB) RecordAPIRequest(ctx context.Context, log *samgov.APIRequestLog) error {
+	req := &SAMGovRequest{
+		Endpoint:          log.Endpoint,
+		Method:            log.Method,
+		HTTPStatusCode:    log.HTTPStatusCode,
+		ResponseTimeMs:    log.ResponseTimeMs,
+		ResponseSizeBytes: log.ResponseSizeBytes,
+		ErrorMessage:      log.ErrorMessage,
+		Success:           log.Success,
+	}
+	_, err := db.RecordSAMGovRequest(ctx, req)
+	return err
 }

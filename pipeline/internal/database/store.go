@@ -39,6 +39,10 @@ type Store interface {
 	ResolveExpectedDisappearances(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error)
 	MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error)
 
+	// API snapshot operations
+	BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []SnapAPIRow) (int64, error)
+	UpsertOpportunitiesFromAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
+
 	// Bulk CSV log
 	InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, error)
 	GetLatestBulkCSVHash(ctx context.Context, source string) (string, error)
