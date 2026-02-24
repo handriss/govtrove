@@ -21,6 +21,7 @@ type SAMGovRequest struct {
 	ErrorMessage      *string
 	IngestionRunID    *int
 	Success           bool
+	APIKeyHash        *string
 }
 
 func (db *DB) RecordSAMGovRequest(ctx context.Context, req *SAMGovRequest) (int, error) {
@@ -35,8 +36,9 @@ func (db *DB) RecordSAMGovRequest(ctx context.Context, req *SAMGovRequest) (int,
 			response_size_bytes,
 			error_message,
 			ingestion_run_id,
-			success
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			success,
+			api_key_hash
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id
 	`,
 		req.Endpoint,
@@ -48,6 +50,7 @@ func (db *DB) RecordSAMGovRequest(ctx context.Context, req *SAMGovRequest) (int,
 		req.ErrorMessage,
 		req.IngestionRunID,
 		req.Success,
+		req.APIKeyHash,
 	).Scan(&id)
 
 	if err != nil {
@@ -140,6 +143,10 @@ func (db *DB) UpdateSAMGovRequestResponseSize(ctx context.Context, requestID int
 
 // RecordAPIRequest implements samgov.RequestRecorder by bridging to RecordSAMGovRequest.
 func (db *DB) RecordAPIRequest(ctx context.Context, log *samgov.APIRequestLog) error {
+	var keyHash *string
+	if log.APIKeyHash != "" {
+		keyHash = &log.APIKeyHash
+	}
 	req := &SAMGovRequest{
 		Endpoint:          log.Endpoint,
 		Method:            log.Method,
@@ -148,6 +155,7 @@ func (db *DB) RecordAPIRequest(ctx context.Context, log *samgov.APIRequestLog) e
 		ResponseSizeBytes: log.ResponseSizeBytes,
 		ErrorMessage:      log.ErrorMessage,
 		Success:           log.Success,
+		APIKeyHash:        keyHash,
 	}
 	_, err := db.RecordSAMGovRequest(ctx, req)
 	return err

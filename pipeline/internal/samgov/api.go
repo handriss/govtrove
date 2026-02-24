@@ -2,6 +2,8 @@ package samgov
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -103,6 +105,7 @@ type APIRequestLog struct {
 	ResponseSizeBytes *int
 	ErrorMessage      *string
 	Success           bool
+	APIKeyHash        string
 }
 
 // RequestRecorder logs API requests. Implemented by database.DB.
@@ -111,15 +114,18 @@ type RequestRecorder interface {
 }
 
 type APIClient struct {
-	apiKey   string
-	http     *http.Client
-	logger   *slog.Logger
-	recorder RequestRecorder
+	apiKey     string
+	apiKeyHash string
+	http       *http.Client
+	logger     *slog.Logger
+	recorder   RequestRecorder
 }
 
 func NewAPIClient(apiKey string, logger *slog.Logger, recorder RequestRecorder) *APIClient {
+	hash := sha256.Sum256([]byte(apiKey))
 	return &APIClient{
-		apiKey: apiKey,
+		apiKey:     apiKey,
+		apiKeyHash: hex.EncodeToString(hash[:])[:8],
 		http: &http.Client{
 			Timeout: requestTimeout,
 		},
@@ -242,6 +248,7 @@ func (c *APIClient) logRequest(ctx context.Context, elapsedMs int, statusCode *i
 		Method:         "GET",
 		ResponseTimeMs: &elapsedMs,
 		Success:        reqErr == nil && statusCode != nil && *statusCode == http.StatusOK,
+		APIKeyHash:     c.apiKeyHash,
 	}
 	if statusCode != nil {
 		req.HTTPStatusCode = statusCode
