@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Register a Foreign Business on SAM.gov: Complete Guide | GovTrove Blog</title>
+    <meta name="description" content="Step-by-step guide to SAM.gov registration for non-U.S. businesses. How to get an NCAGE code, navigate entity registration, and start bidding on federal contracts.">
+    <meta name="keywords" content="SAM.gov registration foreign entity, NCAGE code, foreign business federal contracts, SAM.gov international, non-US SAM.gov registration, CAGE code foreign company">
+
+    <link rel="canonical" href="https://govtrove.com/blog/sam-gov-foreign-entity-registration.html">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="How to Register a Foreign Business on SAM.gov: Complete Guide">
+    <meta property="og:description" content="Step-by-step guide to SAM.gov registration for non-U.S. businesses. How to get an NCAGE code, navigate entity registration, and start bidding on federal contracts.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://govtrove.com/blog/sam-gov-foreign-entity-registration.html">
+    <meta property="og:image" content="https://govtrove.com/og-image.png">
+    <meta property="article:published_time" content="2026-02-25">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="How to Register a Foreign Business on SAM.gov: Complete Guide">
+    <meta name="twitter:description" content="Step-by-step guide to SAM.gov registration for non-U.S. businesses. How to get an NCAGE code, navigate entity registration, and start bidding on federal contracts.">
+    <meta name="twitter:image" content="https://govtrove.com/og-image.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-page: #0a0f1a;
+            --bg-card: #0f172a;
+            --bg-elevated: #1e293b;
+            --bg-hover: #334155;
+            --border-subtle: rgba(148, 163, 184, 0.1);
+            --border-default: rgba(148, 163, 184, 0.15);
+            --border-strong: rgba(148, 163, 184, 0.25);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #7b8ba2;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-subtle: rgba(37, 99, 235, 0.15);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Consolas, monospace;
+            --transition-fast: 150ms ease;
+            --transition-base: 250ms ease;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        body { font-family: var(--font-sans); font-size: 16px; line-height: 1.6; color: var(--text-primary); background-color: var(--bg-page); }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.875rem 1.75rem; font-size: 1rem; font-weight: 500; border-radius: 0.375rem; transition: all var(--transition-fast); }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+        .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 1rem 0; background: rgba(10, 10, 15, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
+        .nav-inner { display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+        .nav-logo svg { color: var(--accent); }
+        .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+        .nav-links a { color: var(--text-secondary); font-weight: 500; transition: color var(--transition-fast); }
+        .nav-links a:hover, .nav-links a.active { color: var(--text-primary); }
+        .nav-cta { margin-left: 1rem; }
+        .nav-mobile-toggle { display: none; padding: 0.5rem; color: var(--text-primary); }
+        .nav-mobile-menu { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-page); padding: 5rem 1.5rem 2rem; z-index: 99; }
+        .nav-mobile-menu.open { display: block; }
+        .nav-mobile-menu ul { list-style: none; display: flex; flex-direction: column; gap: 1.5rem; }
+        .nav-mobile-menu a { font-size: 1.25rem; font-weight: 500; color: var(--text-primary); }
+        .nav-mobile-menu .btn { width: 100%; margin-top: 1rem; }
+
+        @media (max-width: 768px) {
+            .nav-links, .nav-cta { display: none; }
+            .nav-mobile-toggle { display: block; }
+        }
+
+        .article-container { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
+        .article-header { padding: 8rem 0 2rem; }
+        .article-meta { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .article-category { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.625rem; border-radius: 9999px; }
+        .category-guide { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .article-date { font-size: 0.875rem; color: var(--text-muted); }
+        .article-reading-time { font-size: 0.875rem; color: var(--text-muted); }
+        .article-meta-separator { color: var(--text-muted); }
+        .article-header h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 0; }
+        .article-subtitle { font-size: 1.125rem; color: var(--text-secondary); line-height: 1.6; margin-top: 1rem; font-style: italic; }
+
+        .article-body { padding-bottom: 3rem; }
+        .article-body p { font-size: 1.125rem; line-height: 1.75; color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .article-body h2 { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin-top: 2.5rem; margin-bottom: 1rem; letter-spacing: -0.01em; }
+        .article-body h3 { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 2rem; margin-bottom: 0.75rem; }
+        .article-body h4 { font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-top: 1.5rem; margin-bottom: 0.5rem; }
+        .article-body ul, .article-body ol { font-size: 1.125rem; line-height: 1.75; color: var(--text-secondary); margin-bottom: 1.5rem; padding-left: 1.5rem; }
+        .article-body li { margin-bottom: 0.5rem; }
+        .article-body strong { color: var(--text-primary); font-weight: 600; }
+        .article-body em { font-style: italic; }
+        .article-body blockquote { border-left: 3px solid var(--accent); background: var(--accent-subtle); padding: 1rem 1.25rem; margin: 1.5rem 0; border-radius: 0 0.375rem 0.375rem 0; }
+        .article-body blockquote p { margin-bottom: 0; color: var(--text-primary); font-size: 1rem; }
+        .article-body code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-elevated); padding: 0.125rem 0.375rem; border-radius: 0.25rem; color: #e2e8f0; }
+        .article-body pre { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 0.375rem; padding: 1.25rem; overflow-x: auto; margin-bottom: 1.5rem; font-family: var(--font-mono); font-size: 0.875rem; line-height: 1.7; color: var(--text-secondary); }
+        .article-body pre code { background: none; padding: 0; border-radius: 0; font-size: inherit; }
+        .article-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+        .article-body a:hover { color: var(--accent-hover); }
+        .article-body hr { border: none; border-top: 1px solid var(--border-subtle); margin: 2.5rem 0; }
+        .article-body table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.9375rem; }
+        .article-body th, .article-body td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+        .article-body th { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+        .article-body td { color: var(--text-secondary); }
+        .article-body .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; }
+        .article-body .table-wrap table { margin-bottom: 0; }
+
+        .article-body .disclaimer { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 0.375rem; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.9375rem; color: var(--text-muted); }
+
+        .tldr { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 0.5rem; padding: 1.5rem 2rem; margin-bottom: 1.5rem; }
+        .tldr h2 { margin-top: 0 !important; }
+
+        .article-back { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.9375rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 3rem; transition: color var(--transition-fast); }
+        .article-back:hover { color: var(--text-primary); }
+
+        .article-cta { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 0.5rem; padding: 2.5rem; text-align: center; margin-bottom: 4rem; }
+        .article-cta h3 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .article-cta p { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .article-cta .btn { text-decoration: none; color: #fff; }
+
+        .footer { padding: 4rem 0 2rem; border-top: 1px solid var(--border-subtle); }
+        .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 2rem; margin-bottom: 3rem; }
+        .footer-brand { max-width: 280px; }
+        .footer-logo { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .footer-logo svg { color: var(--accent); }
+        .footer-brand p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+        .footer-links { display: flex; flex-wrap: wrap; gap: 3rem; }
+        .footer-links-group .footer-heading { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; }
+        .footer-links-group ul { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+        .footer-links-group a { font-size: 0.875rem; color: var(--text-secondary); transition: color var(--transition-fast); }
+        .footer-links-group a:hover { color: var(--text-primary); }
+        .footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle); font-size: 0.875rem; color: var(--text-muted); }
+
+        @media (max-width: 640px) {
+            .footer-content { flex-direction: column; }
+            .footer-links { flex-direction: column; gap: 2rem; }
+            .footer-bottom { flex-direction: column; text-align: center; }
+        }
+    </style>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "BlogPosting",
+          "headline": "How I Registered My Hungarian Business on SAM.gov: A Complete Guide for Foreign Entities",
+          "description": "Step-by-step guide to SAM.gov registration for non-U.S. businesses. How to get an NCAGE code, navigate entity registration, and start bidding on federal contracts.",
+          "datePublished": "2026-02-25",
+          "author": {
+            "@type": "Organization",
+            "name": "GovTrove",
+            "url": "https://govtrove.com"
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "GovTrove",
+            "url": "https://govtrove.com"
+          },
+          "url": "https://govtrove.com/blog/sam-gov-foreign-entity-registration.html",
+          "mainEntityOfPage": "https://govtrove.com/blog/sam-gov-foreign-entity-registration.html"
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How long does SAM.gov registration take for foreign entities?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Expect 2-4 weeks from start to finish. Most of that time is waiting: 3-10 business days for your NCAGE code, 1-10 days for the DLA sync, and 2-10 days for SAM.gov to process your entity registration. The actual hands-on work is about 3-4 hours spread across a few sessions."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can a foreign company register on SAM.gov?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Foreign businesses can register on SAM.gov and compete for U.S. federal contracts. You'll need an NCAGE code (the international equivalent of a CAGE code) before starting registration. The process is free and open to any legal business entity regardless of country."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Do foreign companies need a CAGE or NCAGE code?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Foreign companies need an NCAGE code, not a CAGE code. CAGE codes are for U.S. entities; NCAGE codes are the international equivalent. You request an NCAGE code through the NATO Support and Procurement Agency (NSPA), which routes your request to your country's National Codification Bureau for approval."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is SAM.gov registration really free?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, SAM.gov registration is completely free. There is no fee to register, renew, or maintain your entity registration. Third-party companies charge $500-$2,000 to do the registration for you, but the process itself costs nothing. The SAM.gov confirmation page literally states 'FREE' in capital letters multiple times."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+    <script>if(!localStorage.getItem('govtrove_notrack'))document.write('<script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"><\/script>')</script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="container nav-inner">
+            <a href="/" class="nav-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                GovTrove
+            </a>
+            <ul class="nav-links">
+                <li><a href="/#features">Features</a></li>
+                <li><a href="/#pricing">Pricing</a></li>
+                <li><a href="/#faq">FAQ</a></li>
+                <li><a href="/blog/" class="active">Blog</a></li>
+            </ul>
+            <a href="https://app.govtrove.com" class="btn btn-primary nav-cta">Start Searching</a>
+            <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Toggle menu">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <div class="nav-mobile-menu" id="mobile-menu">
+        <ul>
+            <li><a href="/#features" class="mobile-link">Features</a></li>
+            <li><a href="/#pricing" class="mobile-link">Pricing</a></li>
+            <li><a href="/#faq" class="mobile-link">FAQ</a></li>
+            <li><a href="/blog/" class="mobile-link">Blog</a></li>
+        </ul>
+        <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
+    </div>
+
+    <main>
+        <article>
+            <header class="article-header">
+                <div class="article-container">
+                    <div class="article-meta">
+                        <span class="article-category category-guide">Guide</span>
+                        <span class="article-meta-separator">&middot;</span>
+                        <span class="article-date">February 25, 2026</span>
+                        <span class="article-meta-separator">&middot;</span>
+                        <span class="article-reading-time">25 min read</span>
+                    </div>
+                    <h1>How I Registered My Hungarian Business on SAM.gov: A Complete Guide for Foreign Entities</h1>
+                    <p class="article-subtitle">Everything I learned getting a non-U.S. sole proprietorship registered in the U.S. federal contracting system &mdash; so you don't have to figure it out yourself.</p>
+                </div>
+            </header>
+
+            <div class="article-body">
+                <div class="article-container">
+
+                    <div class="disclaimer">This guide reflects my experience as of February 2026. SAM.gov's interface and policies may change &mdash; always verify current requirements directly on <a href="https://sam.gov">SAM.gov</a>.</div>
+
+                    <p>If you're a business outside the United States and you want to compete for U.S. federal contracts, you need to register on <strong><a href="https://sam.gov">SAM.gov</a></strong> (the System for Award Management). It's free, it's mandatory, and it's one of the most frustrating bureaucratic processes I've ever been through.</p>
+
+                    <p>I run a small software business in Budapest, Hungary, registered as an <em>egyéni vállalkozó</em> (sole proprietorship). It took me about two weeks from start to finish. This guide documents every step, every surprise, and every dead end &mdash; because the official documentation assumes you're American and already know how this works.</p>
+
+                    <div class="tldr">
+                        <h2>TL;DR</h2>
+                        <ul>
+                            <li>Foreign entities need an <strong>NCAGE code</strong> before registering on SAM.gov</li>
+                            <li>The code must sync from <strong>NSPA &rarr; DLA</strong> before SAM.gov recognizes it</li>
+                            <li>Don't select <strong>"Foreign Owned"</strong> unless you have a foreign parent company</li>
+                            <li><strong>EFT and TIN are optional</strong> for non-U.S. entities</li>
+                            <li>Don't request roles until your entity registration is <strong>fully active</strong></li>
+                            <li>Total time: <strong>~2&ndash;4 weeks</strong> (mostly waiting)</li>
+                        </ul>
+                    </div>
+
+                    <h2>What You'll Need Before Starting</h2>
+
+                    <ul>
+                        <li>A <strong>legal business entity</strong> in your country (sole proprietorship, LLC, Ltd, GmbH &mdash; whatever structure you have)</li>
+                        <li>A <strong>login.gov account</strong> (SAM.gov uses login.gov for authentication &mdash; create one at <a href="https://login.gov">login.gov</a>)</li>
+                        <li>Your business's <strong>official registered name</strong>, exactly as it appears in your country's business registry</li>
+                        <li>Your <strong>business address</strong> and <strong>contact information</strong></li>
+                        <li><strong>Patience</strong> &mdash; you'll be dealing with your country's defense bureaucracy and the U.S. federal system simultaneously</li>
+                    </ul>
+
+                    <h2>The Process at a Glance</h2>
+
+                    <p>Here's what the full chain looks like:</p>
+
+<pre><code>NCAGE Code Request &rarr; National Codification Bureau Approval &rarr; NCAGE Assigned
+&rarr; Wait for DLA Sync &rarr; SAM.gov Entity Registration &rarr; DLA Validation
+&rarr; Registration Active &rarr; You Can Bid on Federal Contracts</code></pre>
+
+                    <p><strong>Realistic timeline:</strong> 2&ndash;4 weeks, mostly waiting. The actual hands-on work is about 3&ndash;4 hours spread across a few sessions.</p>
+
+                    <hr>
+
+                    <h2>Phase 1: Get an NCAGE Code</h2>
+
+                    <h3>What Is an NCAGE Code and Why Do I Need One?</h3>
+
+                    <p>NCAGE stands for <strong>NATO Commercial and Government Entity</strong>. It's a five-character alphanumeric code that identifies your organization in the NATO/U.S. defense supply chain. Think of it as an international business ID for government contracting.</p>
+
+                    <p>U.S. companies get a CAGE code. Everyone else gets an NCAGE code. They're part of the same system, managed by the <strong>Defense Logistics Agency (DLA)</strong>.</p>
+
+                    <p><strong>You cannot register on SAM.gov as a foreign entity without one.</strong> The registration form has a mandatory NCAGE field, and it validates the code against DLA's database in real time. No code, no registration.</p>
+
+                    <h3>Step 1: Submit a Request Through NSPA</h3>
+
+                    <p>Go to the <strong>NATO Support and Procurement Agency (NSPA)</strong> ePortal:</p>
+
+                    <p><a href="https://eportal.nspa.nato.int/Codification/CageTool/home">https://eportal.nspa.nato.int/Codification/CageTool/home</a></p>
+
+                    <p>First, <strong>search for your entity</strong> &mdash; you may already have an NCAGE code if your business has ever done any work involving NATO countries. Search by your organization name.</p>
+
+                    <p>If you don't have one, click <strong>"Request New CAGE"</strong> and fill out the form:</p>
+
+                    <ul>
+                        <li><strong>Organization name</strong> &mdash; Your legal business name, exactly as registered. NATO systems store everything in uppercase, but enter it normally &mdash; they'll convert it.</li>
+                        <li><strong>Address</strong> &mdash; Your official business address</li>
+                        <li><strong>Country</strong> &mdash; Your country of incorporation</li>
+                        <li><strong>Contact information</strong> &mdash; Name, phone, email</li>
+                        <li><strong>Business type</strong> &mdash; Manufacturer, distributor, service provider, etc.</li>
+                    </ul>
+
+                    <p>Submit and wait. Here's where it gets interesting.</p>
+
+                    <h3>Step 2: Your Country's National Codification Bureau Gets Involved</h3>
+
+                    <p>NSPA doesn't process your request directly. They route it to your country's <strong>National Codification Bureau (NCB)</strong> &mdash; a government office (usually under the Ministry of Defence) responsible for managing NCAGE codes for entities in that country.</p>
+
+                    <p>In my case, the Hungarian NCB is the <strong>MH ARB Termékazonosítási és Törzskarbantartó Osztály</strong>, part of the Hungarian Ministry of Defence.</p>
+
+                    <p>Within a couple of days, I got an email. Not an approval &mdash; a pushback.</p>
+
+                    <h3>When Your NCB Pushes Back</h3>
+
+                    <p>The Hungarian NCB's default policy is that NCAGE codes are issued <strong>"exclusively after contract signing"</strong> (<em>kizárólag a szerződéskötést követően</em>). In other words: you need a government contract to get a code, but you need a code to register on SAM.gov, and you need SAM.gov registration to bid on contracts. Classic catch-22.</p>
+
+                    <p>However, the email also listed <strong>exceptions</strong>. One of them: <strong>bidding on tenders in the United States</strong> (<em>Az Amerikai Egyesült Államokban benyújtandó pályázatok</em>).</p>
+
+                    <p>This is the exception you want. SAM.gov entity registration is a prerequisite for any U.S. federal contracting activity. You're not trying to get a code for fun &mdash; the U.S. system requires it before you can even see or respond to opportunities.</p>
+
+                    <p><strong>What I included in my response:</strong></p>
+
+                    <ul>
+                        <li>Explained that SAM.gov requires an NCAGE code for non-U.S. entity registration</li>
+                        <li>Referenced the SAM.gov Entity Registration Checklist (downloadable from <a href="https://sam.gov">sam.gov</a>) which lists NCAGE as a mandatory field</li>
+                        <li>Stated that my intention is to register for U.S. federal contracting opportunities</li>
+                    </ul>
+
+                    <p>It worked. A day later, they sent me a questionnaire.</p>
+
+                    <blockquote><p><strong>Your experience may vary.</strong> Every country's NCB has different policies. Some may approve immediately, others may have similar gatekeeping. If your NCB doesn't have a clear exception for U.S. tenders, the argument is the same: SAM.gov requires the code, and you can't register without it.</p></blockquote>
+
+                    <h3>Step 3: The Questionnaire</h3>
+
+                    <p>The Hungarian NCB sent me a Word document &mdash; an NCAGE data entry form (<em>NCAGE adatbeviteli kérdőív</em>). Your country's form will be different, but the information requested is similar:</p>
+
+                    <ul>
+                        <li><strong>Purpose of request</strong> &mdash; New NCAGE code application (not a modification)</li>
+                        <li><strong>Reason for request</strong> &mdash; Foreign tender / bidding abroad</li>
+                        <li><strong>Business activity</strong> &mdash; Service provider (for a software company)</li>
+                        <li><strong>Contact person</strong> &mdash; Name, phone, email</li>
+                        <li><strong>Company details</strong> &mdash; Official registered name, full address with postal code, city, and country</li>
+                    </ul>
+
+                    <p>I filled it out and emailed it back to the NCB. Three calendar days later &mdash; including a weekend &mdash; I had my NCAGE code. A lieutenant colonel signed off on it personally. The Hungarian military doesn't mess around.</p>
+
+                    <h3>Step 4: Wait for the Code to Reach SAM.gov</h3>
+
+                    <p>Here's a gotcha that cost me a few days: <strong>your NCAGE code existing in NATO's system doesn't mean SAM.gov can see it yet.</strong></p>
+
+                    <p>The code needs to sync from NSPA to the <strong>Defense Logistics Agency (DLA)</strong> in the United States. SAM.gov validates against DLA's database, not NSPA's. This sync can take <strong>1&ndash;10 additional business days</strong>.</p>
+
+                    <p>You can check the status at:</p>
+
+                    <ul>
+                        <li><strong>NSPA:</strong> <a href="https://eportal.nspa.nato.int/Codification/CageTool/home">eportal.nspa.nato.int/Codification/CageTool/home</a> &mdash; search by your organization name</li>
+                        <li><strong>DLA:</strong> <a href="https://cage.dla.mil/Search">cage.dla.mil/Search</a> &mdash; search by your NCAGE code</li>
+                    </ul>
+
+                    <p>When the code appears at cage.dla.mil, SAM.gov should recognize it.</p>
+
+                    <blockquote><p><strong>Tip:</strong> If your code is visible in NSPA but DLA doesn't have it after a few business days, email <strong>dlacontactcenter@dla.mil</strong> with your NCAGE code, entity name, and address. I did this and it may have helped speed things up. Include your NCAGE code, organization name, city, and country in the email so they can look it up immediately.</p></blockquote>
+
+                    <h3>Step 5: Verify on SAM.gov</h3>
+
+                    <p>Once the code is in DLA's system:</p>
+
+                    <ol>
+                        <li>Log into <a href="https://sam.gov">sam.gov</a></li>
+                        <li>Go to <strong>Workspace &rarr; Entity Registration</strong></li>
+                        <li>Start a new registration</li>
+                        <li>When it asks for your NCAGE code, enter it</li>
+                    </ol>
+
+                    <p>If SAM.gov accepts it and pulls up your entity name and address, you're ready for Phase 2.</p>
+
+                    <hr>
+
+                    <h2>Phase 2: SAM.gov Entity Registration</h2>
+
+                    <p>This is the main event. SAM.gov's entity registration is a multi-section form covering your business details, structure, financials, contacts, and a long series of compliance certifications. It looks overwhelming, but for a foreign entity with no existing U.S. government contracts, most sections are simplified.</p>
+
+                    <h3>Choosing Your Registration Type</h3>
+
+                    <p>SAM.gov asks what you're registering for. Select <strong>"All Awards"</strong> &mdash; this covers both federal contracts (what you're here for) and financial assistance (grants). Even if you only want contracts, "All Awards" gives you the most flexibility.</p>
+
+                    <h3>Section by Section</h3>
+
+                    <p>I'll go through every section in order, noting what I entered as a Hungarian sole proprietor and what's different for foreign entities.</p>
+
+                    <hr>
+
+                    <h3>Business Information</h3>
+
+                    <p>Your basic entity details. Most of this is straightforward.</p>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Field</th><th>What I Entered</th><th>Notes</th></tr></thead>
+                        <tbody>
+                            <tr><td>Entity Start Date</td><td>My business registration date</td><td>When your entity was legally established</td></tr>
+                            <tr><td>Fiscal Year End</td><td>12/31</td><td>Calendar year &mdash; use whatever your actual fiscal year end is</td></tr>
+                            <tr><td>Entity Division Name</td><td><em>(blank)</em></td><td>Not applicable for a sole proprietorship</td></tr>
+                            <tr><td>Entity Division Number</td><td><em>(blank)</em></td><td>Same</td></tr>
+                            <tr><td>Entity URL</td><td><em>(blank)</em></td><td>Optional &mdash; add your website if you have one</td></tr>
+                            <tr><td>Congressional District</td><td>Not Applicable</td><td>Automatic for foreign entities</td></tr>
+                            <tr><td>Physical Address</td><td>My Budapest business address</td><td>Must match or closely resemble your NCAGE registration address</td></tr>
+                            <tr><td>Mailing Address</td><td>Same as physical</td><td>Can be different if needed</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <blockquote><p><strong>Address note:</strong> SAM.gov will uppercase your address and may mangle special characters (accented letters, etc.). As long as it's recognizable for mail delivery, don't worry about formatting.</p></blockquote>
+
+                    <hr>
+
+                    <h3>Taxpayer Information</h3>
+
+                    <p><strong>Good news:</strong> As a non-U.S. entity, you don't need a U.S. Taxpayer Identification Number (TIN) or Employer Identification Number (EIN). The TIN/EIN field and IRS consent section are only for U.S. entities.</p>
+
+                    <p>This also means you skip the <strong>IRS validation step</strong>, which typically adds 2&ndash;5 business days to the registration timeline for U.S. registrants. One fewer bureaucracy to wait for.</p>
+
+                    <hr>
+
+                    <h3>Business Types</h3>
+
+                    <p>This is where you classify your entity's structure. Watch out for a subtle trap here.</p>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Classification</th><th>What I Selected</th></tr></thead>
+                        <tbody>
+                            <tr><td>Country of Incorporation</td><td>Hungary</td></tr>
+                            <tr><td>Entity Structure</td><td>Sole Proprietorship</td></tr>
+                            <tr><td>Profit Structure</td><td>For Profit Organization</td></tr>
+                            <tr><td>Entity Type</td><td>Business or Organization</td></tr>
+                            <tr><td>Organization Factors</td><td><strong>Not Applicable</strong></td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>The "Foreign Owned" Trap</h4>
+
+                    <p>When I saw "Foreign Owned" listed under Organization Factors, I thought &mdash; obviously, I'm a foreign business, I should select this. <strong>Don't.</strong></p>
+
+                    <p>In SAM.gov's terminology, <strong>"Foreign Owned" means your entity is owned or controlled by another foreign entity</strong> &mdash; a foreign parent company. It doesn't mean "incorporated outside the U.S."</p>
+
+                    <p>I selected it initially, and later got hit with a validation error at submission: the system complained that I said I'm "Foreign Owned" in Business Types but didn't list a foreign owner in Entity Relationships. Because there is no foreign owner &mdash; I'm a sole proprietorship.</p>
+
+                    <p>The fix: change Organization Factors to <strong>"Not Applicable"</strong>. Your country of incorporation (Hungary, or wherever you are) already communicates your foreign entity status. No need for the "Foreign Owned" flag unless another company actually owns yours.</p>
+
+                    <h4>Socioeconomic Categories</h4>
+
+                    <p>Most U.S.-specific socioeconomic designations don't apply to foreign entities:</p>
+
+                    <ul>
+                        <li>SBA certifications (8(a), HUBZone, WOSB, SDVOSB, etc.) &mdash; U.S. programs only</li>
+                        <li>Minority-owned, veteran-owned &mdash; U.S. designations</li>
+                        <li>Small business status &mdash; Determined by SBA size standards; as a foreign entity, you'll likely be classified as "other than small"</li>
+                    </ul>
+
+                    <p>I left everything blank or "Not Applicable" in this section.</p>
+
+                    <hr>
+
+                    <h3>Entity Relationships</h3>
+
+                    <p>Two simple questions for a sole proprietorship:</p>
+
+                    <ol>
+                        <li><strong>"Does another entity own or control the entity you are registering?"</strong> &rarr; <strong>No</strong></li>
+                        <li><strong>"Are you a successor to a predecessor that held a federal contract or grant within the last 3 years?"</strong> &rarr; <strong>No</strong></li>
+                    </ol>
+
+                    <p>If you have a parent company, this section is more involved &mdash; you'll need their NCAGE code and details.</p>
+
+                    <hr>
+
+                    <h3>Financial Information</h3>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Field</th><th>What I Entered</th></tr></thead>
+                        <tbody>
+                            <tr><td>Accept Credit Cards as Payment</td><td>No</td></tr>
+                            <tr><td>Delinquent Federal Debt</td><td>No</td></tr>
+                            <tr><td>Electronic Funds Transfer (EFT)</td><td>Left blank</td></tr>
+                            <tr><td>Remittance Address</td><td>My Budapest business address</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <p><strong>EFT banking details are optional for non-U.S. entities.</strong> You only need them if you're expecting to receive payments from the U.S. government. I left the bank account fields blank &mdash; I can add them later if I actually win a contract.</p>
+
+                    <p><strong>Executive Compensation:</strong> Two questions about whether 80%+ of your revenue comes from U.S. federal sources exceeding $25M. The answer is No (and if you're reading this guide, it's No for you too).</p>
+
+                    <hr>
+
+                    <h3>Points of Contact</h3>
+
+                    <p>SAM.gov requires four mandatory Points of Contact (POCs). As a sole proprietor, <strong>I listed myself for all four:</strong></p>
+
+                    <ol>
+                        <li><strong>Accounts Receivable POC</strong> &mdash; Who receives payment-related communications</li>
+                        <li><strong>Electronic Business POC</strong> &mdash; Who manages the SAM.gov registration. <strong>This email receives renewal reminders</strong> &mdash; use one you actively monitor.</li>
+                        <li><strong>Government Business POC</strong> &mdash; Contact for contracting officers. <strong>Critical:</strong> If DLA has questions during registration processing, they contact this person via @dla.mil email. Respond quickly or your registration gets sent back.</li>
+                        <li><strong>Sole Proprietorship POC</strong> &mdash; Required because I selected Sole Proprietorship as my entity structure. If you're registering a company, you may see a different fourth POC.</li>
+                    </ol>
+
+                    <p>For each POC you need: first name, last name, email, phone number (U.S. or non-U.S.), and for some POCs an address.</p>
+
+                    <blockquote><p><strong>Tip:</strong> Use a professional email if possible. I used my personal Gmail because it was convenient, but a business domain email (you@yourbusiness.com) looks more credible to contracting officers who might look you up.</p></blockquote>
+
+                    <hr>
+
+                    <h3>Financial Assistance Response</h3>
+
+                    <p><strong>"Does your entity wish to apply for a Federal financial assistance project or program?"</strong> &rarr; <strong>No</strong></p>
+
+                    <p>Unless you're also applying for U.S. federal grants, skip this.</p>
+
+                    <hr>
+
+                    <h3>Representations and Certifications</h3>
+
+                    <p>This is the longest, most intimidating part. It uses a legacy interface that looks like it hasn't been updated since the early 2000s. You'll answer roughly 40+ questions across multiple sections about your compliance with the Federal Acquisition Regulation (FAR) and Defense FAR Supplement (DFARS).</p>
+
+                    <p>For a foreign entity with no U.S. contracting history, the vast majority of answers are <strong>No</strong> or <strong>Not Applicable</strong>. I'll walk through what I entered.</p>
+
+                    <h4>FAR Response 1 (Questions 1&ndash;4)</h4>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Q</th><th>Topic</th><th>My Answer</th></tr></thead>
+                        <tbody>
+                            <tr><td>1</td><td>Certificate of Independent Price Determination</td><td>Added my name as the responsible person</td></tr>
+                            <tr><td>2</td><td>Other facilities (government-owned or government-furnished)</td><td>No</td></tr>
+                            <tr><td>3</td><td>Taxpayer Identification</td><td>Not required for non-U.S. &mdash; informational only</td></tr>
+                            <tr><td>4</td><td>EPA recovered materials (manufacturing)</td><td>No &mdash; software/services, not physical products</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>FAR Response 2 (Questions 5&ndash;17)</h4>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Q</th><th>Topic</th><th>My Answer</th></tr></thead>
+                        <tbody>
+                            <tr><td>5</td><td>Small business status</td><td>Auto-determined by the system</td></tr>
+                            <tr><td>6</td><td>Common parent consolidated tax return</td><td>No</td></tr>
+                            <tr><td>7</td><td>Debarment or suspension</td><td>No</td></tr>
+                            <tr><td>8</td><td>Fraud convictions or civil judgments</td><td>No</td></tr>
+                            <tr><td>8b</td><td>Delinquent federal taxes over $3,500</td><td>No</td></tr>
+                            <tr><td>9</td><td>Currently indicted or charged</td><td>No</td></tr>
+                            <tr><td>10</td><td>Terminated for cause in last 3 years</td><td>No</td></tr>
+                            <tr><td>11</td><td>HUBZone Joint Venture</td><td>None</td></tr>
+                            <tr><td>12&ndash;16</td><td>Joint venture participation</td><td>Auto-determined</td></tr>
+                            <tr><td>17</td><td>Limited rights data or restricted software</td><td>No</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>FAR Response 3 (Questions 18&ndash;26)</h4>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Q</th><th>Topic</th><th>My Answer</th></tr></thead>
+                        <tbody>
+                            <tr><td>18&ndash;20</td><td>Auto-determined or reserved</td><td>Skipped</td></tr>
+                            <tr><td>21</td><td>Forced or child labor products</td><td>No</td></tr>
+                            <tr><td>23</td><td>Foreign nondomestic end products</td><td>No &mdash; services, not physical goods</td></tr>
+                            <tr><td>26</td><td>IT equipment maintenance or calibration</td><td>No</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>FAR Response 4 (Questions 27&ndash;35)</h4>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Q</th><th>Topic</th><th>My Answer</th></tr></thead>
+                        <tbody>
+                            <tr><td>27</td><td>Service Contract Labor Standards</td><td>No</td></tr>
+                            <tr><td>28</td><td>PSC manufacturing</td><td>Auto-determined</td></tr>
+                            <tr><td>29</td><td>Inverted domestic corporation</td><td>No</td></tr>
+                            <tr><td>30</td><td>Subsidiary of inverted domestic corporation</td><td>No</td></tr>
+                            <tr><td>32</td><td>Unpaid federal tax liability</td><td>No</td></tr>
+                            <tr><td>33</td><td>Felony conviction in last 24 months</td><td>No</td></tr>
+                            <tr><td>35</td><td>Covered telecommunications equipment or services</td><td>No (both parts)</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>Defense Response (Questions 37&ndash;46)</h4>
+
+                    <p>This section appears because I selected "All Awards" registration.</p>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Q</th><th>Topic</th><th>My Answer</th><th>Notes</th></tr></thead>
+                        <tbody>
+                            <tr><td>37</td><td>Interested in DoD contracts</td><td>Yes</td><td>Select Yes if you want to keep your options open for defense work</td></tr>
+                            <tr><td>38</td><td>Sea transport</td><td>No</td><td></td></tr>
+                            <tr><td>39</td><td>Foreign government wage rates</td><td>Not Applicable</td><td></td></tr>
+                            <tr><td>40</td><td>Foreign government ownership or control</td><td>No</td><td>Unless your government actually owns your business</td></tr>
+                            <tr><td>41&ndash;44</td><td>Satellite operations and services</td><td>No (all four)</td><td></td></tr>
+                            <tr><td>45</td><td>Employing severely disabled individuals</td><td>No</td><td></td></tr>
+                            <tr><td>46</td><td>GAAP compliance</td><td>No</td><td>You follow your country's accounting standards, not U.S. GAAP. This is disclosure only &mdash; it doesn't block registration.</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <h4>Review FAR/DFARS Provisions</h4>
+
+                    <p>After the questionnaires, you'll see a long page listing ~40+ FAR and DFARS provisions. These are read-only standard clauses that apply to all registrants. There's a certification checkbox at the bottom.</p>
+
+                    <p>The certification attests that the answers you provided in the FAR Responses and Defense Response are accurate. Check the box.</p>
+
+                    <blockquote><p><strong>Reality:</strong> This page is intimidating by volume alone. Nobody reads every clause during registration. The substance is in the answers you already provided &mdash; this page just lists the legal provisions those answers relate to.</p></blockquote>
+
+                    <hr>
+
+                    <h2>Phase 3: Submit and Wait</h2>
+
+                    <h3>The Entity Review Page</h3>
+
+                    <p>After completing all sections, you reach the <strong>Entity Review</strong> &mdash; a summary of your entire registration. Scroll through and check:</p>
+
+                    <ul>
+                        <li>Your NCAGE code is correct</li>
+                        <li>Your address is recognizable</li>
+                        <li>Your NAICS codes are right</li>
+                        <li>Your POC information is accurate</li>
+                    </ul>
+
+                    <h4>If You Hit Validation Errors</h4>
+
+                    <p>I hit one. Red text appeared at the top saying the Entity Relationships section was incomplete &mdash; even though I had already filled it out. The fix was to go back to that section, re-enter my answers, and save through again. The system sometimes doesn't persist your answers properly on the first pass.</p>
+
+                    <p>If you get validation errors, click the link in the red text to go to the offending section, re-enter your answers, save, and return to the Entity Review page.</p>
+
+                    <h3>Submitting</h3>
+
+                    <p>Click <strong>Submit</strong>. SAM.gov sends a One-Time Password (OTP) to your email for identity confirmation. Enter it, and you're done.</p>
+
+                    <p>You'll see a confirmation page with your submission timestamp and a summary of what happens next.</p>
+
+                    <h3>What Happens After Submission</h3>
+
+                    <ol>
+                        <li><strong>IRS Validation &mdash; Skipped</strong> for foreign entities (no TIN provided). This saves 2&ndash;5 business days compared to U.S. registrants.</li>
+                        <li><strong>DLA CAGE/NCAGE Validation</strong> &mdash; The Defense Logistics Agency verifies your NCAGE code. Since yours was already assigned, this should be faster than a brand-new assignment. <strong>Expect 2&ndash;10 business days.</strong> Watch for emails from @sam.gov and @dla.mil.</li>
+                        <li><strong>Registration Goes Active</strong> &mdash; You'll receive a confirmation email from @sam.gov.</li>
+                    </ol>
+
+                    <blockquote><p><strong>Important:</strong> If DLA has questions, they'll email the <strong>Government Business POC</strong> (from an @dla.mil address). Respond immediately. If you take too long, your registration status changes to "Work in Progress" and you have to resubmit. Make sure this email doesn't end up in your spam folder.</p></blockquote>
+
+                    <h3>While You Wait</h3>
+
+                    <p>There's nothing to do except monitor your email. You can check your registration status anytime at:</p>
+
+                    <ol>
+                        <li>Go to <a href="https://sam.gov">sam.gov</a> &rarr; Sign In</li>
+                        <li>Click <strong>"Check Entity Status"</strong> (linked in the footer under Customer Service)</li>
+                        <li>Enter your UEI (Unique Entity ID &mdash; assigned when you started registration)</li>
+                    </ol>
+
+                    <hr>
+
+                    <h2>Phase 4: After Your Registration Goes Active</h2>
+
+                    <p>Once your entity registration is active, you'll want to set up <strong>roles</strong> for your account. Roles determine what you can do within SAM.gov &mdash; viewing contract opportunities, managing your entity, etc.</p>
+
+                    <h3>Requesting Roles &mdash; Don't Do It Too Early</h3>
+
+                    <p>This is a mistake I made. While my entity registration was still being processed, I went to <strong>Workspace &rarr; Profile &rarr; My Roles &rarr; Request Role</strong> and submitted a request for the <strong>Contract Opportunities Viewer</strong> role.</p>
+
+                    <p>The request showed up as "pending" on my profile. But it never appeared on the entity administration side &mdash; meaning there was nobody who could approve it. The request was stuck in limbo: visible to me, invisible to the system. I couldn't approve it as entity admin, and I couldn't cancel it cleanly.</p>
+
+                    <p><strong>The lesson: wait until your entity registration is fully active before requesting any roles.</strong> Submitting role requests while the entity is still in "Submitted" or processing status can result in orphaned requests that don't route properly.</p>
+
+                    <h3>The Workaround: A Second SAM.gov Account</h3>
+
+                    <p>To fix the stuck role situation, I ended up creating a <strong>second SAM.gov account</strong> using a business email address (as opposed to the personal Gmail I used for the original account). I then added this second user to my entity through the entity administration panel.</p>
+
+                    <p>This isn't what I'd recommend &mdash; it's what I had to do because I jumped the gun on the role request. If you wait until your registration is active, you should be able to request and approve roles from a single account without issues.</p>
+
+                    <blockquote><p><strong>If you're a sole operator:</strong> Having a second SAM.gov account associated with your entity isn't a bad thing in practice. It gives you a backup login in case you lose access to your primary account, and some SAM.gov features (like system accounts) require a second registered user. But do it intentionally, not as a workaround for a mistake.</p></blockquote>
+
+                    <h3>Roles You May Want to Request</h3>
+
+                    <p>Once your registration is active, go to <strong>Workspace &rarr; Profile &rarr; My Roles &rarr; Request Role</strong> and consider:</p>
+
+                    <ul>
+                        <li><strong>Contract Opportunities &rarr; Viewer</strong> &mdash; Read access to contract opportunity data</li>
+                        <li><strong>Entity Registration &rarr; Viewer</strong> &mdash; View (but not edit) your entity's registration details</li>
+                    </ul>
+
+                    <p>Your account should already have an <strong>Administrator</strong> role for your entity (auto-assigned during registration). This lets you manage your entity's registration and approve role requests from other users.</p>
+
+                    <hr>
+
+                    <h2>My Timeline</h2>
+
+                    <p>Here's how it actually played out for me, registering a Hungarian sole proprietorship:</p>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Day</th><th>What Happened</th></tr></thead>
+                        <tbody>
+                            <tr><td>Day 1 (Feb 6)</td><td>Started researching SAM.gov registration requirements for non-U.S. entities</td></tr>
+                            <tr><td>Day 5 (Feb 10)</td><td>Submitted NCAGE request via NSPA ePortal</td></tr>
+                            <tr><td>Day 7 (Feb 12)</td><td>Hungarian NCB pushed back &mdash; required justification for why I need the code</td></tr>
+                            <tr><td>Day 7 (Feb 12)</td><td>Sent response citing SAM.gov registration requirement and the "foreign tenders" exception</td></tr>
+                            <tr><td>Day 8 (Feb 13)</td><td>NCB accepted justification, sent NCAGE data entry questionnaire</td></tr>
+                            <tr><td>Day 8 (Feb 13)</td><td>Returned completed questionnaire</td></tr>
+                            <tr><td>Day 11 (Feb 16)</td><td><strong>NCAGE code assigned</strong> (3 calendar days &mdash; surprisingly fast)</td></tr>
+                            <tr><td>Day 12 (Feb 17)</td><td>Code visible in NSPA but not in DLA/SAM.gov &mdash; emailed DLA to flag the sync</td></tr>
+                            <tr><td>Day 16 (Feb 21)</td><td>NCAGE code recognized by SAM.gov</td></tr>
+                            <tr><td>Day 16 (Feb 21)</td><td>Completed and submitted entire SAM.gov entity registration</td></tr>
+                            <tr><td>Day 16 (Feb 21)</td><td>Prematurely requested a role &mdash; mistake (see Phase 4)</td></tr>
+                            <tr><td>Day 16+</td><td>Waiting for DLA validation (estimated 2&ndash;10 business days)</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <p><strong>Total hands-on time:</strong> About 3&ndash;4 hours across multiple sessions. Most of the calendar time is waiting for government offices to process things.</p>
+
+                    <hr>
+
+                    <h2>Things I Wish I'd Known Before Starting</h2>
+
+                    <h3>1. The "Foreign Owned" Field Doesn't Mean What You Think</h3>
+
+                    <p>"Foreign Owned" in SAM.gov means <strong>owned by a foreign parent company</strong>, not "my business is based outside the U.S." If you're a sole proprietor or independent company with no parent entity, select "Not Applicable." Selecting "Foreign Owned" creates a validation conflict later.</p>
+
+                    <h3>2. Your NCAGE Code Has to Sync Between Two Systems</h3>
+
+                    <p>Your code being active in NATO's system (NSPA) doesn't mean SAM.gov can see it. It has to propagate to the U.S. Defense Logistics Agency (DLA) first. Budget an extra 1&ndash;10 business days for this, or contact DLA proactively at <strong>dlacontactcenter@dla.mil</strong>.</p>
+
+                    <h3>3. EFT Banking Details Are Optional</h3>
+
+                    <p>You don't need a U.S. bank account to complete registration. The Electronic Funds Transfer section is optional for non-U.S. entities. Fill it in when you actually need to receive payments.</p>
+
+                    <h3>4. No TIN = Faster Processing</h3>
+
+                    <p>Because foreign entities skip IRS validation, your registration processing is shorter by 2&ndash;5 business days compared to a U.S. entity. Small win.</p>
+
+                    <h3>5. SAM.gov Will Glitch on You</h3>
+
+                    <p>Expect transient errors, slow page loads, and mysterious validation messages. If something fails, just retry. If a section won't save, use "Save &amp; Exit" and come back from the dashboard. I hit at least three random errors during my registration &mdash; all resolved by retrying.</p>
+
+                    <h3>6. The Reps &amp; Certs Section Uses a Different (Older) Interface</h3>
+
+                    <p>When you reach Representations and Certifications, the UI suddenly looks like it's from 2003. Different styling, different layout, different navigation. Don't be alarmed &mdash; you're still in the same registration. The questions still auto-save, but click Save &amp; Continue at each step to be safe.</p>
+
+                    <h3>7. Don't Request Roles Until Your Entity Is Active</h3>
+
+                    <p>I requested a Contract Opportunities Viewer role while my entity registration was still processing. The request got stuck &mdash; visible on my profile as "pending" but invisible on the entity admin side, so nobody could approve it. I had to create a second SAM.gov account to work around the issue. Save yourself the hassle: wait until you get the "Registration Active" email before requesting any roles.</p>
+
+                    <h3>8. You Must Renew Every Year</h3>
+
+                    <p>SAM.gov registration expires after <strong>365 days</strong>. Your Electronic Business POC receives reminder emails starting about 60 days before expiration. If it lapses, you'll need to go through the renewal process to keep your registration active. Set a calendar reminder.</p>
+
+                    <h3>9. Your NCB May Be Surprisingly Helpful</h3>
+
+                    <p>I expected months of bureaucratic ping-pong with the Hungarian Ministry of Defence. Instead, they processed my NCAGE code in three calendar days, including a weekend. A lieutenant colonel personally signed off on it. Don't assume government offices will be slow &mdash; be prepared, be professional, respond quickly, and you might be pleasantly surprised.</p>
+
+                    <hr>
+
+                    <h2>Frequently Asked Questions</h2>
+
+                    <h3>How long does SAM.gov registration take for foreign entities?</h3>
+
+                    <p>Expect <strong>2&ndash;4 weeks</strong> from start to finish. Most of that time is waiting: 3&ndash;10 business days for your NCAGE code, 1&ndash;10 days for the DLA sync, and 2&ndash;10 days for SAM.gov to process your entity registration. The actual hands-on work is about 3&ndash;4 hours spread across a few sessions.</p>
+
+                    <h3>Can a foreign company register on SAM.gov?</h3>
+
+                    <p>Yes. Foreign businesses can register on SAM.gov and compete for U.S. federal contracts. You'll need an NCAGE code (the international equivalent of a CAGE code) before starting registration. The process is free and open to any legal business entity regardless of country.</p>
+
+                    <h3>Do foreign companies need a CAGE or NCAGE code?</h3>
+
+                    <p>Foreign companies need an <strong>NCAGE code</strong>, not a CAGE code. CAGE codes are for U.S. entities; NCAGE codes are the international equivalent. You request an NCAGE code through the <a href="https://eportal.nspa.nato.int/Codification/CageTool/home">NATO Support and Procurement Agency (NSPA)</a>, which routes your request to your country's National Codification Bureau for approval.</p>
+
+                    <h3>Is SAM.gov registration really free?</h3>
+
+                    <p>Yes, SAM.gov registration is <strong>completely free</strong>. There is no fee to register, renew, or maintain your entity registration. Third-party companies charge $500&ndash;$2,000 to do the registration for you, but the process itself costs nothing. The SAM.gov confirmation page literally states "FREE" in capital letters multiple times.</p>
+
+                    <hr>
+
+                    <h2>Useful Links</h2>
+
+                    <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Resource</th><th>URL</th></tr></thead>
+                        <tbody>
+                            <tr><td>SAM.gov</td><td><a href="https://sam.gov">sam.gov</a></td></tr>
+                            <tr><td>Login.gov (authentication)</td><td><a href="https://login.gov">login.gov</a></td></tr>
+                            <tr><td>NSPA NCAGE Request Tool</td><td><a href="https://eportal.nspa.nato.int/Codification/CageTool/home">eportal.nspa.nato.int/Codification/CageTool/home</a></td></tr>
+                            <tr><td>DLA CAGE/NCAGE Search</td><td><a href="https://cage.dla.mil/Search">cage.dla.mil/Search</a></td></tr>
+                            <tr><td>Federal Service Desk (support)</td><td><a href="https://www.fsd.gov">fsd.gov</a> / 866-606-8220 (toll-free) / 334-206-7828 (international)</td></tr>
+                            <tr><td>DLA Contact Center</td><td>dlacontactcenter@dla.mil</td></tr>
+                            <tr><td>Check Entity Status</td><td><a href="https://sam.gov">sam.gov</a> footer &rarr; "Check Entity Status"</td></tr>
+                        </tbody>
+                    </table>
+                    </div>
+
+                    <hr>
+
+                    <h2>Final Thoughts</h2>
+
+                    <p>The SAM.gov registration process for foreign entities is poorly documented, occasionally broken, and designed for an audience that doesn't include you. The confirmation page after submission literally shouts <strong>"FREE"</strong> in capital letters multiple times &mdash; because a predatory industry of third-party companies charges small businesses $500&ndash;$2,000 to do what you just read in this guide.</p>
+
+                    <p>It's free. It's doable. It just requires some persistence.</p>
+
+                    <p>The U.S. federal government spends over <strong>$700 billion annually</strong> on contracts. A meaningful share of that is open to foreign businesses, especially in IT services, software development, and technical consulting. The registration hurdle keeps many foreign companies out &mdash; not because they can't compete, but because the process is opaque enough to be discouraging.</p>
+
+                    <p>If you've made it through, you've already cleared the biggest barrier to entry. The next step is finding opportunities that match your capabilities &mdash; which is exactly what <a href="https://govtrove.com">GovTrove</a> is built for.</p>
+
+                    <a href="/blog/" class="article-back">&larr; Back to Blog</a>
+
+                    <div class="article-cta">
+                        <h3>Ready to find federal contracts?</h3>
+                        <p>Search U.S. government contract opportunities &mdash; faster and easier than SAM.gov.</p>
+                        <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="/" class="footer-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        GovTrove
+                    </a>
+                    <p>A free SAM.gov search alternative. Find federal contract opportunities in seconds, not hours.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-links-group">
+                        <p class="footer-heading">Product</p>
+                        <ul>
+                            <li><a href="/#features">Features</a></li>
+                            <li><a href="/#pricing">Pricing</a></li>
+                            <li><a href="/#faq">FAQ</a></li>
+                            <li><a href="/blog/">Blog</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links-group">
+                        <p class="footer-heading">Legal</p>
+                        <ul>
+                            <li><a href="/terms.html">Terms of Service</a></li>
+                            <li><a href="/privacy.html">Privacy Policy</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>Data sourced from SAM.gov</span>
+                <span>&copy; 2026 GovTrove. All rights reserved.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        var navToggle = document.getElementById('nav-toggle');
+        var mobileMenu = document.getElementById('mobile-menu');
+        var menuOpen = false;
+
+        navToggle.addEventListener('click', function() {
+            menuOpen = !menuOpen;
+            mobileMenu.classList.toggle('open', menuOpen);
+            navToggle.innerHTML = menuOpen
+                ? '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+                : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>';
+            document.body.style.overflow = menuOpen ? 'hidden' : '';
+        });
+
+        document.querySelectorAll('.mobile-link').forEach(function(link) {
+            link.addEventListener('click', function() {
+                menuOpen = false;
+                mobileMenu.classList.remove('open');
+                navToggle.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>';
+                document.body.style.overflow = '';
+            });
+        });
+    </script>
+</body>
+</html>
