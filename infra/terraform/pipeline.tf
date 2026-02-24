@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile", "generate-alerts"]
+  lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile", "generate-alerts", "ingest-api"]
 }
 
 # --- Lambda Zip Archives ---
@@ -36,6 +36,7 @@ resource "aws_lambda_function" "pipeline" {
       S3_BUCKET               = aws_s3_bucket.data.id
       AWS_REGION_NAME         = var.aws_region
       SENTRY_DSN              = var.sentry_pipeline_dsn
+      SAM_API_KEY_SECRET_ARN  = aws_secretsmanager_secret.sam_api_key.arn
     }
   }
 
@@ -84,7 +85,10 @@ resource "aws_iam_role_policy" "lambda_pipeline_base" {
         Sid      = "SecretsManager"
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [aws_secretsmanager_secret.database_url.arn]
+        Resource = [
+          aws_secretsmanager_secret.database_url.arn,
+          aws_secretsmanager_secret.sam_api_key.arn
+        ]
       }
     ]
   })
@@ -147,6 +151,7 @@ resource "aws_sfn_state_machine" "pipeline" {
     ingest_archived_arn    = aws_lambda_function.pipeline["ingest-archived"].arn
     reconcile_arn          = aws_lambda_function.pipeline["reconcile"].arn
     generate_alerts_arn    = aws_lambda_function.pipeline["generate-alerts"].arn
+    ingest_api_arn         = aws_lambda_function.pipeline["ingest-api"].arn
     sns_notifications_arn  = aws_sns_topic.notifications.arn
     sqs_dlq_url            = aws_sqs_queue.pipeline_dlq.url
   })

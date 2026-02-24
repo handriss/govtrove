@@ -28,6 +28,11 @@ resource "aws_iam_role_policy" "eventbridge_scheduler_sfn" {
         Effect   = "Allow"
         Action   = ["states:StartExecution"]
         Resource = [aws_sfn_state_machine.pipeline.arn]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["lambda:InvokeFunction"]
+        Resource = [aws_lambda_function.pipeline["ingest-api"].arn]
       }
     ]
   })
