@@ -81,7 +81,7 @@ var _ = Describe("API Enrichment E2E", Ordered, func() {
 			archivedRunID, err := simulateIngest(ctx, db, apiEnrichmentArchivedCSV, "ingest-archived", csvSnapshot)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = simulateReconcile(ctx, db, activeRunID, archivedRunID, csvSnapshot)
+			err = simulateReconcile(ctx, db, activeRunID, []uuid.UUID{archivedRunID}, csvSnapshot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 

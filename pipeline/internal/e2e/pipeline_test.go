@@ -50,7 +50,7 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("reconciles and upserts opportunities", func() {
-			err := simulateReconcile(ctx, db, activeRunID1, archivedRunID1, snapshotDate1)
+			err := simulateReconcile(ctx, db, activeRunID1, []uuid.UUID{archivedRunID1}, snapshotDate1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -146,7 +146,7 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("reconciles run 2", func() {
-			err := simulateReconcile(ctx, db, activeRunID2, archivedRunID2, snapshotDate2)
+			err := simulateReconcile(ctx, db, activeRunID2, []uuid.UUID{archivedRunID2}, snapshotDate2)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -263,7 +263,7 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("reconciles run 3", func() {
-			err := simulateReconcile(ctx, db, activeRunID3, archivedRunID3, snapshotDate3)
+			err := simulateReconcile(ctx, db, activeRunID3, []uuid.UUID{archivedRunID3}, snapshotDate3)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
