@@ -204,7 +204,7 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 		return false, fmt.Errorf("unmarshal filters: %w", err)
 	}
 
-	conditions := []string{"active = true"}
+	conditions := []string{"active = true", "is_latest = true"}
 	args := []any{}
 	argNum := 1
 
@@ -225,7 +225,7 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 	}
 
 	// Also get total result count (ignoring the created_at constraint)
-	totalConditions := []string{"active = true"}
+	totalConditions := []string{"active = true", "is_latest = true"}
 	totalArgs := []any{}
 	totalArgNum := 1
 	totalConditions, totalArgs, _ = appendFilterConditions(totalConditions, totalArgs, totalArgNum, f)
@@ -420,7 +420,7 @@ func (h *Handler) processOpportunityAlerts(ctx context.Context) (int, error) {
 	}
 	totalAlerts += amendments
 
-	// In-place changes via snap_changes
+	// In-place changes detected via versioned rows
 	changes, err := h.detectInPlaceChanges(ctx)
 	if err != nil {
 		return totalAlerts, fmt.Errorf("detect changes: %w", err)
@@ -489,64 +489,101 @@ func (h *Handler) detectAmendments(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-type changeRow struct {
+type versionChangeRow struct {
 	SavedOppID int
 	UserID     int
 	NoticeID   string
-	FieldName  string
-	OldValue   *string
-	NewValue   *string
+	// New version fields
+	NewTitle             *string
+	NewResponseDeadline  *time.Time
+	NewArchiveDate       *time.Time
+	NewDescription       *string
+	NewSetAsideCode      *string
+	NewAwardAmount       *float64
+	NewResourceLinks     *string
+	// Previous version fields
+	OldTitle             *string
+	OldResponseDeadline  *time.Time
+	OldArchiveDate       *time.Time
+	OldDescription       *string
+	OldSetAsideCode      *string
+	OldAwardAmount       *float64
+	OldResourceLinks     *string
 }
 
 func (h *Handler) detectInPlaceChanges(ctx context.Context) (int, error) {
+	// Find saved opportunities where a new version was created since last_notified_at.
+	// Join the latest version (curr) against the previous version (prev) to diff fields.
 	rows, err := h.Pool.Query(ctx, `
-		SELECT so.id, so.user_id, so.notice_id, sc.field_name, sc.old_value, sc.new_value
+		SELECT so.id, so.user_id, so.notice_id,
+			curr.title, curr.response_deadline, curr.archive_date, curr.description, curr.set_aside_code, curr.award_amount, curr.resource_links,
+			prev.title, prev.response_deadline, prev.archive_date, prev.description, prev.set_aside_code, prev.award_amount, prev.resource_links
 		FROM saved_opportunities so
-		JOIN pipeline.snap_changes sc ON sc.notice_id = so.notice_id
-		WHERE sc.detected_date > so.last_notified_at
-		  AND sc.field_name IN ('response_deadline','archive_date','description','set_aside_code','award_amount')
-		  AND sc.change_type = 'modified'
+		JOIN opportunities curr ON curr.notice_id = so.notice_id AND curr.is_latest = true AND curr.version > 1
+		JOIN opportunities prev ON prev.notice_id = so.notice_id AND prev.version = curr.version - 1
+		WHERE curr.created_at > so.last_notified_at
 	`)
 	if err != nil {
-		return 0, fmt.Errorf("query changes: %w", err)
+		return 0, fmt.Errorf("query version changes: %w", err)
 	}
 	defer rows.Close()
 
-	// Group changes by saved_opp_id
-	type changeGroup struct {
-		UserID   int
-		NoticeID string
-		Changes  []changeRow
-	}
-	groups := map[int]*changeGroup{}
-
-	for rows.Next() {
-		var c changeRow
-		if err := rows.Scan(&c.SavedOppID, &c.UserID, &c.NoticeID, &c.FieldName, &c.OldValue, &c.NewValue); err != nil {
-			return 0, fmt.Errorf("scan change: %w", err)
-		}
-		g, ok := groups[c.SavedOppID]
-		if !ok {
-			g = &changeGroup{UserID: c.UserID, NoticeID: c.NoticeID}
-			groups[c.SavedOppID] = g
-		}
-		g.Changes = append(g.Changes, c)
-	}
-
 	count := 0
-	for savedOppID, g := range groups {
+	for rows.Next() {
+		var r versionChangeRow
+		if err := rows.Scan(
+			&r.SavedOppID, &r.UserID, &r.NoticeID,
+			&r.NewTitle, &r.NewResponseDeadline, &r.NewArchiveDate, &r.NewDescription, &r.NewSetAsideCode, &r.NewAwardAmount, &r.NewResourceLinks,
+			&r.OldTitle, &r.OldResponseDeadline, &r.OldArchiveDate, &r.OldDescription, &r.OldSetAsideCode, &r.OldAwardAmount, &r.OldResourceLinks,
+		); err != nil {
+			return count, fmt.Errorf("scan version change: %w", err)
+		}
+
 		var fieldNames []string
-		diffs := make([]map[string]any, 0, len(g.Changes))
-		for _, c := range g.Changes {
-			fieldNames = append(fieldNames, friendlyFieldName(c.FieldName))
-			diff := map[string]any{"field": c.FieldName}
-			if c.OldValue != nil {
-				diff["old"] = *c.OldValue
+		var diffs []map[string]any
+
+		if !strPtrEqual(r.OldTitle, r.NewTitle) {
+			fieldNames = append(fieldNames, "Title")
+			diffs = append(diffs, diffPtrs("title", r.OldTitle, r.NewTitle))
+		}
+		if !timePtrEqual(r.OldResponseDeadline, r.NewResponseDeadline) {
+			fieldNames = append(fieldNames, friendlyFieldName("response_deadline"))
+			diffs = append(diffs, diffTimePtrs("response_deadline", r.OldResponseDeadline, r.NewResponseDeadline))
+		}
+		if !timePtrEqual(r.OldArchiveDate, r.NewArchiveDate) {
+			fieldNames = append(fieldNames, friendlyFieldName("archive_date"))
+			diffs = append(diffs, diffTimePtrs("archive_date", r.OldArchiveDate, r.NewArchiveDate))
+		}
+		if !strPtrEqual(r.OldDescription, r.NewDescription) {
+			fieldNames = append(fieldNames, friendlyFieldName("description"))
+			diffs = append(diffs, map[string]any{"field": "description"})
+		}
+		if !strPtrEqual(r.OldSetAsideCode, r.NewSetAsideCode) {
+			fieldNames = append(fieldNames, friendlyFieldName("set_aside_code"))
+			diffs = append(diffs, diffPtrs("set_aside_code", r.OldSetAsideCode, r.NewSetAsideCode))
+		}
+		if !floatPtrEqual(r.OldAwardAmount, r.NewAwardAmount) {
+			fieldNames = append(fieldNames, friendlyFieldName("award_amount"))
+			diffs = append(diffs, diffFloatPtrs("award_amount", r.OldAwardAmount, r.NewAwardAmount))
+		}
+		if added, removed := diffResourceLinks(r.OldResourceLinks, r.NewResourceLinks); len(added) > 0 || len(removed) > 0 {
+			parts := []string{}
+			if len(added) > 0 {
+				parts = append(parts, fmt.Sprintf("%d added", len(added)))
 			}
-			if c.NewValue != nil {
-				diff["new"] = *c.NewValue
+			if len(removed) > 0 {
+				parts = append(parts, fmt.Sprintf("%d removed", len(removed)))
 			}
-			diffs = append(diffs, diff)
+			fieldNames = append(fieldNames, fmt.Sprintf("Attachments (%s)", strings.Join(parts, ", ")))
+			diffs = append(diffs, map[string]any{
+				"field":   "resource_links",
+				"added":   added,
+				"removed": removed,
+			})
+		}
+
+		if len(fieldNames) == 0 {
+			continue
 		}
 
 		summary := fmt.Sprintf("Changes detected: %s", strings.Join(fieldNames, ", "))
@@ -558,17 +595,109 @@ func (h *Handler) detectInPlaceChanges(ctx context.Context) (int, error) {
 		_, err := h.Pool.Exec(ctx, `
 			INSERT INTO user_updates (id, user_id, update_type, source_id, summary, details)
 			VALUES ($1, $2, 'opportunity_changed', $3, $4, $5)
-		`, uuid.New(), g.UserID, savedOppID, summary, string(details))
+		`, uuid.New(), r.UserID, r.SavedOppID, summary, string(details))
 		if err != nil {
 			h.Logger.Error("insert change update", "error", err)
 			continue
 		}
 
-		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, savedOppID)
+		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, r.SavedOppID)
 		count++
 	}
 
 	return count, nil
+}
+
+func strPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func timePtrEqual(a, b *time.Time) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(*b)
+}
+
+func floatPtrEqual(a, b *float64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+func diffPtrs(field string, old, new *string) map[string]any {
+	d := map[string]any{"field": field}
+	if old != nil {
+		d["old"] = *old
+	}
+	if new != nil {
+		d["new"] = *new
+	}
+	return d
+}
+
+func diffTimePtrs(field string, old, new *time.Time) map[string]any {
+	d := map[string]any{"field": field}
+	if old != nil {
+		d["old"] = old.Format(time.RFC3339)
+	}
+	if new != nil {
+		d["new"] = new.Format(time.RFC3339)
+	}
+	return d
+}
+
+func diffFloatPtrs(field string, old, new *float64) map[string]any {
+	d := map[string]any{"field": field}
+	if old != nil {
+		d["old"] = fmt.Sprintf("%.2f", *old)
+	}
+	if new != nil {
+		d["new"] = fmt.Sprintf("%.2f", *new)
+	}
+	return d
+}
+
+func diffResourceLinks(oldJSON, newJSON *string) (added, removed []string) {
+	var oldLinks, newLinks []string
+	if oldJSON != nil {
+		json.Unmarshal([]byte(*oldJSON), &oldLinks)
+	}
+	if newJSON != nil {
+		json.Unmarshal([]byte(*newJSON), &newLinks)
+	}
+	oldSet := make(map[string]bool, len(oldLinks))
+	for _, l := range oldLinks {
+		oldSet[l] = true
+	}
+	newSet := make(map[string]bool, len(newLinks))
+	for _, l := range newLinks {
+		newSet[l] = true
+	}
+	for _, l := range newLinks {
+		if !oldSet[l] {
+			added = append(added, l)
+		}
+	}
+	for _, l := range oldLinks {
+		if !newSet[l] {
+			removed = append(removed, l)
+		}
+	}
+	return added, removed
 }
 
 func friendlyFieldName(field string) string {
