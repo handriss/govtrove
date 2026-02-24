@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -233,8 +234,9 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 			archive_date, set_aside_code, set_aside_description,
 			naics_code, classification_code,
 			pop_street_address, pop_city, pop_state, pop_zip, pop_country,
+			pop_city_code, pop_state_code, pop_country_code,
 			award_number, award_amount, awardee_name,
-			awardee_uei, award_date, active, ui_link, data_sources,
+			awardee_uei, award_date, active, ui_link, resource_links, data_sources,
 			primary_contact_title, primary_contact_fullname, primary_contact_email,
 			primary_contact_phone, primary_contact_fax,
 			secondary_contact_title, secondary_contact_fullname, secondary_contact_email,
@@ -245,6 +247,7 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 	`
 
 	var opp models.Opportunity
+	var resourceLinksJSON *string
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&opp.ID,
 		&opp.NoticeID,
@@ -266,6 +269,9 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		&opp.PopState,
 		&opp.PopZip,
 		&opp.PopCountry,
+		&opp.PopCityCode,
+		&opp.PopStateCode,
+		&opp.PopCountryCode,
 		&opp.AwardNumber,
 		&opp.AwardAmount,
 		&opp.AwardeeName,
@@ -273,6 +279,7 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		&opp.AwardDate,
 		&opp.Active,
 		&opp.UILink,
+		&resourceLinksJSON,
 		&opp.DataSource,
 		&opp.PrimaryContactTitle,
 		&opp.PrimaryContactFullname,
@@ -294,17 +301,11 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		return nil, fmt.Errorf("querying opportunity: %w", err)
 	}
 
-	resources, err := r.getResourceLinks(ctx, opp.ID)
-	if err != nil {
-		return nil, fmt.Errorf("getting resource links: %w", err)
+	if resourceLinksJSON != nil {
+		json.Unmarshal([]byte(*resourceLinksJSON), &opp.ResourceLinks)
 	}
-	opp.ResourceLinks = resources
 
 	return &opp, nil
-}
-
-func (r *OpportunityRepository) getResourceLinks(ctx context.Context, opportunityID int) ([]string, error) {
-	return nil, nil
 }
 
 func (r *OpportunityRepository) GetFilterOptions(ctx context.Context) (*models.FilterOptions, error) {

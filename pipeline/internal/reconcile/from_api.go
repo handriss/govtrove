@@ -81,12 +81,15 @@ func FromAPI(d samgov.OpportunityData) Opportunity {
 		pop := d.PlaceOfPerformance
 		if pop.City != nil {
 			opp.PopCity = pop.City.Name
+			opp.PopCityCode = pop.City.Code
 		}
 		if pop.State != nil {
 			opp.PopState = pop.State.Name
+			opp.PopStateCode = pop.State.Code
 		}
 		if pop.Country != nil {
 			opp.PopCountry = pop.Country.Name
+			opp.PopCountryCode = pop.Country.Code
 		}
 		opp.PopZip = pop.Zip
 		opp.PopStreetAddress = pop.StreetAddress
@@ -123,7 +126,7 @@ func FromAPI(d samgov.OpportunityData) Opportunity {
 		opp.AwardNumber = d.Award.Number
 		opp.AwardDate = parse.DateOnly(d.Award.Date)
 		opp.AwardAmount = parse.Amount(d.Award.Amount)
-		opp.Awardee = d.Award.Awardee.Name
+		opp.AwardeeName = d.Award.Awardee.Name
 	}
 
 	return opp

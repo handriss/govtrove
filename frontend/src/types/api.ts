@@ -37,6 +37,9 @@ export interface Opportunity {
   pop_state?: string;
   pop_zip?: string;
   pop_country?: string;
+  pop_city_code?: string;
+  pop_state_code?: string;
+  pop_country_code?: string;
   award_number?: string;
   award_amount?: number;
   awardee_name?: string;
