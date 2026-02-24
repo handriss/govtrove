@@ -61,12 +61,14 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 			set_aside_code, set_aside_description, naics_code, classification_code,
 			department, sub_tier, office, cgac, fpds_code, aac_code,
 			pop_street_address, pop_city, pop_state, pop_zip, pop_country,
+			pop_city_code, pop_state_code, pop_country_code,
 			office_city, office_state, office_zip, office_country,
-			award_number, award_date, award_amount, awardee,
+			award_number, award_date, award_amount, awardee, awardee_name,
 			primary_contact_title, primary_contact_fullname, primary_contact_email, primary_contact_phone, primary_contact_fax,
 			secondary_contact_title, secondary_contact_fullname, secondary_contact_email, secondary_contact_phone, secondary_contact_fax,
 			ui_link,
-			full_parent_path_name, full_parent_path_code, description_url, additional_info_link
+			full_parent_path_name, full_parent_path_code, description_url, additional_info_link,
+			resource_links
 		FROM opportunities
 		WHERE notice_id = ANY($1) AND is_latest = true
 	`, noticeIDs)
@@ -84,15 +86,17 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 		var setAsideCode, setAsideDesc, naicsCode, classCode *string
 		var dept, subTier, office, cgac, fpdsCode, aacCode *string
 		var popStreet, popCity, popState, popZip, popCountry *string
+		var popCityCode, popStateCode, popCountryCode *string
 		var offCity, offState, offZip, offCountry *string
 		var awardNum *string
 		var awardDate *time.Time
 		var awardAmt *float64
-		var awardee *string
+		var awardee, awardeeName *string
 		var pc1Title, pc1Name, pc1Email, pc1Phone, pc1Fax *string
 		var pc2Title, pc2Name, pc2Email, pc2Phone, pc2Fax *string
 		var uiLink *string
 		var fppName, fppCode, descURL, addInfoLink *string
+		var resourceLinksJSON *string
 
 		if err := rows.Scan(
 			&nid, &ex.ContentHash, &ex.Version,
@@ -101,18 +105,20 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 			&setAsideCode, &setAsideDesc, &naicsCode, &classCode,
 			&dept, &subTier, &office, &cgac, &fpdsCode, &aacCode,
 			&popStreet, &popCity, &popState, &popZip, &popCountry,
+			&popCityCode, &popStateCode, &popCountryCode,
 			&offCity, &offState, &offZip, &offCountry,
-			&awardNum, &awardDate, &awardAmt, &awardee,
+			&awardNum, &awardDate, &awardAmt, &awardee, &awardeeName,
 			&pc1Title, &pc1Name, &pc1Email, &pc1Phone, &pc1Fax,
 			&pc2Title, &pc2Name, &pc2Email, &pc2Phone, &pc2Fax,
 			&uiLink,
 			&fppName, &fppCode, &descURL, &addInfoLink,
+			&resourceLinksJSON,
 		); err != nil {
 			rows.Close()
 			return 0, 0, fmt.Errorf("scan existing row: %w", err)
 		}
 
-		ex.Opp = reconcile.Opportunity{
+		opp := reconcile.Opportunity{
 			NoticeID:                 nid,
 			SolicitationNumber:      derefStr(solNum),
 			Title:                   derefStr(title),
@@ -139,7 +145,10 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 			PopCity:                 derefStr(popCity),
 			PopState:                derefStr(popState),
 			PopZip:                  derefStr(popZip),
-			PopCountry:             derefStr(popCountry),
+			PopCountry:              derefStr(popCountry),
+			PopCityCode:             derefStr(popCityCode),
+			PopStateCode:            derefStr(popStateCode),
+			PopCountryCode:          derefStr(popCountryCode),
 			OfficeCity:              derefStr(offCity),
 			OfficeState:             derefStr(offState),
 			OfficeZip:               derefStr(offZip),
@@ -148,6 +157,7 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 			AwardDate:               awardDate,
 			AwardAmount:             awardAmt,
 			Awardee:                 derefStr(awardee),
+			AwardeeName:             derefStr(awardeeName),
 			PrimaryContactTitle:     derefStr(pc1Title),
 			PrimaryContactFullname:  derefStr(pc1Name),
 			PrimaryContactEmail:     derefStr(pc1Email),
@@ -164,6 +174,10 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 			DescriptionURL:          derefStr(descURL),
 			AdditionalInfoLink:      derefStr(addInfoLink),
 		}
+		if resourceLinksJSON != nil {
+			json.Unmarshal([]byte(*resourceLinksJSON), &opp.ResourceLinks)
+		}
+		ex.Opp = opp
 		existing[nid] = ex
 	}
 	rows.Close()
@@ -196,8 +210,9 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 				nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
 				nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
 				nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
+				nilIfEmpty(o.PopCityCode), nilIfEmpty(o.PopStateCode), nilIfEmpty(o.PopCountryCode),
 				nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-				nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
+				nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee), nilIfEmpty(o.AwardeeName),
 				nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
 				nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
 				nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
@@ -246,24 +261,25 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 						cgac = COALESCE($19, cgac), fpds_code = COALESCE($20, fpds_code), aac_code = COALESCE($21, aac_code),
 						pop_street_address = COALESCE($22, pop_street_address), pop_city = COALESCE($23, pop_city),
 						pop_state = COALESCE($24, pop_state), pop_zip = COALESCE($25, pop_zip), pop_country = COALESCE($26, pop_country),
-						office_city = COALESCE($27, office_city), office_state = COALESCE($28, office_state),
-						office_zip = COALESCE($29, office_zip), office_country = COALESCE($30, office_country),
-						award_number = COALESCE($31, award_number), award_date = COALESCE($32, award_date),
-						award_amount = COALESCE($33, award_amount), awardee = COALESCE($34, awardee),
-						primary_contact_title = COALESCE($35, primary_contact_title), primary_contact_fullname = COALESCE($36, primary_contact_fullname),
-						primary_contact_email = COALESCE($37, primary_contact_email), primary_contact_phone = COALESCE($38, primary_contact_phone),
-						primary_contact_fax = COALESCE($39, primary_contact_fax),
-						secondary_contact_title = COALESCE($40, secondary_contact_title), secondary_contact_fullname = COALESCE($41, secondary_contact_fullname),
-						secondary_contact_email = COALESCE($42, secondary_contact_email), secondary_contact_phone = COALESCE($43, secondary_contact_phone),
-						secondary_contact_fax = COALESCE($44, secondary_contact_fax),
-						ui_link = COALESCE($45, ui_link),
-						full_parent_path_name = COALESCE($46, full_parent_path_name), full_parent_path_code = COALESCE($47, full_parent_path_code),
-						description_url = COALESCE($48, description_url), additional_info_link = COALESCE($49, additional_info_link),
-						resource_links = COALESCE($50, resource_links),
-						content_hash = $51,
+						pop_city_code = COALESCE($27, pop_city_code), pop_state_code = COALESCE($28, pop_state_code), pop_country_code = COALESCE($29, pop_country_code),
+						office_city = COALESCE($30, office_city), office_state = COALESCE($31, office_state),
+						office_zip = COALESCE($32, office_zip), office_country = COALESCE($33, office_country),
+						award_number = COALESCE($34, award_number), award_date = COALESCE($35, award_date),
+						award_amount = COALESCE($36, award_amount), awardee = COALESCE($37, awardee), awardee_name = COALESCE($38, awardee_name),
+						primary_contact_title = COALESCE($39, primary_contact_title), primary_contact_fullname = COALESCE($40, primary_contact_fullname),
+						primary_contact_email = COALESCE($41, primary_contact_email), primary_contact_phone = COALESCE($42, primary_contact_phone),
+						primary_contact_fax = COALESCE($43, primary_contact_fax),
+						secondary_contact_title = COALESCE($44, secondary_contact_title), secondary_contact_fullname = COALESCE($45, secondary_contact_fullname),
+						secondary_contact_email = COALESCE($46, secondary_contact_email), secondary_contact_phone = COALESCE($47, secondary_contact_phone),
+						secondary_contact_fax = COALESCE($48, secondary_contact_fax),
+						ui_link = COALESCE($49, ui_link),
+						full_parent_path_name = COALESCE($50, full_parent_path_name), full_parent_path_code = COALESCE($51, full_parent_path_code),
+						description_url = COALESCE($52, description_url), additional_info_link = COALESCE($53, additional_info_link),
+						resource_links = COALESCE($54, resource_links),
+						content_hash = $55,
 						data_sources = CASE WHEN data_sources LIKE '%csv%' THEN 'csv+api' ELSE 'api' END,
-						last_api_run_id = $52, last_seen_api = $53
-					WHERE notice_id = $54 AND is_latest = true
+						last_api_run_id = $56, last_seen_api = $57
+					WHERE notice_id = $58 AND is_latest = true
 				`,
 					nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description),
 					nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),
@@ -272,8 +288,9 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 					nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
 					nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
 					nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
+					nilIfEmpty(o.PopCityCode), nilIfEmpty(o.PopStateCode), nilIfEmpty(o.PopCountryCode),
 					nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-					nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
+					nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee), nilIfEmpty(o.AwardeeName),
 					nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
 					nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
 					nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
@@ -321,8 +338,9 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 					nilIfEmpty(merged.Department), nilIfEmpty(merged.SubTier), nilIfEmpty(merged.Office),
 					nilIfEmpty(merged.CGAC), nilIfEmpty(merged.FPDSCode), nilIfEmpty(merged.AACCode),
 					nilIfEmpty(merged.PopStreetAddress), nilIfEmpty(merged.PopCity), nilIfEmpty(merged.PopState), nilIfEmpty(merged.PopZip), nilIfEmpty(merged.PopCountry),
+					nilIfEmpty(merged.PopCityCode), nilIfEmpty(merged.PopStateCode), nilIfEmpty(merged.PopCountryCode),
 					nilIfEmpty(merged.OfficeCity), nilIfEmpty(merged.OfficeState), nilIfEmpty(merged.OfficeZip), nilIfEmpty(merged.OfficeCountry),
-					nilIfEmpty(merged.AwardNumber), merged.AwardDate, merged.AwardAmount, nilIfEmpty(merged.Awardee),
+					nilIfEmpty(merged.AwardNumber), merged.AwardDate, merged.AwardAmount, nilIfEmpty(merged.Awardee), nilIfEmpty(merged.AwardeeName),
 					nilIfEmpty(merged.PrimaryContactTitle), nilIfEmpty(merged.PrimaryContactFullname), nilIfEmpty(merged.PrimaryContactEmail),
 					nilIfEmpty(merged.PrimaryContactPhone), nilIfEmpty(merged.PrimaryContactFax),
 					nilIfEmpty(merged.SecondaryContactTitle), nilIfEmpty(merged.SecondaryContactFullname), nilIfEmpty(merged.SecondaryContactEmail),
@@ -378,8 +396,9 @@ const apiInsertSQL = `
 		set_aside_code, set_aside_description, naics_code, classification_code,
 		department, sub_tier, office, cgac, fpds_code, aac_code,
 		pop_street_address, pop_city, pop_state, pop_zip, pop_country,
+		pop_city_code, pop_state_code, pop_country_code,
 		office_city, office_state, office_zip, office_country,
-		award_number, award_date, award_amount, awardee,
+		award_number, award_date, award_amount, awardee, awardee_name,
 		primary_contact_title, primary_contact_fullname, primary_contact_email, primary_contact_phone, primary_contact_fax,
 		secondary_contact_title, secondary_contact_fullname, secondary_contact_email, secondary_contact_phone, secondary_contact_fax,
 		ui_link,
@@ -392,14 +411,15 @@ const apiInsertSQL = `
 		$13, $14, $15, $16,
 		$17, $18, $19, $20, $21, $22,
 		$23, $24, $25, $26, $27,
-		$28, $29, $30, $31,
-		$32, $33, $34, $35,
-		$36, $37, $38, $39, $40,
-		$41, $42, $43, $44, $45,
-		$46,
-		$47, $48, $49, $50, $51,
-		$52, $53, $54,
-		'api', $55, $56
+		$28, $29, $30,
+		$31, $32, $33, $34,
+		$35, $36, $37, $38, $39,
+		$40, $41, $42, $43, $44,
+		$45, $46, $47, $48, $49,
+		$50,
+		$51, $52, $53, $54, $55,
+		$56, $57, $58,
+		'api', $59, $60
 	)`
 
 // coalesceOpp merges API opportunity values into existing, preferring non-empty API values.
@@ -483,6 +503,15 @@ func coalesceOpp(existing, api reconcile.Opportunity) reconcile.Opportunity {
 	if api.PopCountry != "" {
 		m.PopCountry = api.PopCountry
 	}
+	if api.PopCityCode != "" {
+		m.PopCityCode = api.PopCityCode
+	}
+	if api.PopStateCode != "" {
+		m.PopStateCode = api.PopStateCode
+	}
+	if api.PopCountryCode != "" {
+		m.PopCountryCode = api.PopCountryCode
+	}
 	if api.OfficeCity != "" {
 		m.OfficeCity = api.OfficeCity
 	}
@@ -504,8 +533,11 @@ func coalesceOpp(existing, api reconcile.Opportunity) reconcile.Opportunity {
 	if api.AwardAmount != nil {
 		m.AwardAmount = api.AwardAmount
 	}
-	if api.Awardee != "" {
+	if api.Awardee != "" && m.Awardee == "" {
 		m.Awardee = api.Awardee
+	}
+	if api.AwardeeName != "" {
+		m.AwardeeName = api.AwardeeName
 	}
 	if api.PrimaryContactTitle != "" {
 		m.PrimaryContactTitle = api.PrimaryContactTitle

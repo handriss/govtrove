@@ -43,6 +43,9 @@ type Opportunity struct {
 	PopState         string
 	PopZip           string
 	PopCountry       string
+	PopCityCode      string
+	PopStateCode     string
+	PopCountryCode   string
 
 	OfficeCity    string
 	OfficeState   string
@@ -53,6 +56,7 @@ type Opportunity struct {
 	AwardDate   *time.Time
 	AwardAmount *float64
 	Awardee     string
+	AwardeeName string
 
 	PrimaryContactTitle    string
 	PrimaryContactFullname string
