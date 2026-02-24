@@ -4,6 +4,10 @@
 
 locals {
   lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile", "generate-alerts", "ingest-api"]
+
+  lambda_ephemeral_storage = {
+    "download-csvs" = 2048
+  }
 }
 
 # --- Lambda Zip Archives ---
@@ -38,6 +42,10 @@ resource "aws_lambda_function" "pipeline" {
       SENTRY_DSN              = var.sentry_pipeline_dsn
       SAM_API_KEY_SECRET_ARN  = aws_secretsmanager_secret.sam_api_key.arn
     }
+  }
+
+  ephemeral_storage {
+    size = lookup(local.lambda_ephemeral_storage, each.key, 512)
   }
 
   tags = {
