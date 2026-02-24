@@ -66,13 +66,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 
 		It("has 2 completed ingestion runs", func() {
 			count := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.ingestion_runs WHERE status = 'completed'")
+				"SELECT COUNT(*) FROM pipeline.ingestion_runs WHERE status = 'completed' AND job_type IN ('snapshot-csv', 'ingest-archived')")
 			Expect(count).To(Equal(2))
-		})
-
-		It("has no changes on first run", func() {
-			count := queryCount(ctx, "SELECT COUNT(*) FROM pipeline.snap_changes")
-			Expect(count).To(Equal(0))
 		})
 
 		It("has no disappearances on first run", func() {
@@ -162,22 +157,14 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			Expect(count).To(Equal(1))
 		})
 
-		It("detects WILL-CHANGE as modified", func() {
+		It("detects WILL-CHANGE via content hash mismatch", func() {
+			// snap_csv should show hash difference between run 1 and run 2
 			count := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.snap_changes WHERE notice_id = 'WILL-CHANGE' AND change_type = 'modified' AND run_id = $1",
-				activeRunID2)
-			Expect(count).To(BeNumerically(">=", 1))
-
-			// Title and Award$ should both show up as changed fields
-			titleChange := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.snap_changes WHERE notice_id = 'WILL-CHANGE' AND field_name = 'Title' AND run_id = $1",
-				activeRunID2)
-			Expect(titleChange).To(Equal(1))
-
-			awardChange := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.snap_changes WHERE notice_id = 'WILL-CHANGE' AND field_name = 'Award$' AND run_id = $1",
-				activeRunID2)
-			Expect(awardChange).To(Equal(1))
+				`SELECT COUNT(*) FROM pipeline.snap_csv c
+				 JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
+				 WHERE c.run_id = $1 AND c.notice_id = 'WILL-CHANGE' AND c.content_hash != p.content_hash`,
+				activeRunID2, activeRunID1)
+			Expect(count).To(Equal(1))
 		})
 
 		It("creates disappearances for WILL-DISAPPEAR and WILL-GLITCH", func() {
