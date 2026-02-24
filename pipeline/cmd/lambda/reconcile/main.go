@@ -109,7 +109,8 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		"ingestion_count", len(input.IngestionResults),
 	)
 
-	var activeRunID, archivedRunID uuid.UUID
+	var activeRunID uuid.UUID
+	var archivedRunIDs []uuid.UUID
 	for i, r := range input.IngestionResults {
 		if r.Status != "ok" {
 			return nil, fmt.Errorf("ingestion %d failed with status %q", i, r.Status)
@@ -122,7 +123,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		case "snapshot-csv":
 			activeRunID = rid
 		case "ingest-archived":
-			archivedRunID = rid
+			archivedRunIDs = append(archivedRunIDs, rid)
 		}
 	}
 
@@ -131,10 +132,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	var totalUpserted int
 
 	// Archived first so active CSV gets the last word on the active flag
-	if archivedRunID != uuid.Nil {
+	for _, archivedRunID := range archivedRunIDs {
 		upserted, err := h.upsertFromRun(ctx, archivedRunID, snapshotDate)
 		if err != nil {
-			return nil, fmt.Errorf("upsert archived: %w", err)
+			return nil, fmt.Errorf("upsert archived %s: %w", archivedRunID, err)
 		}
 		totalUpserted += upserted
 		h.Logger.Info("archived opportunities upserted", "run_id", archivedRunID, "count", upserted)
@@ -150,12 +151,12 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 
 	if activeRunID != uuid.Nil {
-		if archivedRunID != uuid.Nil {
+		for _, archivedRunID := range archivedRunIDs {
 			resolved, err := h.Store.ResolveExpectedDisappearances(ctx, activeRunID, archivedRunID, snapshotDate)
 			if err != nil {
-				h.Logger.Error("failed to resolve expected disappearances", "error", err)
+				h.Logger.Error("failed to resolve expected disappearances", "error", err, "archived_run_id", archivedRunID)
 			} else if resolved > 0 {
-				h.Logger.Info("expected disappearances resolved (archived)", "count", resolved)
+				h.Logger.Info("expected disappearances resolved (archived)", "count", resolved, "archived_run_id", archivedRunID)
 			}
 		}
 
