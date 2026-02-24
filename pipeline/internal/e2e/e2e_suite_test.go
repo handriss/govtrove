@@ -217,7 +217,7 @@ CREATE TABLE pipeline.pipeline_runs (
 -- Opportunities
 CREATE TABLE opportunities (
     id              BIGSERIAL PRIMARY KEY,
-    notice_id       TEXT UNIQUE NOT NULL,
+    notice_id       TEXT NOT NULL,
     solicitation_number TEXT,
     title           TEXT,
     description     TEXT,
@@ -275,6 +275,9 @@ CREATE TABLE opportunities (
     additional_info_link TEXT,
     description_url TEXT,
     resource_links  JSONB,
+    version         INT NOT NULL DEFAULT 1,
+    is_latest       BOOLEAN NOT NULL DEFAULT true,
+    content_hash    TEXT,
     data_sources    TEXT DEFAULT 'csv',
     last_csv_run_id UUID,
     last_api_run_id UUID,
@@ -285,7 +288,9 @@ CREATE TABLE opportunities (
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE UNIQUE INDEX idx_opps_notice_version ON opportunities(notice_id, version);
 CREATE INDEX idx_opps_notice_id ON opportunities(notice_id);
+CREATE INDEX idx_opps_is_latest ON opportunities(is_latest) WHERE is_latest = true;
 
 -- Search vector trigger
 CREATE OR REPLACE FUNCTION update_opportunities_search_vector()

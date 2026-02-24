@@ -129,6 +129,7 @@ type SolicitationHistoryItem struct {
 	AwardeeName      *string       `json:"awardee_name,omitempty"`
 	Active           bool          `json:"active"`
 	IsCurrent        bool          `json:"is_current"`
+	Version          int           `json:"version"`
 	Changes          []FieldChange `json:"changes,omitempty"`
 }
 

@@ -140,6 +140,7 @@ export interface SolicitationHistoryItem {
   awardee_name?: string;
   active: boolean;
   is_current: boolean;
+  version: number;
   changes?: FieldChange[];
 }
 

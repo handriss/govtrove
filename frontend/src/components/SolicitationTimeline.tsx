@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { SolicitationHistory, SolicitationHistoryItem, FieldChange } from '../types/api';
+import type { SolicitationHistory, SolicitationHistoryItem } from '../types/api';
 
 const typeLabels: Record<string, string> = {
   o: 'Solicitation',
@@ -58,61 +58,59 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function humanizeChange(change: FieldChange): string | null {
-  const { field_name, old_value, new_value } = change;
-
-  switch (field_name) {
-    case 'ResponseDeadLine':
-      if (new_value) {
-        const formatted = formatDate(new_value);
-        return formatted ? `Deadline: ${formatted}` : 'Deadline updated';
-      }
-      return 'Deadline updated';
-
-    case 'Type': {
-      const oldLabel = old_value ? typeLabels[old_value] || old_value : null;
-      const newLabel = new_value ? typeLabels[new_value] || new_value : null;
-      if (oldLabel && newLabel) return `${oldLabel} \u2192 ${newLabel}`;
-      return 'Type changed';
-    }
-
-    case 'Award$':
-      if (new_value) {
-        const num = parseFloat(new_value);
-        return isNaN(num) ? 'Award amount updated' : `Award: ${formatCurrency(num)}`;
-      }
-      return 'Award amount updated';
-
-    case 'Title':
-      return 'Title updated';
-
-    case 'SetASideCode':
-      return 'Set-aside changed';
-
-    case 'AwardeeName':
-      return new_value ? `Awardee: ${new_value}` : 'Awardee updated';
-
-    case 'ArchiveDate':
-      return 'Archive date changed';
-
-    case 'AwardDate':
-      if (new_value) {
-        const formatted = formatDate(new_value);
-        return formatted ? `Award date: ${formatted}` : 'Award date updated';
-      }
-      return 'Award date updated';
-
-    default:
-      return `${field_name} updated`;
+function detectVersionChanges(prev: SolicitationHistoryItem, curr: SolicitationHistoryItem): string[] {
+  const changes: string[] = [];
+  if (prev.title !== curr.title) changes.push('Title updated');
+  if (prev.type !== curr.type) {
+    const oldLabel = prev.type ? typeLabels[prev.type] || prev.type : null;
+    const newLabel = curr.type ? typeLabels[curr.type] || curr.type : null;
+    if (oldLabel && newLabel) changes.push(`${oldLabel} \u2192 ${newLabel}`);
+    else changes.push('Type changed');
   }
+  if (prev.response_deadline !== curr.response_deadline) {
+    const formatted = formatDate(curr.response_deadline);
+    changes.push(formatted ? `Deadline: ${formatted}` : 'Deadline updated');
+  }
+  if (prev.award_amount !== curr.award_amount && curr.award_amount) {
+    changes.push(`Award: ${formatCurrency(curr.award_amount)}`);
+  }
+  if (prev.awardee_name !== curr.awardee_name && curr.awardee_name) {
+    changes.push(`Awardee: ${curr.awardee_name}`);
+  }
+  if (!prev.active && curr.active) changes.push('Reactivated');
+  if (prev.active && !curr.active) changes.push('Deactivated');
+  return changes;
 }
 
-function TimelineEntry({
+interface TimelineGroup {
+  noticeId: string;
+  items: SolicitationHistoryItem[];
+}
+
+function groupByNoticeId(notices: SolicitationHistoryItem[]): TimelineGroup[] {
+  const groups: TimelineGroup[] = [];
+  let current: TimelineGroup | null = null;
+  for (const item of notices) {
+    if (!current || current.noticeId !== item.notice_id) {
+      current = { noticeId: item.notice_id, items: [item] };
+      groups.push(current);
+    } else {
+      current.items.push(item);
+    }
+  }
+  return groups;
+}
+
+function NoticeCard({
   item,
   isLast,
+  isUpdate,
+  prevItem,
 }: {
   item: SolicitationHistoryItem;
   isLast: boolean;
+  isUpdate?: boolean;
+  prevItem?: SolicitationHistoryItem;
 }) {
   const typeCode = item.type || '';
   const typeLabel = typeLabels[typeCode] || item.base_type || 'Notice';
@@ -120,22 +118,30 @@ function TimelineEntry({
   const dot = dotColors[typeCode] || 'bg-gray-400';
   const postedDate = formatDate(item.posted_date);
 
-  const changes = (item.changes || [])
-    .map(humanizeChange)
-    .filter((c): c is string => c !== null);
+  const changes = isUpdate && prevItem
+    ? detectVersionChanges(prevItem, item)
+    : [];
 
   const content = (
     <div
       className={`rounded-lg p-3 transition-colors duration-150 ${
         item.is_current
           ? 'bg-accent/5 border border-accent/30 ring-1 ring-accent/20'
-          : 'bg-dark-800/20 border border-dark-800/40 hover:border-dark-700/50'
+          : isUpdate
+            ? 'bg-dark-800/10 border border-dashed border-dark-700/40 hover:border-dark-600/50'
+            : 'bg-dark-800/20 border border-dark-800/40 hover:border-dark-700/50'
       }`}
     >
       <div className="flex flex-wrap items-center gap-2 mb-1">
-        <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border ${badgeColor}`}>
-          {typeLabel}
-        </span>
+        {isUpdate ? (
+          <span className="inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border bg-dark-700/30 text-dark-400 border-dark-600/30">
+            v{item.version} Update
+          </span>
+        ) : (
+          <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full border ${badgeColor}`}>
+            {typeLabel}
+          </span>
+        )}
         {item.is_current && (
           <span className="text-[11px] text-accent font-medium">Current</span>
         )}
@@ -147,11 +153,13 @@ function TimelineEntry({
         )}
       </div>
 
-      <p className={`text-sm leading-snug ${item.is_current ? 'text-dark-100' : 'text-dark-300'}`}>
+      <p className={`text-sm leading-snug ${
+        item.is_current ? 'text-dark-100' : isUpdate ? 'text-dark-400' : 'text-dark-300'
+      }`}>
         {item.title}
       </p>
 
-      {item.award_amount && (
+      {item.award_amount && !isUpdate && (
         <p className="text-xs text-emerald-400 mt-1">
           Award: {formatCurrency(item.award_amount)}
           {item.awardee_name && ` to ${item.awardee_name}`}
@@ -177,8 +185,12 @@ function TimelineEntry({
     <div className="relative flex gap-4">
       {/* Timeline line + dot */}
       <div className="flex flex-col items-center w-3 flex-shrink-0">
-        <div className={`w-2.5 h-2.5 rounded-full mt-4 flex-shrink-0 ${
-          item.is_current ? 'ring-2 ring-accent/40 ' + dot : dot
+        <div className={`rounded-full mt-4 flex-shrink-0 ${
+          isUpdate
+            ? 'w-1.5 h-1.5 bg-dark-600'
+            : item.is_current
+              ? 'w-2.5 h-2.5 ring-2 ring-accent/40 ' + dot
+              : 'w-2.5 h-2.5 ' + dot
         }`} />
         {!isLast && <div className="w-px flex-1 bg-dark-700/50 mt-1" />}
       </div>
@@ -203,15 +215,28 @@ export default function SolicitationTimeline({
   history: SolicitationHistory;
   currentId: number;
 }) {
+  const groups = groupByNoticeId(history.notices);
+  const totalEntries = history.notices.length;
+  let entryIndex = 0;
+
   return (
     <div>
-      {history.notices.map((item, idx) => (
-        <TimelineEntry
-          key={item.id}
-          item={item}
-          isLast={idx === history.notices.length - 1}
-        />
-      ))}
+      {groups.map((group) =>
+        group.items.map((item, itemIdx) => {
+          const isUpdate = itemIdx > 0;
+          const prevItem = itemIdx > 0 ? group.items[itemIdx - 1] : undefined;
+          const isLast = ++entryIndex === totalEntries;
+          return (
+            <NoticeCard
+              key={item.id}
+              item={item}
+              isLast={isLast}
+              isUpdate={isUpdate}
+              prevItem={prevItem}
+            />
+          );
+        })
+      )}
 
       {history.truncated && (
         <p className="text-xs text-dark-500 mt-3 pl-7">
