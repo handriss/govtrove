@@ -144,24 +144,6 @@ CREATE INDEX idx_snap_csv_notice_id ON pipeline.snap_csv(notice_id);
 CREATE INDEX idx_snap_csv_run_id ON pipeline.snap_csv(run_id);
 CREATE INDEX idx_snap_csv_hash ON pipeline.snap_csv(notice_id, run_id, content_hash);
 
--- Changes
-CREATE TABLE pipeline.snap_changes (
-    id              BIGSERIAL PRIMARY KEY,
-    run_id          UUID NOT NULL REFERENCES pipeline.ingestion_runs(run_id),
-    notice_id       TEXT NOT NULL,
-    solicitation_number TEXT,
-    source          TEXT NOT NULL,
-    field_name      TEXT NOT NULL,
-    old_value       TEXT,
-    new_value       TEXT,
-    detected_date   TIMESTAMPTZ NOT NULL,
-    previous_date   TIMESTAMPTZ,
-    change_type     TEXT,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_snap_changes_run_id ON pipeline.snap_changes(run_id);
-CREATE INDEX idx_snap_changes_notice_id ON pipeline.snap_changes(notice_id);
-
 -- Disappearances
 CREATE TABLE pipeline.snap_disappearances (
     id              BIGSERIAL PRIMARY KEY,
@@ -246,6 +228,9 @@ CREATE TABLE opportunities (
     pop_state       TEXT,
     pop_zip         TEXT,
     pop_country     TEXT,
+    pop_city_code   TEXT,
+    pop_state_code  TEXT,
+    pop_country_code TEXT,
     office_city     TEXT,
     office_state    TEXT,
     office_zip      TEXT,
