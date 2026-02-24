@@ -130,15 +130,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	snapshotDate := time.Now().UTC()
 	var totalUpserted int
 
-	if activeRunID != uuid.Nil {
-		upserted, err := h.upsertFromRun(ctx, activeRunID, snapshotDate)
-		if err != nil {
-			return nil, fmt.Errorf("upsert active: %w", err)
-		}
-		totalUpserted += upserted
-		h.Logger.Info("active opportunities upserted", "run_id", activeRunID, "count", upserted)
-	}
-
+	// Archived first so active CSV gets the last word on the active flag
 	if archivedRunID != uuid.Nil {
 		upserted, err := h.upsertFromRun(ctx, archivedRunID, snapshotDate)
 		if err != nil {
@@ -146,6 +138,15 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 		totalUpserted += upserted
 		h.Logger.Info("archived opportunities upserted", "run_id", archivedRunID, "count", upserted)
+	}
+
+	if activeRunID != uuid.Nil {
+		upserted, err := h.upsertFromRun(ctx, activeRunID, snapshotDate)
+		if err != nil {
+			return nil, fmt.Errorf("upsert active: %w", err)
+		}
+		totalUpserted += upserted
+		h.Logger.Info("active opportunities upserted", "run_id", activeRunID, "count", upserted)
 	}
 
 	if activeRunID != uuid.Nil {
