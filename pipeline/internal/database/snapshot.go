@@ -43,15 +43,6 @@ type SnapCSVRow struct {
 	ContentHash string
 }
 
-type SnapChange struct {
-	NoticeID           string
-	SolicitationNumber string
-	FieldName          string
-	OldValue           string
-	NewValue           string
-	ChangeType         string
-}
-
 type CSVDownloadEntry struct {
 	RunID         uuid.UUID
 	URL           string
@@ -158,99 +149,27 @@ func (s *snapCSVCopySource) Values() ([]interface{}, error) {
 func (s *snapCSVCopySource) Err() error { return nil }
 
 func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (newCount, changedCount int, err error) {
-	// Find new records (in current but not in previous)
-	newRows, err := db.pool.Query(ctx, `
-		SELECT c.notice_id, c.solicitation_number
+	// Count new records (in current but not in previous)
+	err = db.pool.QueryRow(ctx, `
+		SELECT count(*)
 		FROM pipeline.snap_csv c
 		LEFT JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
 		WHERE c.run_id = $1 AND p.notice_id IS NULL
-	`, currentRunID, previousRunID)
+	`, currentRunID, previousRunID).Scan(&newCount)
 	if err != nil {
-		return 0, 0, fmt.Errorf("detect new records: %w", err)
-	}
-	defer newRows.Close()
-
-	batch := &pgx.Batch{}
-	for newRows.Next() {
-		var noticeID string
-		var solNum *string
-		if err := newRows.Scan(&noticeID, &solNum); err != nil {
-			return 0, 0, fmt.Errorf("scan new record: %w", err)
-		}
-		newCount++
-		batch.Queue(`
-			INSERT INTO pipeline.snap_changes (run_id, notice_id, solicitation_number, source, field_name, new_value, detected_date, change_type)
-			VALUES ($1, $2, $3, 'active_csv', '_record', 'new', $4, 'new')
-		`, currentRunID, noticeID, solNum, snapshotDate)
-	}
-	if err := newRows.Err(); err != nil {
-		return 0, 0, fmt.Errorf("iterate new records: %w", err)
+		return 0, 0, fmt.Errorf("count new records: %w", err)
 	}
 
-	// Find changed records (hash mismatch)
-	changedRows, err := db.pool.Query(ctx, `
-		SELECT c.notice_id, c.solicitation_number, c.raw_data, p.raw_data
+	// Count changed records (hash mismatch). Field-level diffs are tracked via
+	// versioned opportunity rows, so we only need the count here for logging.
+	err = db.pool.QueryRow(ctx, `
+		SELECT count(*)
 		FROM pipeline.snap_csv c
 		JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
 		WHERE c.run_id = $1 AND c.content_hash != p.content_hash
-	`, currentRunID, previousRunID)
+	`, currentRunID, previousRunID).Scan(&changedCount)
 	if err != nil {
-		return newCount, 0, fmt.Errorf("detect changed records: %w", err)
-	}
-	defer changedRows.Close()
-
-	previousDate := snapshotDate // approximate — use previous run's snapshot_date ideally
-	// Get previous run's start time for previous_date
-	var prevDate time.Time
-	pErr := db.pool.QueryRow(ctx, `SELECT started_at FROM pipeline.ingestion_runs WHERE run_id = $1`, previousRunID).Scan(&prevDate)
-	if pErr == nil {
-		previousDate = prevDate
-	}
-
-	for changedRows.Next() {
-		var noticeID string
-		var solNum *string
-		var currentRaw, previousRaw json.RawMessage
-		if err := changedRows.Scan(&noticeID, &solNum, &currentRaw, &previousRaw); err != nil {
-			return newCount, changedCount, fmt.Errorf("scan changed record: %w", err)
-		}
-		changedCount++
-
-		var curr, prev map[string]string
-		json.Unmarshal(currentRaw, &curr)
-		json.Unmarshal(previousRaw, &prev)
-
-		allKeys := make(map[string]bool)
-		for k := range curr {
-			allKeys[k] = true
-		}
-		for k := range prev {
-			allKeys[k] = true
-		}
-
-		for field := range allKeys {
-			oldVal := prev[field]
-			newVal := curr[field]
-			if oldVal != newVal {
-				batch.Queue(`
-					INSERT INTO pipeline.snap_changes (run_id, notice_id, solicitation_number, source, field_name, old_value, new_value, detected_date, previous_date, change_type)
-					VALUES ($1, $2, $3, 'active_csv', $4, $5, $6, $7, $8, 'modified')
-				`, currentRunID, noticeID, solNum, field, nilIfEmpty(oldVal), nilIfEmpty(newVal), snapshotDate, previousDate)
-			}
-		}
-	}
-	if err := changedRows.Err(); err != nil {
-		return newCount, changedCount, fmt.Errorf("iterate changed records: %w", err)
-	}
-
-	if batch.Len() > 0 {
-		results := db.pool.SendBatch(ctx, batch)
-		defer results.Close()
-		for i := 0; i < batch.Len(); i++ {
-			if _, err := results.Exec(); err != nil {
-				logger.Warn("failed to insert snap_change", "error", err)
-			}
-		}
+		return newCount, 0, fmt.Errorf("count changed records: %w", err)
 	}
 
 	return newCount, changedCount, nil
