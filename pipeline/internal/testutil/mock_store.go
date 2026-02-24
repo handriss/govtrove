@@ -35,6 +35,9 @@ type MockStore struct {
 	ResolveExpectedDisappearancesFn  func(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error)
 	MarkDisappearedInactiveFn        func(ctx context.Context, runID uuid.UUID) (int, error)
 
+	BulkInsertSnapAPIFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error)
+	UpsertOpportunitiesFromAPIFn   func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
+
 	InsertBulkCSVLogFn        func(ctx context.Context, r *database.BulkCSVLogRecord) (int, error)
 	GetLatestBulkCSVHashFn    func(ctx context.Context, source string) (string, error)
 	GetLatestBulkCSVHeadersFn func(ctx context.Context, source string) (string, string, error)
@@ -173,6 +176,20 @@ func (m *MockStore) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID
 		return m.MarkDisappearedInactiveFn(ctx, runID)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error) {
+	if m.BulkInsertSnapAPIFn != nil {
+		return m.BulkInsertSnapAPIFn(ctx, runID, snapshotDate, rows)
+	}
+	return int64(len(rows)), nil
+}
+
+func (m *MockStore) UpsertOpportunitiesFromAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error) {
+	if m.UpsertOpportunitiesFromAPIFn != nil {
+		return m.UpsertOpportunitiesFromAPIFn(ctx, runID, snapshotDate, opps)
+	}
+	return len(opps), nil
 }
 
 func (m *MockStore) InsertBulkCSVLog(ctx context.Context, r *database.BulkCSVLogRecord) (int, error) {

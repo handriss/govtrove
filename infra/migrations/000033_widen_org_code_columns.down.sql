@@ -1,0 +1,2 @@
+ALTER TABLE opportunities ALTER COLUMN fpds_code TYPE VARCHAR(16);
+ALTER TABLE opportunities ALTER COLUMN aac_code TYPE VARCHAR(16);

@@ -64,6 +64,13 @@ type Opportunity struct {
 	SecondaryContactFax      string
 
 	UILink string
+
+	// API-only fields (NULL when populated from CSV)
+	FullParentPathName string
+	FullParentPathCode string
+	DescriptionURL     string
+	AdditionalInfoLink string
+	ResourceLinks      []string
 }
 
 type DataQualityIssue struct {
