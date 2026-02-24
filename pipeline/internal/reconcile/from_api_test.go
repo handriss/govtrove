@@ -1,0 +1,208 @@
+package reconcile_test
+
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/handriss/govtrove/pipeline/internal/reconcile"
+	"github.com/handriss/govtrove/pipeline/internal/samgov"
+)
+
+var _ = Describe("FromAPI", func() {
+	Context("Place of Performance codes", func() {
+		It("extracts both name and code from City, State, and Country", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "POP-001",
+				Active:   "Yes",
+				PlaceOfPerformance: &samgov.PoP{
+					StreetAddress: "100 Main St",
+					City:          &samgov.NameCode{Code: "12345", Name: "Springfield"},
+					State:         &samgov.NameCode{Code: "IL", Name: "Illinois"},
+					Country:       &samgov.NameCode{Code: "USA", Name: "United States"},
+					Zip:           "62701",
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.PopCity).To(Equal("Springfield"))
+			Expect(opp.PopCityCode).To(Equal("12345"))
+			Expect(opp.PopState).To(Equal("Illinois"))
+			Expect(opp.PopStateCode).To(Equal("IL"))
+			Expect(opp.PopCountry).To(Equal("United States"))
+			Expect(opp.PopCountryCode).To(Equal("USA"))
+			Expect(opp.PopZip).To(Equal("62701"))
+			Expect(opp.PopStreetAddress).To(Equal("100 Main St"))
+		})
+
+		It("leaves all PoP fields empty when PlaceOfPerformance is nil", func() {
+			d := samgov.OpportunityData{
+				NoticeID:           "POP-002",
+				Active:             "Yes",
+				PlaceOfPerformance: nil,
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.PopCity).To(BeEmpty())
+			Expect(opp.PopCityCode).To(BeEmpty())
+			Expect(opp.PopState).To(BeEmpty())
+			Expect(opp.PopStateCode).To(BeEmpty())
+			Expect(opp.PopCountry).To(BeEmpty())
+			Expect(opp.PopCountryCode).To(BeEmpty())
+		})
+
+		It("handles partial PoP — state and country but no city", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "POP-003",
+				Active:   "Yes",
+				PlaceOfPerformance: &samgov.PoP{
+					City:    nil,
+					State:   &samgov.NameCode{Code: "CA", Name: "California"},
+					Country: &samgov.NameCode{Code: "USA", Name: "United States"},
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.PopCity).To(BeEmpty())
+			Expect(opp.PopCityCode).To(BeEmpty())
+			Expect(opp.PopState).To(Equal("California"))
+			Expect(opp.PopStateCode).To(Equal("CA"))
+			Expect(opp.PopCountry).To(Equal("United States"))
+			Expect(opp.PopCountryCode).To(Equal("USA"))
+		})
+
+		It("handles NameCode with empty code but populated name", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "POP-004",
+				Active:   "Yes",
+				PlaceOfPerformance: &samgov.PoP{
+					City: &samgov.NameCode{Code: "", Name: "Unknown City"},
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.PopCity).To(Equal("Unknown City"))
+			Expect(opp.PopCityCode).To(BeEmpty())
+		})
+
+		It("handles country-only PoP (common for overseas)", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "POP-005",
+				Active:   "Yes",
+				PlaceOfPerformance: &samgov.PoP{
+					Country: &samgov.NameCode{Code: "DEU", Name: "Germany"},
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.PopCity).To(BeEmpty())
+			Expect(opp.PopCityCode).To(BeEmpty())
+			Expect(opp.PopState).To(BeEmpty())
+			Expect(opp.PopStateCode).To(BeEmpty())
+			Expect(opp.PopCountry).To(Equal("Germany"))
+			Expect(opp.PopCountryCode).To(Equal("DEU"))
+		})
+	})
+
+	Context("Award / Awardee mapping", func() {
+		It("sets AwardeeName from award.awardee.name and leaves Awardee empty", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "AWD-001",
+				Active:   "Yes",
+				Award: &samgov.Award{
+					Number:  "W91QUZ-26-C-0001",
+					Date:    "2026-01-20",
+					Amount:  "1234567.89",
+					Awardee: samgov.Awardee{Name: "ACME Corporation"},
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.AwardeeName).To(Equal("ACME Corporation"))
+			Expect(opp.Awardee).To(BeEmpty())
+			Expect(opp.AwardNumber).To(Equal("W91QUZ-26-C-0001"))
+		})
+
+		It("leaves both Awardee and AwardeeName empty when Award is nil", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "AWD-002",
+				Active:   "Yes",
+				Award:    nil,
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.Awardee).To(BeEmpty())
+			Expect(opp.AwardeeName).To(BeEmpty())
+			Expect(opp.AwardNumber).To(BeEmpty())
+		})
+
+		It("handles award with empty awardee name", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "AWD-003",
+				Active:   "Yes",
+				Award: &samgov.Award{
+					Number:  "FA8532-26-R-0042",
+					Awardee: samgov.Awardee{Name: ""},
+				},
+			}
+			opp := reconcile.FromAPI(d)
+
+			Expect(opp.AwardeeName).To(BeEmpty())
+			Expect(opp.AwardNumber).To(Equal("FA8532-26-R-0042"))
+		})
+	})
+
+	Context("CSV FromCSV awardee stays in Awardee field", func() {
+		It("CSV Awardee maps to Awardee (not AwardeeName)", func() {
+			raw := map[string]string{
+				"NoticeId": "CSV-001",
+				"Awardee":  "ACME CORP Springfield IL 62701 USA",
+			}
+			opp, issues := reconcile.FromCSV(raw)
+
+			Expect(issues).To(BeEmpty())
+			Expect(opp.Awardee).To(Equal("ACME CORP Springfield IL 62701 USA"))
+			Expect(opp.AwardeeName).To(BeEmpty())
+		})
+	})
+
+	Context("ContentHash includes new fields", func() {
+		It("changes when PopCityCode changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-001", PopCity: "Springfield"}
+			withCode := base
+			withCode.PopCityCode = "12345"
+
+			Expect(base.ContentHash()).NotTo(Equal(withCode.ContentHash()))
+		})
+
+		It("changes when PopStateCode changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-002", PopState: "Illinois"}
+			withCode := base
+			withCode.PopStateCode = "IL"
+
+			Expect(base.ContentHash()).NotTo(Equal(withCode.ContentHash()))
+		})
+
+		It("changes when PopCountryCode changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-003", PopCountry: "United States"}
+			withCode := base
+			withCode.PopCountryCode = "USA"
+
+			Expect(base.ContentHash()).NotTo(Equal(withCode.ContentHash()))
+		})
+
+		It("changes when AwardeeName changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-004"}
+			withName := base
+			withName.AwardeeName = "ACME Corp"
+
+			Expect(base.ContentHash()).NotTo(Equal(withName.ContentHash()))
+		})
+
+		It("does not change when only Active flag differs", func() {
+			a := reconcile.Opportunity{NoticeID: "HASH-005", Active: true}
+			b := reconcile.Opportunity{NoticeID: "HASH-005", Active: false}
+
+			Expect(a.ContentHash()).To(Equal(b.ContentHash()))
+		})
+	})
+})
