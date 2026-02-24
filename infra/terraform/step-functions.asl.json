@@ -142,6 +142,39 @@
         }
       ],
       "ResultPath": "$.ingestion_results",
+      "Next": "IngestAPI"
+    },
+
+    "IngestAPI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${ingest_api_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "run_id.$": "$.Payload.run_id",
+        "job_type.$": "$.Payload.job_type",
+        "total_fetched.$": "$.Payload.total_fetched",
+        "upserted.$": "$.Payload.upserted"
+      },
+      "ResultPath": "$.api_result",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedIngestAPI"
+        }
+      ],
       "Next": "Reconcile"
     },
 
@@ -224,6 +257,13 @@
     "MarkFailedIngest": {
       "Type": "Pass",
       "Result": "IngestFiles",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedIngestAPI": {
+      "Type": "Pass",
+      "Result": "IngestAPI",
       "ResultPath": "$.failed_step",
       "Next": "SendToDLQ"
     },

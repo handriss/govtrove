@@ -96,6 +96,7 @@ func init() {
 
 type Input struct {
 	PipelineRunID string `json:"pipeline_run_id"`
+	Source        string `json:"source"`
 }
 
 type Output struct {
@@ -121,6 +122,22 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 		sentry.Flush(2 * time.Second)
 	}()
+
+	var input Input
+	if err := json.Unmarshal(event, &input); err != nil {
+		return nil, fmt.Errorf("unmarshal input: %w", err)
+	}
+
+	if input.Source == "fallback" {
+		_, completedAt, err := h.Store.GetLastCompletedRun(ctx, "snapshot-csv")
+		if err == nil && time.Since(completedAt) < 24*time.Hour {
+			h.Logger.Info("skipping — CSV pipeline ran recently",
+				"last_csv_run", completedAt.Format(time.RFC3339),
+			)
+			return &Output{Status: "skipped", JobType: jobType}, nil
+		}
+		h.Logger.Info("fallback invocation — CSV pipeline stale or missing, proceeding")
+	}
 
 	h.Logger.Info("starting ingest-api")
 	start := time.Now()
