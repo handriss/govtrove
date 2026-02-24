@@ -16,6 +16,12 @@ var Sources = []Source{
 		S3Prefix: "raw/csv",
 	},
 	{
+		Key:           "archived_fy2025",
+		URL:           "https://sam.gov/api/prod/fileextractservices/v1/api/download/Contract%20Opportunities/Archived%20Data/FY2025_archived_opportunities.csv",
+		S3Prefix:      "raw/archived-csv/FY2025",
+		UseRangeProbe: true,
+	},
+	{
 		Key:           "archived_fy2026",
 		URL:            "https://sam.gov/api/prod/fileextractservices/v1/api/download/Contract%20Opportunities/Archived%20Data/FY2026_archived_opportunities.csv",
 		S3Prefix:       "raw/archived-csv/FY2026",
