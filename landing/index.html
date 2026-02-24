@@ -842,102 +842,6 @@
             padding: 1.25rem;
         }
 
-        /* ===== Pricing Section ===== */
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 2rem;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .pricing-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-default);
-            border-radius: 0.5rem;
-            padding: 2.5rem 2rem;
-            position: relative;
-        }
-
-        .pricing-card.featured {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 1px var(--accent), 0 25px 50px -12px rgba(59, 130, 246, 0.2);
-        }
-
-        .pricing-card.featured::before {
-            content: 'Most Popular';
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--accent);
-            color: #fff;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.375rem 1rem;
-            border-radius: 20px;
-        }
-
-        .pricing-tier {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .pricing-price {
-            font-size: 3rem;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 0.25rem;
-        }
-
-        .pricing-price span {
-            font-size: 1rem;
-            font-weight: 400;
-            color: var(--text-secondary);
-        }
-
-        .pricing-annual {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-        }
-
-        .pricing-annual strong {
-            color: var(--accent);
-        }
-
-        .pricing-features {
-            list-style: none;
-            margin-bottom: 2rem;
-        }
-
-        .pricing-features li {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
-            font-size: 0.9375rem;
-            color: var(--text-secondary);
-        }
-
-        .pricing-features li svg {
-            flex-shrink: 0;
-            color: var(--accent);
-            margin-top: 2px;
-        }
-
-        .pricing-card .btn {
-            width: 100%;
-        }
-
-        .pricing-note {
-            text-align: center;
-            margin-top: 2rem;
-            font-size: 0.9375rem;
-            color: var(--text-muted);
-        }
-
         /* ===== Trust Section ===== */
         .trust {
             background: var(--bg-card);
@@ -1215,10 +1119,6 @@
             .steps {
                 gap: 2rem;
             }
-
-            .pricing-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
     <script type="application/ld+json">
@@ -1231,7 +1131,7 @@
           "name": "Is GovTrove free?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Pro features like unlimited saves and email alerts are $9/month or $79/year."
+            "text": "Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Paid plans with additional features are coming soon."
           }
         },
         {
@@ -1290,7 +1190,7 @@
 <body>
     <!-- Preview Banner -->
     <div class="preview-banner" id="preview-banner">
-        <strong>Preview</strong> &mdash; GovTrove is in early preview. Features and data may change.
+        <strong>Not yet live</strong> &mdash; GovTrove is under active development. The app currently contains test data only.
         <button class="preview-banner-dismiss" id="dismiss-banner" aria-label="Dismiss banner">&times;</button>
     </div>
 
@@ -1303,7 +1203,6 @@
             </a>
             <ul class="nav-links">
                 <li><a href="#features">Features</a></li>
-                <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="/blog/">Blog</a></li>
             </ul>
@@ -1318,7 +1217,6 @@
     <div class="nav-mobile-menu" id="mobile-menu">
         <ul>
             <li><a href="#features" class="mobile-link">Features</a></li>
-            <li><a href="#pricing" class="mobile-link">Pricing</a></li>
             <li><a href="#faq" class="mobile-link">FAQ</a></li>
             <li><a href="/blog/" class="mobile-link">Blog</a></li>
         </ul>
@@ -1647,75 +1545,6 @@
         </div>
     </section>
 
-    <!-- Pricing -->
-    <section class="pricing" id="pricing">
-        <div class="container">
-            <div class="section-header fade-in">
-                <h2>Simple, Transparent Pricing</h2>
-                <p>No enterprise tier. No "contact sales." No surprises.</p>
-            </div>
-            <div class="pricing-grid">
-                <div class="pricing-card fade-in">
-                    <div class="pricing-tier">Free</div>
-                    <div class="pricing-price">$0</div>
-                    <div class="pricing-annual">Free forever</div>
-                    <ul class="pricing-features">
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Full search (text + semantic)</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>All filters</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>10 saved opportunities</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Direct links to SAM.gov</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Mobile access</span>
-                        </li>
-                    </ul>
-                    <a href="https://app.govtrove.com" class="btn btn-secondary">Start Searching</a>
-                </div>
-                <div class="pricing-card featured fade-in">
-                    <div class="pricing-tier">Pro</div>
-                    <div class="pricing-price">$9<span>/month</span></div>
-                    <div class="pricing-annual">or <strong>$79/year</strong> (save 27%)</div>
-                    <ul class="pricing-features">
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Everything in Free</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Unlimited saved opportunities</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Email alerts (daily digest)</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>CSV export</span>
-                        </li>
-                        <li>
-                            <i data-lucide="check" width="18" height="18"></i>
-                            <span>Priority support</span>
-                        </li>
-                    </ul>
-                    <a href="https://app.govtrove.com" class="btn btn-primary">Get Started</a>
-                </div>
-            </div>
-            <p class="pricing-note fade-in">All prices transparent. No enterprise tier, no "contact sales," no surprises.</p>
-        </div>
-    </section>
-
     <!-- Trust Section -->
     <section class="trust">
         <div class="container">
@@ -1773,7 +1602,7 @@
                     </button>
                     <div class="faq-answer">
                         <div class="faq-answer-inner">
-                            Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Pro features like unlimited saves and email alerts are $9/month or $79/year.
+                            Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Paid plans with additional features are coming soon.
                         </div>
                     </div>
                 </div>
@@ -1865,7 +1694,6 @@
                         <p class="footer-heading">Product</p>
                         <ul>
                             <li><a href="#features">Features</a></li>
-                            <li><a href="#pricing">Pricing</a></li>
                             <li><a href="#faq">FAQ</a></li>
                             <li><a href="/blog/">Blog</a></li>
                         </ul>
