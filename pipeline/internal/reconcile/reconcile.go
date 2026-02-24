@@ -10,7 +10,6 @@ import (
 )
 
 // Opportunity is the write model for upserting into the opportunities table.
-// Currently populated from CSV only. Will later merge CSV + API sources.
 type Opportunity struct {
 	NoticeID           string
 	SolicitationNumber string
