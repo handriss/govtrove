@@ -447,6 +447,7 @@ func (h *Handler) detectAmendments(ctx context.Context) (int, error) {
 		WHERE o.notice_id != so.notice_id
 		  AND o.created_at > so.last_notified_at
 		  AND so.solicitation_number IS NOT NULL
+		  AND o.is_latest = true
 	`)
 	if err != nil {
 		return 0, fmt.Errorf("query amendments: %w", err)

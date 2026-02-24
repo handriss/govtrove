@@ -1,6 +1,9 @@
 package reconcile
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	"github.com/handriss/govtrove/pipeline/internal/parse"
@@ -71,6 +74,17 @@ type Opportunity struct {
 	DescriptionURL     string
 	AdditionalInfoLink string
 	ResourceLinks      []string
+}
+
+// ContentHash returns a deterministic SHA-256 hash of content fields.
+// Excludes Active (feed metadata, not content) to avoid spurious versions
+// when the same notice_id appears in both active and archived CSV feeds.
+func (o Opportunity) ContentHash() string {
+	tmp := o
+	tmp.Active = false
+	b, _ := json.Marshal(tmp)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
 }
 
 type DataQualityIssue struct {

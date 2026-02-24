@@ -157,8 +157,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 
 		It("detects BRAND-NEW as a new record", func() {
 			count := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.snap_changes WHERE notice_id = 'BRAND-NEW' AND change_type = 'new' AND run_id = $1",
-				activeRunID2)
+				"SELECT COUNT(*) FROM pipeline.snap_csv c LEFT JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2 WHERE c.run_id = $1 AND c.notice_id = 'BRAND-NEW' AND p.notice_id IS NULL",
+				activeRunID2, activeRunID1)
 			Expect(count).To(Equal(1))
 		})
 
@@ -211,27 +211,44 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		It("marks WILL-GLITCH as inactive in opportunities", func() {
 			var active bool
 			err := db.Pool().QueryRow(ctx,
-				"SELECT active FROM opportunities WHERE notice_id = 'WILL-GLITCH'",
+				"SELECT active FROM opportunities WHERE notice_id = 'WILL-GLITCH' AND is_latest = true",
 			).Scan(&active)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(active).To(BeFalse())
 		})
 
-		It("updates WILL-CHANGE opportunity with new title and amount", func() {
+		It("creates WILL-CHANGE version 2 with new title and amount", func() {
 			var title string
 			var awardAmount *float64
+			var version int
 			err := db.Pool().QueryRow(ctx,
-				"SELECT title, award_amount FROM opportunities WHERE notice_id = 'WILL-CHANGE'",
-			).Scan(&title, &awardAmount)
+				"SELECT title, award_amount, version FROM opportunities WHERE notice_id = 'WILL-CHANGE' AND is_latest = true",
+			).Scan(&title, &awardAmount, &version)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(title).To(Equal("Updated Title"))
 			Expect(awardAmount).NotTo(BeNil())
 			Expect(*awardAmount).To(BeNumerically("==", 2000))
+			Expect(version).To(Equal(2))
+
+			// Old version preserved with is_latest=false
+			var oldTitle string
+			var oldLatest bool
+			err = db.Pool().QueryRow(ctx,
+				"SELECT title, is_latest FROM opportunities WHERE notice_id = 'WILL-CHANGE' AND version = 1",
+			).Scan(&oldTitle, &oldLatest)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(oldTitle).To(Equal("Original Title"))
+			Expect(oldLatest).To(BeFalse())
 		})
 
 		It("adds BRAND-NEW to opportunities", func() {
+			// 9 original + 1 BRAND-NEW + 1 WILL-CHANGE v2 = 11 total rows
 			total := queryCount(ctx, "SELECT COUNT(*) FROM opportunities")
-			Expect(total).To(Equal(10)) // 9 + BRAND-NEW
+			Expect(total).To(Equal(11))
+
+			// 10 latest versions (WILL-CHANGE v1 is not latest)
+			latestCount := queryCount(ctx, "SELECT COUNT(*) FROM opportunities WHERE is_latest = true")
+			Expect(latestCount).To(Equal(10))
 
 			var title string
 			err := db.Pool().QueryRow(ctx,
@@ -278,7 +295,7 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		It("reactivates WILL-GLITCH in opportunities", func() {
 			var active bool
 			err := db.Pool().QueryRow(ctx,
-				"SELECT active FROM opportunities WHERE notice_id = 'WILL-GLITCH'",
+				"SELECT active FROM opportunities WHERE notice_id = 'WILL-GLITCH' AND is_latest = true",
 			).Scan(&active)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(active).To(BeTrue())
@@ -292,8 +309,12 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("maintains correct total opportunity count", func() {
+			// 11 total rows (including WILL-CHANGE v1), 10 with is_latest=true
 			total := queryCount(ctx, "SELECT COUNT(*) FROM opportunities")
-			Expect(total).To(Equal(10))
+			Expect(total).To(Equal(11))
+
+			latestCount := queryCount(ctx, "SELECT COUNT(*) FROM opportunities WHERE is_latest = true")
+			Expect(latestCount).To(Equal(10))
 		})
 	})
 })
