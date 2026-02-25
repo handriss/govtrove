@@ -9,10 +9,10 @@
   --color-dark-500: #64748b;
   --color-dark-600: #475569;
   --color-dark-700: #334155;
-  --color-dark-800: #1e293b;
-  --color-dark-850: #172033;
-  --color-dark-900: #0f172a;
-  --color-dark-950: #0a0f1a;
+  --color-dark-800: #222e44;
+  --color-dark-850: #1a2538;
+  --color-dark-900: #141c2e;
+  --color-dark-950: #0e1525;
 
   --color-accent: #3b82f6;
   --color-accent-hover: #2563eb;
@@ -35,6 +35,131 @@
 @keyframes chip-exit {
   from { opacity: 1; transform: scale(1); }
   to { opacity: 0; transform: scale(0.95); }
+}
+
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Text — proper gradient through Tailwind slate scale */
+  --color-dark-50: #020617;
+  --color-dark-100: #0f172a;
+  --color-dark-200: #1e293b;
+  --color-dark-300: #334155;
+  --color-dark-400: #475569;
+  --color-dark-500: #64748b;
+
+  /* Borders & dividers — darker so /50 opacity still reads */
+  --color-dark-600: #94a3b8;
+  --color-dark-700: #cbd5e1;
+
+  /* Surfaces — enough gap between page bg and cards */
+  --color-dark-800: #e2e8f0;
+  --color-dark-850: #f1f5f9;
+  --color-dark-900: #ffffff;
+  --color-dark-950: #f1f5f9;
+
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* Standard Tailwind color overrides — darken for text contrast */
+  --color-blue-400: #2563eb;
+  --color-violet-400: #7c3aed;
+  --color-emerald-400: #059669;
+  --color-pink-400: #db2777;
+  --color-orange-400: #ea580c;
+  --color-red-400: #dc2626;
+  --color-amber-400: #d97706;
+  --color-green-400: #16a34a;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ===== Light Theme Design ===== */
+
+/* Rich gradient background — blue/indigo top, violet/lavender bottom */
+[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15) 0%, transparent 100%),
+    radial-gradient(ellipse 80% 50% at 80% 120%, rgba(139, 92, 246, 0.1) 0%, transparent 100%),
+    linear-gradient(to bottom, #eef2ff, #f8f7ff 50%, #faf5ff 100%);
+  background-attachment: fixed;
+}
+
+/* Keyword highlight — override dark-theme yellow for light readability */
+[data-theme="light"] mark {
+  background-color: rgba(253, 224, 71, 0.4) !important;
+  color: #854d0e !important;
+}
+
+/* Scrollbar — transparent track so gradient shows through */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Card shadows — in base layer so Tailwind hover states override */
+@layer base {
+  [data-theme="light"] article {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  }
+}
+
+/* Inputs — unlayered to override Tailwind utility backgrounds/borders.
+   Solid white, visible border, prominent shadow. */
+[data-theme="light"] input,
+[data-theme="light"] textarea {
+  background-color: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+  box-shadow: 0 2px 8px -2px rgb(0 0 0 / 0.1), 0 1px 3px -1px rgb(0 0 0 / 0.06);
+}
+
+[data-theme="light"] input:hover,
+[data-theme="light"] textarea:hover {
+  background-color: #ffffff;
+  border-color: rgba(15, 23, 42, 0.25);
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus {
+  background-color: #ffffff;
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), 0 2px 8px -2px rgb(0 0 0 / 0.1);
+}
+
+[data-theme="light"] input::placeholder {
+  color: #64748b;
+}
+
+/* Hero search input — extra prominent shadow */
+[data-theme="light"] input[class*="rounded-2xl"] {
+  box-shadow: 0 8px 30px -4px rgb(0 0 0 / 0.12), 0 4px 10px -4px rgb(0 0 0 / 0.06);
+}
+
+[data-theme="light"] input[class*="rounded-2xl"]:focus {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), 0 8px 30px -4px rgb(0 0 0 / 0.12);
+}
+
+/* CSS class shadows for light mode */
+[data-theme="light"] .card,
+[data-theme="light"] .stat-card {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+}
+
+[data-theme="light"] .btn-primary {
+  box-shadow: 0 1px 3px 0 rgba(37, 99, 235, 0.3);
+}
+
+[data-theme="light"] .btn-secondary {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+}
+
+[data-theme="light"] .table-row:hover {
+  background-color: rgba(59, 130, 246, 0.04);
 }
 
 html {
@@ -159,31 +284,31 @@ body {
 
 .badge-blue {
   background-color: rgb(59 130 246 / 0.2);
-  color: rgb(96 165 250);
+  color: var(--color-blue-400, rgb(96 165 250));
   border: 1px solid rgb(59 130 246 / 0.3);
 }
 
 .badge-green {
   background-color: rgb(16 185 129 / 0.2);
-  color: rgb(52 211 153);
+  color: var(--color-emerald-400, rgb(52 211 153));
   border: 1px solid rgb(16 185 129 / 0.3);
 }
 
 .badge-purple {
   background-color: rgb(168 85 247 / 0.2);
-  color: rgb(192 132 252);
+  color: var(--color-violet-400, rgb(192 132 252));
   border: 1px solid rgb(168 85 247 / 0.3);
 }
 
 .badge-pink {
   background-color: rgb(236 72 153 / 0.2);
-  color: rgb(244 114 182);
+  color: var(--color-pink-400, rgb(244 114 182));
   border: 1px solid rgb(236 72 153 / 0.3);
 }
 
 .badge-orange {
   background-color: rgb(249 115 22 / 0.2);
-  color: rgb(251 146 60);
+  color: var(--color-orange-400, rgb(251 146 60));
   border: 1px solid rgb(249 115 22 / 0.3);
 }
 
@@ -195,13 +320,13 @@ body {
 
 .badge-red {
   background-color: rgb(239 68 68 / 0.2);
-  color: rgb(248 113 113);
+  color: var(--color-red-400, rgb(248 113 113));
   border: 1px solid rgb(239 68 68 / 0.3);
 }
 
 .badge-amber {
   background-color: rgb(245 158 11 / 0.2);
-  color: rgb(251 191 36);
+  color: var(--color-amber-400, rgb(251 191 36));
   border: 1px solid rgb(245 158 11 / 0.3);
 }
 

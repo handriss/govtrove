@@ -22,6 +22,10 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
+    <!-- Theme -->
+    <script>document.documentElement.setAttribute('data-theme','dark')</script>
+    <link rel="stylesheet" href="/theme.css">
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,18 +37,28 @@
     <style>
         /* ===== Preview Banner ===== */
         .preview-banner {
-            background: rgba(59, 130, 246, 0.1);
-            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+            background: var(--preview-banner-bg);
+            border-bottom: 1px solid var(--preview-banner-border);
             padding: 0.5rem 1rem;
             text-align: center;
             font-size: 0.875rem;
-            color: #94a3b8;
-            position: relative;
+            color: var(--preview-banner-text);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
             z-index: 101;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .preview-banner.dismissed {
+            transform: translateY(-100%);
+            opacity: 0;
+            pointer-events: none;
         }
 
         .preview-banner strong {
-            color: #f1f5f9;
+            color: var(--preview-banner-strong);
             font-weight: 600;
         }
 
@@ -55,7 +69,7 @@
             transform: translateY(-50%);
             background: none;
             border: none;
-            color: #64748b;
+            color: var(--preview-banner-dismiss);
             cursor: pointer;
             padding: 0.25rem;
             line-height: 1;
@@ -63,63 +77,15 @@
         }
 
         .preview-banner-dismiss:hover {
-            color: #e2e8f0;
+            color: var(--preview-banner-dismiss-hover);
         }
 
-        /* ===== CSS Custom Properties ===== */
+        /* ===== CSS Custom Properties (non-theme) ===== */
         :root {
-            /* Backgrounds - matching frontend slate palette */
-            --bg-page: #0a0f1a;
-            --bg-card: #0f172a;
-            --bg-elevated: #1e293b;
-            --bg-hover: #334155;
-
-            /* Borders */
-            --border-subtle: rgba(148, 163, 184, 0.1);
-            --border-default: rgba(148, 163, 184, 0.15);
-            --border-strong: rgba(148, 163, 184, 0.25);
-
-            /* Text - matching frontend */
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #7b8ba2;
-
-            /* Accent - matching frontend blue */
-            --accent: #2563eb;
-            --accent-hover: #1d4ed8;
-            --accent-subtle: rgba(37, 99, 235, 0.15);
-
-            /* Set-aside badges - with borders like frontend */
-            --badge-small-business-bg: rgba(59, 130, 246, 0.2);
-            --badge-small-business-text: #60a5fa;
-            --badge-small-business-border: rgba(59, 130, 246, 0.3);
-            --badge-8a-bg: rgba(168, 85, 247, 0.2);
-            --badge-8a-text: #c084fc;
-            --badge-8a-border: rgba(168, 85, 247, 0.3);
-            --badge-sdvosb-bg: rgba(16, 185, 129, 0.2);
-            --badge-sdvosb-text: #34d399;
-            --badge-sdvosb-border: rgba(16, 185, 129, 0.3);
-            --badge-wosb-bg: rgba(236, 72, 153, 0.2);
-            --badge-wosb-text: #f472b6;
-            --badge-wosb-border: rgba(236, 72, 153, 0.3);
-            --badge-hubzone-bg: rgba(249, 115, 22, 0.2);
-            --badge-hubzone-text: #fb923c;
-            --badge-hubzone-border: rgba(249, 115, 22, 0.3);
-
-            /* Deadline colors - matching frontend */
-            --deadline-urgent: #f87171;
-            --deadline-warning: #fbbf24;
-            --deadline-safe: #34d399;
-
-            /* Typography */
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Consolas, monospace;
-
-            /* Spacing */
             --section-padding: 6rem;
             --container-max: 1200px;
-
-            /* Transitions */
             --transition-fast: 150ms ease;
             --transition-base: 250ms ease;
         }
@@ -228,11 +194,11 @@
             right: 0;
             z-index: 100;
             padding: 1rem 0;
-            transition: background var(--transition-base), backdrop-filter var(--transition-base);
+            transition: top 0.3s ease, background var(--transition-base), backdrop-filter var(--transition-base);
         }
 
         .nav.scrolled {
-            background: rgba(10, 10, 15, 0.9);
+            background: var(--nav-bg);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-subtle);
         }
@@ -275,6 +241,15 @@
 
         .nav-cta {
             margin-left: 1rem;
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-cta:hover {
+            background: var(--accent-subtle);
+            border-color: rgba(59, 130, 246, 0.6);
+            transform: none;
         }
 
         .nav-mobile-toggle {
@@ -329,10 +304,11 @@
 
         /* ===== Hero Section ===== */
         .hero {
-            padding: calc(var(--section-padding) + 4rem) 0 var(--section-padding);
+            padding: calc(var(--section-padding) + 2rem + var(--banner-height, 0px)) 0 var(--section-padding);
             text-align: center;
             position: relative;
             overflow: hidden;
+            transition: padding-top 0.3s ease;
         }
 
         .hero::before {
@@ -352,6 +328,13 @@
             z-index: 1;
         }
 
+        .hero-builder-line {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 1.5rem;
+            letter-spacing: 0.01em;
+        }
+
         .hero h1 {
             font-size: clamp(2.5rem, 6vw, 4rem);
             font-weight: 700;
@@ -363,7 +346,7 @@
         .hero-subtitle {
             font-size: clamp(1.125rem, 2vw, 1.25rem);
             color: var(--text-secondary);
-            max-width: 680px;
+            max-width: 620px;
             margin: 0 auto 2.5rem;
             line-height: 1.7;
         }
@@ -386,16 +369,20 @@
             color: var(--text-secondary);
         }
 
-        .hero-stats strong {
-            color: var(--text-primary);
+        .hero-stats-number {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1.0625rem;
         }
 
-        /* ===== Hero Mockup ===== */
-        .hero-mockup {
-            margin-top: 4rem;
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
+        /* ===== Mockup Styles ===== */
+        .mockup-section {
+            padding: 0 0 var(--section-padding);
+        }
+
+        .mockup-wrapper {
+            max-width: 1000px;
+            margin: 0 auto;
         }
 
         .mockup-window {
@@ -409,25 +396,26 @@
         .mockup-header {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.875rem 1rem;
+            justify-content: center;
+            padding: 0.625rem 1rem;
             background: var(--bg-elevated);
             border-bottom: 1px solid var(--border-subtle);
         }
 
-        .mockup-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--text-muted);
+        .mockup-address-bar {
+            background: var(--bg-page);
+            border: 1px solid var(--border-default);
+            border-radius: 0.25rem;
+            padding: 0.25rem 1rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: var(--font-sans);
+            min-width: 200px;
+            text-align: center;
         }
 
-        .mockup-dot:nth-child(1) { background: #ef4444; }
-        .mockup-dot:nth-child(2) { background: #f59e0b; }
-        .mockup-dot:nth-child(3) { background: #22c55e; }
-
         .mockup-body {
-            padding: 1.5rem;
+            padding: 1.5rem 2rem 2rem;
         }
 
         .mockup-search {
@@ -483,14 +471,14 @@
         .mockup-results {
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 1rem;
         }
 
         .mockup-result {
             background: var(--bg-card);
             border: 1px solid var(--border-subtle);
             border-radius: 0.5rem;
-            padding: 1rem;
+            padding: 1.25rem;
             text-align: left;
             transition: background-color var(--transition-fast);
         }
@@ -606,6 +594,10 @@
             .mockup-filter {
                 flex-shrink: 0;
             }
+
+            .mockup-body {
+                padding: 1.5rem;
+            }
         }
 
         /* ===== Section Styles ===== */
@@ -692,106 +684,6 @@
             margin-top: 2px;
         }
 
-        /* ===== Features Section ===== */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
-        .feature-card {
-            padding: 2rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 0.5rem;
-            transition: border-color var(--transition-fast);
-        }
-
-        .feature-card:hover {
-            border-color: var(--border-default);
-        }
-
-        .feature-icon {
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--accent-subtle);
-            border-radius: 0.5rem;
-            margin-bottom: 1.25rem;
-            color: var(--accent);
-        }
-
-        .feature-card h3 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .feature-card p {
-            color: var(--text-secondary);
-            font-size: 0.9375rem;
-            line-height: 1.6;
-        }
-
-        .feature-tag {
-            display: inline-block;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--accent);
-            background: var(--accent-subtle);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            margin-top: 0.75rem;
-        }
-
-        /* ===== How It Works ===== */
-        .how-it-works {
-            background: var(--bg-card);
-            border-top: 1px solid var(--border-subtle);
-            border-bottom: 1px solid var(--border-subtle);
-        }
-
-        .steps {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 3rem;
-            position: relative;
-        }
-
-        .step {
-            text-align: center;
-            position: relative;
-        }
-
-        .step-number {
-            width: 56px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--accent);
-            border-radius: 50%;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #fff;
-            margin: 0 auto 1.5rem;
-        }
-
-        .step h3 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-
-        .step p {
-            color: var(--text-secondary);
-            font-size: 0.9375rem;
-            max-width: 280px;
-            margin: 0 auto;
-        }
-
         /* ===== Manifesto Section ===== */
         .manifesto {
             text-align: center;
@@ -810,7 +702,7 @@
             margin-bottom: 1.5rem;
         }
 
-        .manifesto-content p:last-child {
+        .manifesto-content p:last-of-type {
             margin-bottom: 0;
         }
 
@@ -818,28 +710,14 @@
             color: var(--text-primary);
         }
 
-        /* ===== Product Demo Section ===== */
-        .demo {
-            background: var(--bg-card);
-            border-top: 1px solid var(--border-subtle);
-            border-bottom: 1px solid var(--border-subtle);
+        .manifesto-pricing {
+            margin-top: 2rem;
+            font-size: 0.9375rem;
+            color: var(--text-muted);
         }
 
-        .demo-mockup {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        .demo-mockup .mockup-body {
-            padding: 1.5rem 2rem 2rem;
-        }
-
-        .demo-mockup .mockup-results {
-            gap: 1rem;
-        }
-
-        .demo-mockup .mockup-result {
-            padding: 1.25rem;
+        .manifesto-pricing strong {
+            color: var(--text-primary);
         }
 
         /* ===== Trust Section ===== */
@@ -853,13 +731,6 @@
             max-width: 800px;
             margin: 0 auto;
             text-align: center;
-        }
-
-        .trust-tagline {
-            font-size: clamp(1.25rem, 3vw, 1.5rem);
-            font-weight: 600;
-            margin-bottom: 3rem;
-            color: var(--text-primary);
         }
 
         .trust-items {
@@ -987,6 +858,25 @@
             max-height: 500px;
         }
 
+        /* ===== Final CTA Section ===== */
+        .final-cta {
+            text-align: center;
+            padding: calc(var(--section-padding) * 1.25) 0;
+        }
+
+        .final-cta h2 {
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .final-cta p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
         /* ===== Footer ===== */
         .footer {
             padding: 4rem 0 2rem;
@@ -1109,15 +999,11 @@
             }
 
             .hero {
-                padding-top: calc(var(--section-padding) + 3rem);
+                padding-top: calc(var(--section-padding) + 1.5rem);
             }
 
             .section-header {
                 margin-bottom: 3rem;
-            }
-
-            .steps {
-                gap: 2rem;
             }
         }
     </style>
@@ -1131,7 +1017,7 @@
           "name": "Is GovTrove free?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Paid plans with additional features are coming soon."
+            "text": "Yes, the core search is free forever with no account required. You can search, filter, and view opportunities immediately. Pro features with saved searches and email alerts start at $9/mo."
           }
         },
         {
@@ -1165,22 +1051,6 @@
             "@type": "Answer",
             "text": "No. You can search immediately without creating an account. An account is only needed if you want to save opportunities or set up email alerts."
           }
-        },
-        {
-          "@type": "Question",
-          "name": "Is my data secure?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "We don't store sensitive business data. Your search queries and saved opportunities are protected with industry-standard encryption. We never sell or share your data with third parties."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Is GovTrove a free alternative to SAM.gov?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "GovTrove is a free search tool that makes it easier to find and filter federal contract opportunities from SAM.gov. It doesn't replace SAM.gov — you still respond to solicitations through official channels. Think of it as a better search interface for SAM.gov's public data, with boolean search, smart filters, and a modern UI."
-          }
         }
       ]
     }
@@ -1202,11 +1072,11 @@
                 GovTrove
             </a>
             <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
+                <li><a href="#problem">Why GovTrove</a></li>
                 <li><a href="#faq">FAQ</a></li>
                 <li><a href="/blog/">Blog</a></li>
             </ul>
-            <a href="https://app.govtrove.com" class="btn btn-primary nav-cta">Start Searching</a>
+            <a href="https://app.govtrove.com" class="btn nav-cta">Start Searching</a>
             <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Toggle menu">
                 <i data-lucide="menu" width="24" height="24"></i>
             </button>
@@ -1216,7 +1086,7 @@
     <!-- Mobile Menu -->
     <div class="nav-mobile-menu" id="mobile-menu">
         <ul>
-            <li><a href="#features" class="mobile-link">Features</a></li>
+            <li><a href="#problem" class="mobile-link">Why GovTrove</a></li>
             <li><a href="#faq" class="mobile-link">FAQ</a></li>
             <li><a href="/blog/" class="mobile-link">Blog</a></li>
         </ul>
@@ -1239,236 +1109,20 @@
                 </a>
                 <p class="hero-cta-subtext">No credit card. No sales calls. No catch.</p>
             </div>
+            <p class="hero-builder-line">Built by someone who got tired of SAM.gov</p>
             <p class="hero-stats">
-                <strong>100,000+ active opportunities</strong> from SAM.gov, updated daily
+                <span class="hero-stats-number">100,000+</span> active opportunities from SAM.gov, updated daily
             </p>
+        </div>
+    </section>
 
-            <!-- Hero Mockup -->
-            <div class="hero-mockup fade-in">
+    <!-- Product Mockup -->
+    <section class="mockup-section">
+        <div class="container">
+            <div class="mockup-wrapper fade-in">
                 <div class="mockup-window">
                     <div class="mockup-header">
-                        <span class="mockup-dot"></span>
-                        <span class="mockup-dot"></span>
-                        <span class="mockup-dot"></span>
-                    </div>
-                    <div class="mockup-body">
-                        <div class="mockup-search">
-                            <input type="text" class="mockup-search-input" value="cybersecurity AND (assessment OR penetration)" readonly aria-label="Example search query">
-                            <button class="mockup-search-btn">Search</button>
-                        </div>
-                        <div class="mockup-filters">
-                            <span class="mockup-filter active">
-                                <i data-lucide="building-2" width="14" height="14"></i>
-                                DoD
-                            </span>
-                            <span class="mockup-filter active">
-                                <i data-lucide="shield-check" width="14" height="14"></i>
-                                SDVOSB
-                            </span>
-                            <span class="mockup-filter">NAICS: 541512</span>
-                            <span class="mockup-filter">Active Only</span>
-                        </div>
-                        <div class="mockup-results">
-                            <div class="mockup-result">
-                                <div class="mockup-result-header">
-                                    <span class="mockup-result-title">Cybersecurity Assessment and Penetration Testing Services</span>
-                                    <span class="mockup-result-deadline safe">12 days</span>
-                                </div>
-                                <div class="mockup-result-meta">
-                                    <span class="mockup-result-badge badge-sdvosb">SDVOSB</span>
-                                    <span>Department of the Army</span>
-                                    <span>NAICS 541512</span>
-                                    <span class="mockup-result-sol">W911NF-26-R-0042</span>
-                                </div>
-                            </div>
-                            <div class="mockup-result">
-                                <div class="mockup-result-header">
-                                    <span class="mockup-result-title">Cloud Migration and Infrastructure Modernization</span>
-                                    <span class="mockup-result-deadline urgent">5 days</span>
-                                </div>
-                                <div class="mockup-result-meta">
-                                    <span class="mockup-result-badge badge-small-business">Small Business</span>
-                                    <span>Defense Information Systems Agency</span>
-                                    <span>NAICS 541519</span>
-                                    <span class="mockup-result-sol">HC1028-26-R-0015</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Problem Section -->
-    <section class="problem" id="problem">
-        <div class="container">
-            <div class="section-header fade-in">
-                <h2>SAM.gov Is Broken — There's a Better Way to Search Government Contracts</h2>
-                <p>The government's own accountability office has documented these failures. You've lived them.</p>
-            </div>
-            <div class="problem-grid">
-                <div class="problem-card fade-in">
-                    <div class="problem-card-icon">
-                        <i data-lucide="search-x" width="24" height="24"></i>
-                    </div>
-                    <h3>Search That Doesn't Search</h3>
-                    <p>No boolean operators, no exact-match, keyword search returns irrelevant results. The Professional Services Council formally complained to GSA about this.</p>
-                    <div class="solution">
-                        <i data-lucide="check" width="16" height="16"></i>
-                        <span>GovTrove: Full boolean search with AND, OR, NOT operators and exact-phrase matching</span>
-                    </div>
-                </div>
-                <div class="problem-card fade-in">
-                    <div class="problem-card-icon">
-                        <i data-lucide="filter-x" width="24" height="24"></i>
-                    </div>
-                    <h3>Filters That Don't Filter</h3>
-                    <p>Important fields are missing entirely. Existing filters are buggy, reset unexpectedly, and don't remember your preferences.</p>
-                    <div class="solution">
-                        <i data-lucide="check" width="16" height="16"></i>
-                        <span>GovTrove: Every filter contractors actually need — NAICS, set-aside, agency, location, dates</span>
-                    </div>
-                </div>
-                <div class="problem-card fade-in">
-                    <div class="problem-card-icon">
-                        <i data-lucide="bell-off" width="24" height="24"></i>
-                    </div>
-                    <h3>Alerts That Miss Everything</h3>
-                    <p>Email notifications deliver irrelevant results or nothing at all. Contractors miss real opportunities while wading through noise.</p>
-                    <div class="solution">
-                        <i data-lucide="check" width="16" height="16"></i>
-                        <span>GovTrove: Saved searches with smart alerts (coming soon with Pro)</span>
-                    </div>
-                </div>
-                <div class="problem-card fade-in">
-                    <div class="problem-card-icon">
-                        <i data-lucide="smartphone" width="24" height="24"></i>
-                    </div>
-                    <h3>Unusable on Mobile</h3>
-                    <p>No responsive design. BD professionals checking opportunities between meetings or at industry days can't use it on a phone.</p>
-                    <div class="solution">
-                        <i data-lucide="check" width="16" height="16"></i>
-                        <span>GovTrove: Built mobile-first for how you actually work</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <div class="container">
-            <div class="section-header fade-in">
-                <h2>Built for How Contractors Actually Work</h2>
-                <p>Metadata-first screening. See what matters — title, agency, set-aside, deadline — without digging through 50-page SOWs.</p>
-            </div>
-            <div class="features-grid">
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="search" width="24" height="24"></i>
-                    </div>
-                    <h3>Smart Search</h3>
-                    <p>Full-text search that understands what you're looking for. Boolean operators (AND, OR, NOT) and exact-phrase matching included.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="sliders-horizontal" width="24" height="24"></i>
-                    </div>
-                    <h3>Filters That Work</h3>
-                    <p>NAICS, PSC, agency, set-aside type, notice type, place of performance, date ranges. Every filter you actually need, none of the clutter.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="clock" width="24" height="24"></i>
-                    </div>
-                    <h3>Deadline Intelligence</h3>
-                    <p>Color-coded urgency indicators. See at a glance which opportunities need attention now versus next week versus next month.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="badge-check" width="24" height="24"></i>
-                    </div>
-                    <h3>Set-Aside Matching</h3>
-                    <p>Instantly filter to your eligibility: 8(a), SDVOSB, WOSB, HUBZone, small business. Stop scrolling past opportunities you can't bid on.</p>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="bell-ring" width="24" height="24"></i>
-                    </div>
-                    <h3>Email Alerts</h3>
-                    <p>Saved search profiles that notify you when matching opportunities appear. Daily digests or real-time — you choose.</p>
-                    <span class="feature-tag">Coming Soon</span>
-                </div>
-                <div class="feature-card fade-in">
-                    <div class="feature-icon">
-                        <i data-lucide="smartphone" width="24" height="24"></i>
-                    </div>
-                    <h3>Mobile-First Design</h3>
-                    <p>Built for how you actually work. Check opportunities on your phone between meetings, at industry days, on the go.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- How It Works -->
-    <section class="how-it-works">
-        <div class="container">
-            <div class="section-header fade-in">
-                <h2>How It Works</h2>
-                <p>Three steps. No training required.</p>
-            </div>
-            <div class="steps">
-                <div class="step fade-in">
-                    <div class="step-number">1</div>
-                    <h3>Search</h3>
-                    <p>Type what you're looking for. Use boolean operators or plain language — GovTrove understands both.</p>
-                </div>
-                <div class="step fade-in">
-                    <div class="step-number">2</div>
-                    <h3>Filter</h3>
-                    <p>Narrow by agency, set-aside, NAICS, location, deadline, and more. Filters that actually remember your preferences.</p>
-                </div>
-                <div class="step fade-in">
-                    <div class="step-number">3</div>
-                    <h3>Act</h3>
-                    <p>Save opportunities, set up alerts, and link directly to SAM.gov to respond through official channels.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Manifesto -->
-    <section class="manifesto">
-        <div class="container">
-            <div class="manifesto-content fade-in">
-                <p>
-                    For years, finding government contracts meant fighting SAM.gov's broken search or paying
-                    <strong>$6,000–$50,000/year</strong> for an enterprise tool. We think that's absurd.
-                </p>
-                <p>
-                    Public contracts are public data. Searching them shouldn't require a training course or a procurement budget.
-                </p>
-                <p>
-                    We built GovTrove around a simple observation: <strong>contractors don't read 50-page Statements of Work to decide if an opportunity is worth pursuing.</strong> The first pass is always the metadata — title, agency, set-aside, deadline. So we built the best metadata search tool we could, and made it accessible to everyone.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Product Demo -->
-    <section class="demo">
-        <div class="container">
-            <div class="section-header fade-in">
-                <h2>See Opportunities Clearly</h2>
-                <p>Everything you need to screen an opportunity, at a glance.</p>
-            </div>
-            <div class="demo-mockup fade-in">
-                <div class="mockup-window">
-                    <div class="mockup-header">
-                        <span class="mockup-dot"></span>
-                        <span class="mockup-dot"></span>
-                        <span class="mockup-dot"></span>
+                        <div class="mockup-address-bar">app.govtrove.com</div>
                     </div>
                     <div class="mockup-body">
                         <div class="mockup-search">
@@ -1545,11 +1199,87 @@
         </div>
     </section>
 
+    <!-- Problem Section -->
+    <section class="problem" id="problem">
+        <div class="container">
+            <div class="section-header fade-in">
+                <h2>SAM.gov Is Broken — There's a Better Way to Search Government Contracts</h2>
+                <p>The government's own accountability office has documented these failures. You've lived them.</p>
+            </div>
+            <div class="problem-grid">
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="search-x" width="24" height="24"></i>
+                    </div>
+                    <h3>Search That Doesn't Search</h3>
+                    <p>No boolean operators, no exact-match, keyword search returns irrelevant results. The Professional Services Council formally complained to GSA about this.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>GovTrove: Full boolean search with AND, OR, NOT operators and exact-phrase matching</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="filter-x" width="24" height="24"></i>
+                    </div>
+                    <h3>Filters That Don't Filter</h3>
+                    <p>Important fields are missing entirely. Existing filters are buggy, reset unexpectedly, and don't remember your preferences.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>GovTrove: Every filter contractors actually need — NAICS, set-aside, agency, location, dates</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="bell-off" width="24" height="24"></i>
+                    </div>
+                    <h3>Alerts That Miss Everything</h3>
+                    <p>Email notifications deliver irrelevant results or nothing at all. Contractors miss real opportunities while wading through noise.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>GovTrove: Saved searches with smart alerts (coming soon with Pro)</span>
+                    </div>
+                </div>
+                <div class="problem-card fade-in">
+                    <div class="problem-card-icon">
+                        <i data-lucide="smartphone" width="24" height="24"></i>
+                    </div>
+                    <h3>Unusable on Mobile</h3>
+                    <p>No responsive design. BD professionals checking opportunities between meetings or at industry days can't use it on a phone.</p>
+                    <div class="solution">
+                        <i data-lucide="check" width="16" height="16"></i>
+                        <span>GovTrove: Built mobile-first for how you actually work</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Manifesto -->
+    <section class="manifesto">
+        <div class="container">
+            <div class="manifesto-content fade-in">
+                <p>
+                    For years, finding government contracts meant fighting SAM.gov's broken search or paying
+                    <strong>$6,000–$50,000/year</strong> for an enterprise tool. We think that's absurd.
+                </p>
+                <p>
+                    Public contracts are public data. Searching them shouldn't require a training course or a procurement budget.
+                </p>
+                <p>
+                    We built GovTrove around a simple observation: <strong>contractors don't read 50-page Statements of Work to decide if an opportunity is worth pursuing.</strong> The first pass is always the metadata — title, agency, set-aside, deadline. So we built the best metadata search tool we could, and made it accessible to everyone.
+                </p>
+                <p class="manifesto-pricing">
+                    <strong>Free forever</strong> core search. Pro features starting at <strong>$9/mo</strong>.
+                </p>
+            </div>
+        </div>
+    </section>
+
     <!-- Trust Section -->
     <section class="trust">
         <div class="container">
             <div class="trust-content">
-                <p class="trust-tagline fade-in">Built by a contractor who got tired of SAM.gov. You probably know the feeling.</p>
                 <div class="trust-items">
                     <div class="trust-item fade-in">
                         <div class="trust-item-icon">
@@ -1602,7 +1332,7 @@
                     </button>
                     <div class="faq-answer">
                         <div class="faq-answer-inner">
-                            Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. Paid plans with additional features are coming soon.
+                            Yes, the core search is free forever with no account required. You can search, filter, and view opportunities immediately. Pro features with saved searches and email alerts start at $9/mo.
                         </div>
                     </div>
                 </div>
@@ -1650,28 +1380,20 @@
                         </div>
                     </div>
                 </div>
-                <div class="faq-item fade-in">
-                    <button class="faq-question" aria-expanded="false">
-                        Is my data secure?
-                        <i data-lucide="chevron-down" width="20" height="20"></i>
-                    </button>
-                    <div class="faq-answer">
-                        <div class="faq-answer-inner">
-                            We don't store sensitive business data. Your search queries and saved opportunities are protected with industry-standard encryption. We never sell or share your data with third parties.
-                        </div>
-                    </div>
-                </div>
-                <div class="faq-item fade-in">
-                    <button class="faq-question" aria-expanded="false">
-                        Is GovTrove a free alternative to SAM.gov?
-                        <i data-lucide="chevron-down" width="20" height="20"></i>
-                    </button>
-                    <div class="faq-answer">
-                        <div class="faq-answer-inner">
-                            GovTrove is a free search tool that makes it easier to find and filter federal contract opportunities from SAM.gov. It doesn't replace SAM.gov — you still respond to solicitations through official channels. Think of it as a better search interface for SAM.gov's public data, with boolean search, smart filters, and a modern UI.
-                        </div>
-                    </div>
-                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="final-cta">
+        <div class="container">
+            <div class="fade-in">
+                <h2>Ready to find contracts faster?</h2>
+                <p>Search 100,000+ federal opportunities — no account required.</p>
+                <a href="https://app.govtrove.com" class="btn btn-primary btn-large">
+                    Start Searching
+                    <i data-lucide="arrow-right" width="20" height="20"></i>
+                </a>
             </div>
         </div>
     </section>
@@ -1693,7 +1415,7 @@
                     <div class="footer-links-group">
                         <p class="footer-heading">Product</p>
                         <ul>
-                            <li><a href="#features">Features</a></li>
+                            <li><a href="#problem">Why GovTrove</a></li>
                             <li><a href="#faq">FAQ</a></li>
                             <li><a href="/blog/">Blog</a></li>
                         </ul>
@@ -1734,8 +1456,9 @@
         updateBannerHeight();
 
         dismissBtn.addEventListener('click', () => {
-            banner.remove();
+            banner.classList.add('dismissed');
             document.documentElement.style.setProperty('--banner-height', '0px');
+            banner.addEventListener('transitionend', () => banner.remove(), { once: true });
         });
 
         // Navigation scroll effect

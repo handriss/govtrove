@@ -47,13 +47,13 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={placeholder}
           autoFocus={autoFocus}
           className={`
-            w-full bg-dark-900/80 backdrop-blur-sm
-            border border-dark-700/50
-            text-dark-50 placeholder:text-dark-500
+            w-full bg-dark-800 border border-dark-600/50
+            text-dark-50 placeholder:text-dark-400
             transition-all duration-300 ease-out
-            focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20
-            focus:bg-dark-900
-            hover:border-dark-600/50 hover:bg-dark-900/90
+            focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20
+            focus:shadow-[0_0_24px_rgba(59,130,246,0.15)]
+            hover:border-dark-500/60
+            shadow-lg shadow-black/30
             ${isLarge
               ? `py-5 pl-14 text-lg rounded-2xl ${hasSubmit ? 'pr-20' : 'pr-14'}`
               : 'py-3 pl-12 pr-12 text-sm rounded-xl'

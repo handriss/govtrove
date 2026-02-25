@@ -46,6 +46,20 @@ export default function SimpleSearchPage() {
 
   useEffect(() => { preloadWhatsNew(); }, []);
 
+  // "/" keyboard shortcut to focus search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   // Non-keyword search params — auto-search fires when these change
   const autoSearchKey = useMemo(() => {
     const p = fs.toSearchParams();
@@ -147,20 +161,26 @@ export default function SimpleSearchPage() {
   return (
     <div className="min-h-screen flex flex-col relative">
       <a href="#search-results" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg">Skip to search results</a>
-      {/* Subtle gradient overlay */}
-      <div className="fixed inset-0 bg-gradient-to-b from-dark-900/20 via-transparent to-dark-950/40 pointer-events-none" />
+      {/* Ambient glow */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/[0.03] rounded-full blur-3xl pointer-events-none" />
 
-      {/* Subtle radial glow */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-accent/[0.02] rounded-full blur-3xl pointer-events-none" />
-
+      {/* Header: wordmark left, auth right */}
+      {!showResults && (
+        <div className="absolute top-5 left-6 z-20">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-dark-300 tracking-tight">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            GovTrove
+          </span>
+        </div>
+      )}
       <div className="absolute top-4 right-6 z-20">
         <AuthButton />
       </div>
 
-      <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'pt-[25vh]'}`}>
+      <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'flex-1 justify-center pb-24'}`}>
         {/* Logo */}
-        <Link to="/" className={`mb-8 transition-all duration-500 ${showResults ? 'mb-6' : 'mb-10'}`}>
-          <h1 className={`text-center font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-200 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
+        <Link to="/" className={`transition-all duration-500 ${showResults ? 'mb-6' : 'mb-8'}`}>
+          <h1 className={`text-center font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-300 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
             GovTrove
           </h1>
           {!showResults && (
@@ -169,9 +189,12 @@ export default function SimpleSearchPage() {
                 Government Contract Intelligence
               </p>
               {heroTotal > 0 && (
-                <p className="text-center text-dark-500 text-xs mt-1">
-                  {heroTotal.toLocaleString()} active opportunities
-                </p>
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                  <span className="inline-flex items-center gap-1.5 text-dark-300 text-xs bg-dark-800/60 border border-dark-700/30 px-3 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                    {heroTotal.toLocaleString()} active opportunities
+                  </span>
+                </div>
               )}
             </>
           )}
@@ -180,7 +203,7 @@ export default function SimpleSearchPage() {
         {/* Hero mode: large search + quick filters */}
         {!showResults && (
           <>
-            <div className="w-full max-w-2xl px-6 mb-6">
+            <div className="w-full max-w-2xl px-6 mb-8">
               <SearchInput
                 ref={inputRef}
                 value={fs.filters.keyword}
@@ -194,13 +217,14 @@ export default function SimpleSearchPage() {
               />
             </div>
 
-            <div className="text-center space-y-5 animate-in fade-in duration-500">
+            <div className="text-center space-y-4 animate-in fade-in duration-500">
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Link
                   to="/whats-new"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm
-                             border border-accent/30 bg-accent/10 text-accent
-                             hover:bg-accent/20 transition-all duration-200"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium
+                             border border-accent/40 bg-accent/20 text-accent
+                             hover:bg-accent/30 hover:border-accent/50 transition-all duration-200
+                             shadow-md shadow-accent/15"
                 >
                   <Clock size={14} strokeWidth={1.5} />
                   What's New Today?
@@ -212,6 +236,15 @@ export default function SimpleSearchPage() {
           </>
         )}
       </div>
+
+      {/* Empty state footer hint */}
+      {!showResults && (
+        <div className="absolute bottom-6 left-0 right-0 z-10 text-center">
+          <p className="text-dark-600 text-xs tracking-wide">
+            Data sourced from SAM.gov &middot; Press <kbd className="px-1.5 py-0.5 rounded bg-dark-800/60 border border-dark-700/30 text-dark-500 font-mono text-[10px]">/</kbd> to search
+          </p>
+        </div>
+      )}
 
       {/* Results mode: compact FilterBar + SearchResults */}
       {showResults && (
