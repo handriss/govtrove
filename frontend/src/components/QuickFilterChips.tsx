@@ -73,7 +73,9 @@ export default function QuickFilterChips({ filters, setFilter, onSearch }: Quick
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm border transition-all duration-150 cursor-pointer
               ${active
                 ? 'border-accent/30 bg-accent/10 text-accent'
-                : 'border-dark-700/50 bg-dark-800/30 text-dark-400 hover:border-dark-600 hover:text-dark-300'
+                : chip.type === 'deadline'
+                  ? 'border-amber-500/20 bg-amber-500/[0.06] text-amber-400/80 hover:border-amber-500/30 hover:text-amber-400'
+                  : 'border-dark-600/30 bg-dark-800/40 text-dark-300 hover:border-dark-500/40 hover:text-dark-200'
               }`}
           >
             <Icon size={13} strokeWidth={1.5} />
