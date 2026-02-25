@@ -159,6 +159,14 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(authmw.SentryRecoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
 	for i := range allowedOrigins {
