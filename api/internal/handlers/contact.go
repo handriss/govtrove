@@ -19,10 +19,11 @@ import (
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 
 var validSubjects = map[string]bool{
-	"General":     true,
-	"Support":     true,
-	"Feedback":    true,
+	"General":    true,
+	"Support":    true,
+	"Feedback":   true,
 	"Partnership": true,
+	"Bug Report": true,
 }
 
 type ContactHandler struct {

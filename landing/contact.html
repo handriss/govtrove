@@ -188,6 +188,7 @@
                         <option value="General">General Inquiry</option>
                         <option value="Support">Support</option>
                         <option value="Feedback">Feedback</option>
+                        <option value="Bug Report">Report a Problem</option>
                         <option value="Partnership">Partnership</option>
                     </select>
                 </div>
@@ -221,6 +222,13 @@
         var errorMsg = document.getElementById('error-msg');
         var messageEl = document.getElementById('message');
         var charCurrent = document.getElementById('char-current');
+        var subjectEl = document.getElementById('subject');
+
+        // Pre-select subject from query param (e.g. ?subject=bug)
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('subject') === 'bug') {
+            subjectEl.value = 'Bug Report';
+        }
 
         messageEl.addEventListener('input', function() {
             var len = this.value.length;
@@ -236,11 +244,17 @@
             btn.disabled = true;
             btn.textContent = 'Sending...';
 
+            var message = document.getElementById('message').value.trim();
+            var referrer = document.referrer;
+            if (subjectEl.value === 'Bug Report' && referrer) {
+                message = 'Page: ' + referrer + '\n\n' + message;
+            }
+
             var data = {
                 name: document.getElementById('name').value.trim(),
                 email: document.getElementById('email').value.trim(),
-                subject: document.getElementById('subject').value,
-                message: document.getElementById('message').value.trim(),
+                subject: subjectEl.value,
+                message: message,
                 website: document.getElementById('website').value
             };
 

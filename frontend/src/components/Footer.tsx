@@ -50,6 +50,9 @@ export default function Footer() {
           <a href="https://govtrove.com/contact.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
             Contact
           </a>
+          <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            Report a Problem
+          </a>
         </div>
       </div>
     </footer>
