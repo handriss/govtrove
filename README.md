@@ -1,50 +1,54 @@
 # GovTrove
 
-GovTrove is a federal contracting opportunity search platform that aggregates data from SAM.gov and provides a fast, searchable interface for government contractors.
+Federal contract opportunity search platform. Aggregates data from SAM.gov's official public data services and provides a fast, searchable interface for government contractors.
 
 ## Architecture
 
 ```
-                                    +------------------+
-                                    |    CloudFront    |
-                                    |    (Frontend)    |
-                                    +--------+---------+
-                                             |
-                                             v
-+------------------+              +------------------+
-|   SAM.gov API    |              |    App Runner    |
-|                  |              |      (API)       |
-+--------+---------+              +--------+---------+
-         |                                 |
-         v                                 v
-+------------------+              +------------------+
-|   ECS Fargate    |------------->|     Neon DB      |
-|   (Ingestion)    |              |   (PostgreSQL)   |
-+------------------+              +------------------+
+                    govtrove.com          app.govtrove.com         api.govtrove.com
+                         |                       |                       |
+                    CloudFront              CloudFront              Cloudflare
+                    (Landing)               (Frontend)              (Proxy)
+                         |                       |                       |
+                    S3 Bucket               S3 Bucket              App Runner
+                                                                     (API)
+                                                                       |
++------------------+                                            +-----------+
+|  EventBridge     |  every 15 min                              |  Neon DB  |
+|  (Schedule)      |----------+                                 | (Postgres)|
++------------------+          |                                 +-----------+
+                              v                                       ^
+                    +------------------+                               |
+                    |  Step Functions  |-------------------------------+
+                    |  (Pipeline)      |
+                    +------------------+
+                              |
+               +--------------+--------------+
+               |              |              |
+          download-csvs  ingest-active  reconcile
+                         ingest-archived
+                         ingest-api
+                         generate-alerts
 ```
 
 **Components:**
-- **Frontend** - React SPA served via CloudFront/S3
-- **API** - Go service on AWS App Runner
-- **Ingestion** - Scheduled Go service on ECS Fargate that pulls data from SAM.gov
-- **Database** - Neon serverless PostgreSQL
+- **Landing page** — Static marketing site (`landing/`), served via CloudFront/S3 at govtrove.com
+- **Frontend** — React SPA (`frontend/`), served via CloudFront/S3 at app.govtrove.com
+- **API** — Go service (`api/`), running on AWS App Runner at api.govtrove.com (proxied through Cloudflare)
+- **Pipeline** — Go Lambda functions (`pipeline/`), orchestrated by Step Functions on a 15-minute schedule. Downloads SAM.gov CSV bulk exports and API data, ingests into the database, and reconciles changes.
+- **Database** — Neon serverless PostgreSQL
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.24+
 - Node.js 20+
-- Docker
-- AWS CLI v2
+- Docker (for local PostgreSQL and Lambda builds)
+- AWS CLI v2 (configured with `govtrove` profile)
 - Terraform 1.0+
-- jq (for some operations commands)
 
-**AWS Setup:**
 ```bash
-# Configure AWS profile
+# Configure AWS profile (one-time setup)
 aws configure --profile govtrove
-
-# Verify access
-aws sts get-caller-identity --profile govtrove
 ```
 
 ## Local Development
@@ -52,7 +56,7 @@ aws sts get-caller-identity --profile govtrove
 ### Quick Start
 
 ```bash
-# Start everything (database, API, frontend)
+# Start everything (database + API + frontend)
 make dev
 
 # Stop everything
@@ -68,223 +72,131 @@ This starts:
 ### Running Services Individually
 
 ```bash
-# Database only
-make dev-up-d        # Start in background
+# Database
+make dev-up-d        # Start PostgreSQL + Adminer (background)
 make dev-down        # Stop
+make dev-clean       # Stop and delete data volumes
 
-# API only (requires database)
+# API (requires database running)
 make api-run         # Foreground
-make api-run-d       # Background
-make api-stop        # Stop background
+make api-run-d       # Background (logs at .logs/api.log)
+make api-stop        # Stop background process
 
-# Frontend only
-make frontend-dev    # Foreground
-make frontend-dev-d  # Background
-make frontend-stop   # Stop background
+# API against Neon (production data, local code)
+make api-run-neon    # Requires NEON_DATABASE_URL in .env
+
+# Frontend
+make frontend-dev    # Foreground (localhost:5173)
+make frontend-dev-d  # Background (logs at .logs/frontend.log)
+make frontend-stop   # Stop background process
 ```
 
 ### Database Migrations
 
 ```bash
-# Run migrations locally
-make migrate-up
-
-# Rollback
-make migrate-down
-
-# Create new migration
-make migrate-create
-# Enter name when prompted
-
-# Run migrations on Neon
-NEON_DATABASE_URL="postgres://..." make migrate-neon
+make migrate-up       # Run migrations (local DB)
+make migrate-down     # Rollback migrations (local DB)
+make migrate-create   # Create a new migration (prompts for name)
+make migrate-neon     # Run migrations on Neon (requires NEON_DATABASE_URL)
 ```
 
-### Ingestion Service
+### Testing
 
 ```bash
-# Run against local database
-make run
-
-# Run against mock SAM.gov server
-make mock-server &    # Start mock server
-make run-mock         # Run ingestion
-
-# Run against Neon with real SAM.gov API
-NEON_DATABASE_URL="postgres://..." SAM_API_KEY="..." make run-neon
-```
-
-### Testing Against Neon
-
-Before deploying, you can test the API locally against the production database:
-
-```bash
-NEON_DATABASE_URL="postgres://..." make api-run-neon
+make test             # Run all unit tests (pipeline + api)
+make test-e2e         # Run pipeline E2E tests (requires Docker for testcontainers)
 ```
 
 ## Deployment
 
-### Initial Setup
+All deploy commands use the `govtrove` AWS profile and read configuration from Terraform outputs.
 
-1. Initialize Terraform:
-   ```bash
-   make tf-init
-   ```
+### Deploy Everything
 
-2. Review and apply infrastructure:
-   ```bash
-   make tf-plan
-   make tf-apply   # Requires manual confirmation
-   ```
-
-3. Run database migrations on Neon:
-   ```bash
-   NEON_DATABASE_URL="postgres://..." make migrate-neon
-   ```
-
-### Deploying Services
-
-**Deploy Everything:**
 ```bash
 make deploy-all
 ```
 
-**Deploy Individually:**
+### Deploy Individually
+
 ```bash
-# API (builds, pushes to ECR, triggers App Runner)
-make deploy-api
-
-# Frontend (builds with prod API URL, syncs to S3, invalidates CloudFront)
-make deploy-frontend
-
-# Ingestion (builds, pushes to ECR - runs on schedule)
-make deploy-ingestion
+make deploy-frontend    # Build React app → S3 → CloudFront invalidation
+make deploy-landing     # Sync landing/ → S3 → CloudFront invalidation
+make deploy-api         # Docker build → ECR push → App Runner deployment
+make deploy-pipeline    # Cross-compile Lambda zips → update-function-code
 ```
 
-### Deployment Flow
+**Frontend deployment** automatically pulls the API URL, WorkOS client ID, and Sentry DSN from Terraform outputs and writes a temporary `.env.production` for the Vite build.
 
-**API Deployment:**
-1. Builds Docker image locally
-2. Authenticates with ECR
-3. Pushes image to ECR
-4. Triggers App Runner deployment
+**Landing page deployment** syncs the entire `landing/` directory to S3 with `--delete`.
 
-**Frontend Deployment:**
-1. Gets App Runner URL from Terraform
-2. Builds frontend with production API URL
-3. Syncs to S3 bucket
-4. Invalidates CloudFront cache
+**API deployment** builds a linux/amd64 Docker image, pushes to ECR, and triggers an App Runner deployment.
 
-**Ingestion Deployment:**
-1. Builds Docker image locally
-2. Pushes to ECR
-3. ECS scheduled task uses new image on next run
+**Pipeline deployment** cross-compiles all 6 Lambda functions (download-csvs, ingest-active, ingest-archived, ingest-api, reconcile, generate-alerts) as `provided.al2023` binaries, zips them, and updates each function via `aws lambda update-function-code`.
+
+## Pipeline Operations
+
+```bash
+make run-pipeline           # Manually trigger the Step Functions pipeline
+make pipeline-status        # Show last 5 pipeline executions
+make pipeline-dlq-status    # Check dead letter queue depth
+```
 
 ## Operations
 
-### Viewing Logs
-
 ```bash
-# API logs (App Runner)
-make logs-api
-
-# Ingestion logs (CloudWatch)
-make logs-ingestion
+make logs-api                       # Tail App Runner logs
+make logs-pipeline SVC=reconcile    # Tail a specific Lambda's logs
+make status                         # Show status of all deployed services
 ```
 
-### Service Status
+Available Lambda names for `SVC`: `download-csvs`, `ingest-active`, `ingest-archived`, `ingest-api`, `reconcile`, `generate-alerts`
+
+## Infrastructure
+
+All infrastructure is managed with Terraform in `infra/terraform/`.
 
 ```bash
-make status
+make tf-init       # Initialize (first time or after provider changes)
+make tf-plan       # Preview changes
+make tf-apply      # Apply changes (with confirmation)
+make tf-output     # Show all outputs (URLs, ARNs, bucket names, etc.)
+make tf-fmt        # Format .tf files
+make tf-validate   # Validate syntax
 ```
-
-Shows:
-- App Runner API status and URL
-- CloudFront distribution status
-- Recent ingestion task runs
-
-### Manual Ingestion Run
-
-To trigger an ingestion run outside the schedule:
-
-```bash
-make run-ingestion-aws
-```
-
-## Infrastructure Management
-
-### Terraform Commands
-
-```bash
-make tf-init      # Initialize (first time or after provider changes)
-make tf-plan      # Preview changes
-make tf-apply     # Apply changes (with confirmation)
-make tf-output    # Show all outputs (URLs, ARNs, etc.)
-make tf-destroy   # Destroy infrastructure (with confirmation)
-make tf-fmt       # Format .tf files
-make tf-validate  # Validate syntax
-```
-
-### Key Terraform Outputs
-
-```bash
-# Get specific outputs
-cd terraform
-terraform output apprunner_service_url      # API URL
-terraform output cloudfront_distribution_url # Frontend URL
-terraform output ecr_repository_url         # Ingestion ECR
-terraform output ecr_api_repository_url     # API ECR
-```
-
-## Quick Reference
-
-| Task | Command |
-|------|---------|
-| Start local dev | `make dev` |
-| Stop local dev | `make dev-stop` |
-| Run tests | `make test` |
-| Deploy API | `make deploy-api` |
-| Deploy frontend | `make deploy-frontend` |
-| Deploy everything | `make deploy-all` |
-| View API logs | `make logs-api` |
-| Check status | `make status` |
-| Run ingestion manually | `make run-ingestion-aws` |
 
 ## Environment Variables
 
-**Local Development:**
-- Uses `infra/docker-compose.yml` defaults
-- No `.env` file needed for basic dev
+**Local development** uses Docker Compose defaults — no `.env` file needed for basic dev.
 
-**Production (set in Terraform/AWS):**
-- `DATABASE_URL` - Neon connection string (via Secrets Manager)
-- `SAM_API_KEY` - SAM.gov API key (via Secrets Manager)
-- `ALLOWED_ORIGINS` - CORS origins (set automatically from CloudFront URL)
-
-**Local Testing with Neon:**
+**For Neon/production database access**, create a `.env` file in the repo root (see `.env.example`):
 ```bash
-export NEON_DATABASE_URL="postgres://user:pass@host/db?sslmode=require"
-export SAM_API_KEY="your-sam-api-key"
+NEON_DATABASE_URL=postgres://user:password@host.neon.tech/govtrove?sslmode=require
+SAM_API_KEY=your-sam-api-key
 ```
+
+**Production secrets** (DATABASE_URL, SAM_API_KEY, WorkOS keys) are managed through AWS Secrets Manager and Terraform — never committed to the repo.
 
 ## Project Structure
 
 ```
 govtrove/
 ├── api/                  # Go API service
-│   ├── cmd/api/          # Main entrypoint
-│   └── internal/         # Handlers, repository, config
-├── frontend/             # React frontend
+│   ├── cmd/api/          # Entrypoint
+│   └── internal/         # Handlers, repository, middleware
+├── frontend/             # React + Vite frontend
 │   └── src/
-├── pipeline/             # Go pipeline Lambdas (data ingestion)
-│   ├── cmd/lambda/       # Lambda entrypoints
-│   └── internal/         # SAM.gov client, DB operations
-├── landing/              # Static landing page
+├── pipeline/             # Go pipeline Lambda functions
+│   ├── cmd/lambda/       # Lambda entrypoints (6 functions)
+│   └── internal/         # SAM.gov client, CSV parsing, DB ops, reconciler
+├── landing/              # Static landing page + blog
+│   └── blog/             # Blog post HTML files
 ├── infra/                # Infrastructure
-│   ├── terraform/        # Infrastructure as code
-│   ├── migrations/       # SQL migrations
-│   ├── cf-functions/     # CloudFront functions
+│   ├── terraform/        # All AWS resources
+│   ├── migrations/       # SQL migrations (golang-migrate)
+│   ├── cf-functions/     # CloudFront functions (OG redirect)
 │   └── docker-compose.yml
 ├── docs/                 # Documentation
-└── Makefile              # All commands
+├── Makefile              # All commands
+└── .env.example          # Environment variable template
 ```
