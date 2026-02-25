@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import type { FilterState } from '../../hooks/useFilterState';
 import {
   NOTICE_TYPE_LABELS,
+  DEFAULT_NOTICE_TYPES,
   DEADLINE_PRESET_LABELS,
   SET_ASIDE_LABELS,
   STATE_NAMES,
@@ -70,13 +71,17 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       });
     }
 
-    for (const type of filters.noticeType) {
-      result.push({
-        id: `noticeType:${type}`,
-        filterKey: 'noticeType',
-        value: type,
-        label: NOTICE_TYPE_LABELS[type] || type,
-      });
+    const isDefaultTypes = filters.noticeType.length === DEFAULT_NOTICE_TYPES.length
+      && filters.noticeType.slice().sort().every((v, i) => v === DEFAULT_NOTICE_TYPES.slice().sort()[i]);
+    if (!isDefaultTypes) {
+      for (const type of filters.noticeType) {
+        result.push({
+          id: `noticeType:${type}`,
+          filterKey: 'noticeType',
+          value: type,
+          label: NOTICE_TYPE_LABELS[type] || type,
+        });
+      }
     }
 
     if (filters.department) {
