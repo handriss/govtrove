@@ -2,6 +2,7 @@ import { useReducer, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { expandToLeafCodes } from '../components/filters/naicsTree';
 import { expandPscToLeafCodes } from '../components/filters/pscTree';
+import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
 import type { SearchParams } from '../types/api';
 
 export interface FilterState {
@@ -30,7 +31,7 @@ const DEFAULTS: FilterState = {
   setAside: [],
   department: '',
   state: '',
-  noticeType: [],
+  noticeType: [...DEFAULT_NOTICE_TYPES],
   deadlinePreset: '',
   postedFrom: '',
   postedTo: '',
@@ -304,7 +305,7 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.setAside.length) count++;
     if (filters.department) count++;
     if (filters.state) count++;
-    if (filters.noticeType.length) count++;
+    if (JSON.stringify(filters.noticeType.slice().sort()) !== JSON.stringify(DEFAULTS.noticeType.slice().sort())) count++;
     if (filters.deadlinePreset) count++;
     if (filters.postedFrom || filters.postedTo) count++;
     if (filters.deadlineFrom || filters.deadlineTo) count++;
