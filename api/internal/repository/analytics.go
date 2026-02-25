@@ -142,12 +142,11 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 		States:    []models.FilterStat{},
 	}
 
-	// Get type filter usage
 	typeQuery := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'type') as value
-		WHERE event_type IN ('search', 'filter')
+		WHERE event_type = 'search'
 		  AND filters->'type' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
@@ -169,12 +168,11 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 	}
 	rows.Close()
 
-	// Get set_aside filter usage
 	setAsideQuery := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'set_aside') as value
-		WHERE event_type IN ('search', 'filter')
+		WHERE event_type = 'search'
 		  AND filters->'set_aside' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
@@ -196,12 +194,11 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 	}
 	rows.Close()
 
-	// Get state filter usage
 	stateQuery := fmt.Sprintf(`
 		SELECT value, COUNT(*) as count
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'state') as value
-		WHERE event_type IN ('search', 'filter')
+		WHERE event_type = 'search'
 		  AND filters->'state' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
@@ -227,70 +224,41 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 }
 
 func (r *AnalyticsRepository) getClickStats(ctx context.Context, interval string) (*models.ClickStats, error) {
-	stats := &models.ClickStats{
-		ByPosition: []models.PositionStat{},
-	}
+	stats := &models.ClickStats{}
 
-	// Get total searches and clicks
-	countQuery := fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		SELECT
 			COALESCE(SUM(CASE WHEN event_type = 'search' THEN 1 ELSE 0 END), 0) as searches,
-			COALESCE(SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END), 0) as clicks
+			COALESCE(SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END), 0) as views
 		FROM search_events
 		WHERE created_at > NOW() - INTERVAL '%s'
 	`, interval)
 
-	err := r.pool.QueryRow(ctx, countQuery).Scan(&stats.TotalSearches, &stats.TotalClicks)
+	err := r.pool.QueryRow(ctx, query).Scan(&stats.TotalSearches, &stats.TotalViews)
 	if err != nil {
 		return nil, err
 	}
 
 	if stats.TotalSearches > 0 {
-		stats.ClickThroughRate = float64(stats.TotalClicks) / float64(stats.TotalSearches) * 100
+		stats.ClickThroughRate = float64(stats.TotalViews) / float64(stats.TotalSearches) * 100
 	}
 
-	// Get clicks by position
-	positionQuery := fmt.Sprintf(`
-		SELECT result_position, COUNT(*) as clicks
-		FROM search_events
-		WHERE event_type = 'click'
-		  AND result_position IS NOT NULL
-		  AND created_at > NOW() - INTERVAL '%s'
-		GROUP BY result_position
-		ORDER BY result_position
-		LIMIT 20
-	`, interval)
-
-	rows, err := r.pool.Query(ctx, positionQuery)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var stat models.PositionStat
-		if err := rows.Scan(&stat.Position, &stat.Clicks); err != nil {
-			return nil, err
-		}
-		stats.ByPosition = append(stats.ByPosition, stat)
-	}
-
-	return stats, rows.Err()
+	return stats, nil
 }
 
 func (r *AnalyticsRepository) getEventCounts(ctx context.Context, interval string) (*models.EventCounts, error) {
 	query := fmt.Sprintf(`
 		SELECT
 			COALESCE(SUM(CASE WHEN event_type = 'search' THEN 1 ELSE 0 END), 0) as searches,
-			COALESCE(SUM(CASE WHEN event_type = 'filter' THEN 1 ELSE 0 END), 0) as filters,
-			COALESCE(SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END), 0) as clicks,
-			COALESCE(SUM(CASE WHEN event_type = 'page' THEN 1 ELSE 0 END), 0) as pages
+			COALESCE(SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END), 0) as views,
+			COALESCE(SUM(CASE WHEN event_type = 'save_opportunity' THEN 1 ELSE 0 END), 0) as saves,
+			COALESCE(SUM(CASE WHEN event_type = 'save_search' THEN 1 ELSE 0 END), 0) as search_saves
 		FROM search_events
 		WHERE created_at > NOW() - INTERVAL '%s'
 	`, interval)
 
 	var counts models.EventCounts
-	err := r.pool.QueryRow(ctx, query).Scan(&counts.Searches, &counts.Filters, &counts.Clicks, &counts.Pages)
+	err := r.pool.QueryRow(ctx, query).Scan(&counts.Searches, &counts.Views, &counts.Saves, &counts.SearchSaves)
 	if err != nil {
 		return nil, err
 	}

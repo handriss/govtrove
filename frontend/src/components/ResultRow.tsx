@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import type { OpportunityListItem } from '../types/api';
-import { trackEvent } from '../services/api';
 
 const setAsideColors: Record<string, string> = {
   'SBA': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -49,7 +48,7 @@ interface ResultRowProps {
   index: number;
 }
 
-export default function ResultRow({ opportunity, index }: ResultRowProps) {
+export default function ResultRow({ opportunity }: ResultRowProps) {
   const daysUntil = getDaysUntilDeadline(opportunity.response_deadline);
   const deadline = getDeadlineStyle(daysUntil);
 
@@ -68,11 +67,6 @@ export default function ResultRow({ opportunity, index }: ResultRowProps) {
         <Link
           to={`/opportunity/${opportunity.id}`}
           className="block"
-          onClick={() => trackEvent({
-            event_type: 'click',
-            opportunity_id: opportunity.id,
-            result_position: index + 1,
-          })}
         >
           <p className="text-dark-100 font-medium group-hover:text-accent transition-colors duration-150 line-clamp-1">
             {opportunity.title}

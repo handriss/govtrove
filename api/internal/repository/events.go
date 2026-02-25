@@ -25,21 +25,20 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 
 	query := `
 		INSERT INTO search_events (
-			event_type, session_id, query, filters, sort_by, page,
-			total_results, result_position, opportunity_id,
+			event_type, user_id, query, filters, sort_by, page,
+			total_results, opportunity_id,
 			user_agent, referer
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	_, err = r.pool.Exec(ctx, query,
 		event.EventType,
-		event.SessionID,
+		event.UserID,
 		event.Query,
 		filtersJSON,
 		event.SortBy,
 		event.Page,
 		event.TotalResults,
-		event.ResultPosition,
 		event.OpportunityID,
 		event.UserAgent,
 		event.Referer,
@@ -49,4 +48,15 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 	}
 
 	return nil
+}
+
+func (r *EventRepository) DeleteOlderThan(ctx context.Context, days int) (int64, error) {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM search_events WHERE created_at < NOW() - INTERVAL '1 day' * $1`,
+		days,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("deleting old events: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }

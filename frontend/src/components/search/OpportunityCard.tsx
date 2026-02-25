@@ -2,7 +2,6 @@ import { memo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, MapPin } from 'lucide-react';
 import type { OpportunityListItem } from '../../types/api';
-import { trackEvent } from '../../services/api';
 
 // --- Shared utilities ---
 
@@ -167,9 +166,6 @@ export default memo(function OpportunityCard({
       <Link
         to={`/opportunity/${opp.id}`}
         className="block px-4 py-3.5"
-        onClick={() =>
-          trackEvent({ event_type: 'click', opportunity_id: opp.id })
-        }
       >
         {/* PRIMARY: Title row */}
         <div className="flex items-start gap-2">

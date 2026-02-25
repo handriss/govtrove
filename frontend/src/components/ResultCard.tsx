@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import type { OpportunityListItem } from '../types/api';
-import { trackEvent } from '../services/api';
 
 const setAsideColors: Record<string, string> = {
   'SBA': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -42,7 +41,7 @@ interface ResultCardProps {
   index: number;
 }
 
-export default function ResultCard({ opportunity, index }: ResultCardProps) {
+export default function ResultCard({ opportunity }: ResultCardProps) {
   const daysUntil = getDaysUntilDeadline(opportunity.response_deadline);
   const deadline = getDeadlineStyle(daysUntil);
   const agency = formatDepartment(opportunity.department);
@@ -52,11 +51,6 @@ export default function ResultCard({ opportunity, index }: ResultCardProps) {
       to={`/opportunity/${opportunity.id}`}
       className="block p-4 border border-dark-800/50 rounded-xl bg-dark-900/30
                  active:bg-dark-800/40 transition-colors duration-150"
-      onClick={() => trackEvent({
-        event_type: 'click',
-        opportunity_id: opportunity.id,
-        result_position: index + 1,
-      })}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <p className="text-dark-100 font-medium text-sm leading-snug line-clamp-2 flex-1">

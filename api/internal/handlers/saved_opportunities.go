@@ -11,20 +11,23 @@ import (
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
+
 )
 
 type SavedOpportunityHandler struct {
 	repo     *repository.SavedOpportunityRepository
 	userRepo *repository.UserRepository
 	logger   *slog.Logger
+	eventLog *EventLogger
 }
 
 func NewSavedOpportunityHandler(
 	repo *repository.SavedOpportunityRepository,
 	userRepo *repository.UserRepository,
 	logger *slog.Logger,
+	eventLog *EventLogger,
 ) *SavedOpportunityHandler {
-	return &SavedOpportunityHandler{repo: repo, userRepo: userRepo, logger: logger}
+	return &SavedOpportunityHandler{repo: repo, userRepo: userRepo, logger: logger, eventLog: eventLog}
 }
 
 func (h *SavedOpportunityHandler) resolveUserID(w http.ResponseWriter, r *http.Request) (int, bool) {
@@ -128,6 +131,11 @@ func (h *SavedOpportunityHandler) Add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+
+	h.eventLog.Log(r, &userID, &models.SearchEvent{
+		EventType:     "save_opportunity",
+		OpportunityID: &req.OpportunityID,
+	})
 }
 
 func (h *SavedOpportunityHandler) Remove(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +159,11 @@ func (h *SavedOpportunityHandler) Remove(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+
+	h.eventLog.Log(r, &userID, &models.SearchEvent{
+		EventType:     "unsave_opportunity",
+		OpportunityID: &req.OpportunityID,
+	})
 }
 
 func (h *SavedOpportunityHandler) RemoveByOpportunityID(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +185,11 @@ func (h *SavedOpportunityHandler) RemoveByOpportunityID(w http.ResponseWriter, r
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+
+	h.eventLog.Log(r, &userID, &models.SearchEvent{
+		EventType:     "unsave_opportunity",
+		OpportunityID: &opportunityID,
+	})
 }
 
 func (h *SavedOpportunityHandler) BulkAdd(w http.ResponseWriter, r *http.Request) {
