@@ -173,6 +173,12 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 
+	if deleted, err := h.Store.DeleteOldSearchEvents(ctx, 90); err != nil {
+		h.Logger.Error("failed to delete old search events", "error", err)
+	} else if deleted > 0 {
+		h.Logger.Info("old search events deleted", "count", deleted)
+	}
+
 	return &Output{Status: "ok"}, nil
 }
 

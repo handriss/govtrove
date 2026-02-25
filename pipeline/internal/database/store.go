@@ -48,6 +48,9 @@ type Store interface {
 	GetLatestBulkCSVHash(ctx context.Context, source string) (string, error)
 	GetLatestBulkCSVHeaders(ctx context.Context, source string) (string, string, error)
 	GetLatestBulkCSVS3Key(ctx context.Context, source string) (string, error)
+
+	// Analytics retention
+	DeleteOldSearchEvents(ctx context.Context, days int) (int64, error)
 }
 
 // Verify *DB satisfies Store at compile time.

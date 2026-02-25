@@ -20,7 +20,7 @@ import {
   Pilcrow,
   GitBranch,
 } from 'lucide-react';
-import { getOpportunity, getSolicitationHistory, trackEvent } from '../services/api';
+import { getOpportunity, getSolicitationHistory } from '../services/api';
 import { formatDescription } from '../utils/formatDescription';
 import SolicitationTimeline from '../components/SolicitationTimeline';
 import type { Opportunity, SolicitationHistory } from '../types/api';
@@ -212,12 +212,6 @@ export default function OpportunityDetail() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
-
-  useEffect(() => {
-    if (opportunity) {
-      trackEvent({ event_type: 'page', opportunity_id: opportunity.id });
-    }
-  }, [opportunity?.id]);
 
   useEffect(() => {
     if (opportunity?.solicitation_number) {

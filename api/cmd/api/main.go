@@ -138,15 +138,15 @@ func main() {
 	savedSearchRepo := repository.NewSavedSearchRepository(pool)
 	userUpdateRepo := repository.NewUserUpdateRepository(pool)
 
-	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger)
-	eventHandler := handlers.NewEventHandler(eventRepo, logger)
+	eventLog := handlers.NewEventLogger(eventRepo, logger)
+	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, logger)
-	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger)
-	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger)
+	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
+	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
@@ -207,12 +207,18 @@ func main() {
 	r.Route("/api", func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Use(authmw.MaxBodySize(1 << 20))
-		r.Get("/opportunities", oppHandler.Search)
+
+		r.Group(func(r chi.Router) {
+			if jwks != nil {
+				r.Use(authmw.OptionalAuth(jwks))
+			}
+			r.Get("/opportunities", oppHandler.Search)
+			r.Get("/opportunities/{id}", oppHandler.GetByID)
+		})
+
 		r.Get("/opportunities/facets", oppHandler.GetFacets)
-		r.Get("/opportunities/{id}", oppHandler.GetByID)
 		r.Get("/opportunities/{id}/history", oppHandler.GetSolicitationHistory)
 		r.Get("/filters", oppHandler.GetFilters)
-		r.Post("/events", eventHandler.Create)
 		r.Get("/status", statusHandler.GetStatus)
 		r.Route("/contact", func(r chi.Router) {
 			r.Use(httprate.LimitByIP(5, time.Hour))

@@ -25,20 +25,14 @@ type FilterStat struct {
 }
 
 type ClickStats struct {
-	TotalClicks      int            `json:"total_clicks"`
-	TotalSearches    int            `json:"total_searches"`
-	ClickThroughRate float64        `json:"click_through_rate"`
-	ByPosition       []PositionStat `json:"by_position"`
-}
-
-type PositionStat struct {
-	Position int `json:"position"`
-	Clicks   int `json:"clicks"`
+	TotalViews       int     `json:"total_views"`
+	TotalSearches    int     `json:"total_searches"`
+	ClickThroughRate float64 `json:"click_through_rate"`
 }
 
 type EventCounts struct {
-	Searches int `json:"searches"`
-	Filters  int `json:"filters"`
-	Clicks   int `json:"clicks"`
-	Pages    int `json:"pages"`
+	Searches     int `json:"searches"`
+	Views        int `json:"views"`
+	Saves        int `json:"saves"`
+	SearchSaves  int `json:"search_saves"`
 }

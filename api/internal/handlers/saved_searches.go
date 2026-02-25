@@ -18,14 +18,16 @@ type SavedSearchHandler struct {
 	repo     *repository.SavedSearchRepository
 	userRepo *repository.UserRepository
 	logger   *slog.Logger
+	eventLog *EventLogger
 }
 
 func NewSavedSearchHandler(
 	repo *repository.SavedSearchRepository,
 	userRepo *repository.UserRepository,
 	logger *slog.Logger,
+	eventLog *EventLogger,
 ) *SavedSearchHandler {
-	return &SavedSearchHandler{repo: repo, userRepo: userRepo, logger: logger}
+	return &SavedSearchHandler{repo: repo, userRepo: userRepo, logger: logger, eventLog: eventLog}
 }
 
 func (h *SavedSearchHandler) resolveUserID(w http.ResponseWriter, r *http.Request) (int, bool) {
@@ -105,6 +107,14 @@ func (h *SavedSearchHandler) Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(search)
+
+	var filters map[string]interface{}
+	if err := json.Unmarshal(input.Filters, &filters); err == nil {
+		h.eventLog.Log(r, &userID, &models.SearchEvent{
+			EventType: "save_search",
+			Filters:   filters,
+		})
+	}
 }
 
 func (h *SavedSearchHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +185,10 @@ func (h *SavedSearchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+
+	h.eventLog.Log(r, &userID, &models.SearchEvent{
+		EventType: "delete_search",
+	})
 }
 
 func (h *SavedSearchHandler) Run(w http.ResponseWriter, r *http.Request) {

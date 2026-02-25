@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
@@ -20,10 +21,24 @@ type OpportunityHandler struct {
 	repo     *repository.OpportunityRepository
 	logger   *slog.Logger
 	renderer *ogimage.Renderer
+	eventLog *EventLogger
+	userRepo *repository.UserRepository
 }
 
-func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger) *OpportunityHandler {
-	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer}
+func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository) *OpportunityHandler {
+	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo}
+}
+
+func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
+	workosID := authmw.UserIDFromContext(r.Context())
+	if workosID == "" {
+		return nil
+	}
+	user, err := h.userRepo.GetByWorkOSID(r.Context(), workosID)
+	if err != nil || user == nil {
+		return nil
+	}
+	return &user.ID
 }
 
 func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +52,21 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, result)
+
+	userID := h.resolveOptionalUserID(r)
+	event := &models.SearchEvent{EventType: "search"}
+	if params.Query != "" {
+		event.Query = &params.Query
+	}
+	if params.Sort != "" {
+		event.SortBy = &params.Sort
+	}
+	if params.Page > 0 {
+		event.Page = &params.Page
+	}
+	event.TotalResults = &result.Total
+	event.Filters = h.buildFilters(params)
+	h.eventLog.Log(r, userID, event)
 }
 
 func (h *OpportunityHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +102,12 @@ func (h *OpportunityHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, opp)
+
+	userID := h.resolveOptionalUserID(r)
+	h.eventLog.Log(r, userID, &models.SearchEvent{
+		EventType:     "view",
+		OpportunityID: &id,
+	})
 }
 
 func (h *OpportunityHandler) GetSolicitationHistory(w http.ResponseWriter, r *http.Request) {
@@ -379,6 +415,41 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	return params
+}
+
+func (h *OpportunityHandler) buildFilters(params models.SearchParams) map[string]interface{} {
+	f := make(map[string]interface{})
+	if len(params.Types) > 0 {
+		f["type"] = params.Types
+	}
+	if len(params.SetAsides) > 0 {
+		f["set_aside"] = params.SetAsides
+	}
+	if len(params.NAICSCodes) > 0 {
+		f["naics"] = params.NAICSCodes
+	}
+	if len(params.PSCCodes) > 0 {
+		f["psc"] = params.PSCCodes
+	}
+	if len(params.States) > 0 {
+		f["state"] = params.States
+	}
+	if params.Department != "" {
+		f["department"] = params.Department
+	}
+	if params.PostedFrom != nil {
+		f["posted_from"] = params.PostedFrom.Format("2006-01-02")
+	}
+	if params.PostedTo != nil {
+		f["posted_to"] = params.PostedTo.Format("2006-01-02")
+	}
+	if params.DeadlineFrom != nil {
+		f["deadline_from"] = params.DeadlineFrom.Format("2006-01-02")
+	}
+	if params.DeadlineTo != nil {
+		f["deadline_to"] = params.DeadlineTo.Format("2006-01-02")
+	}
+	return f
 }
 
 func (h *OpportunityHandler) writeJSON(w http.ResponseWriter, status int, data any) {

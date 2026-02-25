@@ -102,32 +102,6 @@ export async function getSolicitationHistory(id: number): Promise<SolicitationHi
   return response.json();
 }
 
-function getSessionId(): string {
-  let id = localStorage.getItem('session_id');
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem('session_id', id);
-  }
-  return id;
-}
-
-export function trackEvent(event: {
-  event_type: 'search' | 'filter' | 'click' | 'page';
-  query?: string;
-  filters?: Record<string, unknown>;
-  sort_by?: string;
-  page?: number;
-  total_results?: number;
-  result_position?: number;
-  opportunity_id?: number;
-}): void {
-  fetch(`${API_BASE}/events`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...event, session_id: getSessionId() }),
-  }).catch(() => {});
-}
-
 export async function syncUser(
   token: string,
   data: { email: string; first_name: string; last_name: string },
