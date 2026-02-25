@@ -291,7 +291,10 @@ export default function ResultsList({
       {/* Mobile: card layout */}
       <div className="md:hidden space-y-3">
         {results.length === 0 ? (
-          <p className="text-center text-dark-400 text-sm py-12">No matching opportunities. Try adjusting your filters.</p>
+          <div className="text-center py-12">
+            <p className="text-dark-400 text-sm">No opportunities match your current filters.</p>
+            <p className="text-dark-500 text-xs mt-1">Try broadening your search or removing some filters.</p>
+          </div>
         ) : (
           results.map((opp, index) => (
             <ResultCard key={opp.id} opportunity={opp} index={index} />
@@ -392,8 +395,9 @@ export default function ResultsList({
           <tbody className="divide-y divide-dark-800/30">
             {results.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-dark-400 text-sm">
-                  No matching opportunities. Try adjusting your filters.
+                <td colSpan={9} className="px-4 py-12 text-center">
+                  <p className="text-dark-400 text-sm">No opportunities match your current filters.</p>
+                  <p className="text-dark-500 text-xs mt-1">Try broadening your search or removing some filters.</p>
                 </td>
               </tr>
             ) : (

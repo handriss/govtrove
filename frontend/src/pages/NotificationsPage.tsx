@@ -240,8 +240,16 @@ export default function NotificationsPage() {
             <p className="text-sm text-dark-500 max-w-md">
               {filter === 'unread'
                 ? 'You have no unread notifications.'
-                : 'Notifications about your saved searches and opportunities will appear here.'}
+                : 'Save a search or star an opportunity to start receiving notifications when new matches appear or details change.'}
             </p>
+            {filter === 'all' && (
+              <Link
+                to="/"
+                className="mt-4 text-sm text-accent hover:text-accent/80 transition-colors"
+              >
+                Start searching
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
