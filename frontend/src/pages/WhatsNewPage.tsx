@@ -202,7 +202,7 @@ export default function WhatsNewPage() {
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-dark-800/50">
           <p className="text-sm text-dark-400">
             {loading ? (
-              <span className="text-dark-500">Loading...</span>
+              <span className="inline-block h-4 w-48 bg-dark-800/50 rounded animate-pulse" />
             ) : (
               <>
                 <span className="text-dark-200 font-medium">{totalFiltered.toLocaleString()}</span>
