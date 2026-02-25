@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAM.gov Data Services Explained: CSV Downloads, Archived Data &amp; Public API | GovTrove Blog</title>
+    <meta name="description" content="SAM.gov offers bulk CSV downloads, archived data, and a public API for contract opportunities — but each has tradeoffs. Learn what each data channel provides, what it's missing, and how GovTrove combines them into a faster, more reliable search.">
+
+    <link rel="canonical" href="https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="SAM.gov Has Three Ways to Access Contract Data — Here's What Each One Actually Does">
+    <meta property="og:description" content="SAM.gov offers bulk CSV downloads, archived data, and a public API for contract opportunities — but each has tradeoffs. Learn how GovTrove combines all three.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html">
+    <meta property="og:image" content="https://govtrove.com/og-image.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SAM.gov Has Three Ways to Access Contract Data — Here's What Each One Actually Does">
+    <meta name="twitter:description" content="SAM.gov offers bulk CSV downloads, archived data, and a public API for contract opportunities — but each has tradeoffs. Learn how GovTrove combines all three.">
+    <meta name="twitter:image" content="https://govtrove.com/og-image.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script>document.documentElement.setAttribute('data-theme','dark')</script>
+    <link rel="stylesheet" href="/theme.css">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Consolas, monospace;
+            --transition-fast: 150ms ease;
+            --transition-base: 250ms ease;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        body { font-family: var(--font-sans); font-size: 16px; line-height: 1.6; color: var(--text-primary); background-color: var(--bg-page); }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.875rem 1.75rem; font-size: 1rem; font-weight: 500; border-radius: 0.375rem; transition: all var(--transition-fast); }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+        .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 1rem 0; background: var(--nav-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
+        .nav-inner { display: flex; align-items: center; justify-content: space-between; }
+        .nav-logo { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+        .nav-logo svg { color: var(--accent); }
+        .nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+        .nav-links a { color: var(--text-secondary); font-weight: 500; transition: color var(--transition-fast); }
+        .nav-links a:hover, .nav-links a.active { color: var(--text-primary); }
+        .nav-cta { margin-left: 1rem; background: transparent; color: var(--accent); border: 1px solid rgba(59, 130, 246, 0.4); }
+        .nav-cta:hover { background: var(--accent-subtle); border-color: rgba(59, 130, 246, 0.6); }
+        .nav-mobile-toggle { display: none; padding: 0.5rem; color: var(--text-primary); }
+        .nav-mobile-menu { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-page); padding: 5rem 1.5rem 2rem; z-index: 99; }
+        .nav-mobile-menu.open { display: block; }
+        .nav-mobile-menu ul { list-style: none; display: flex; flex-direction: column; gap: 1.5rem; }
+        .nav-mobile-menu a { font-size: 1.25rem; font-weight: 500; color: var(--text-primary); }
+        .nav-mobile-menu .btn { width: 100%; margin-top: 1rem; }
+
+        @media (max-width: 768px) {
+            .nav-links, .nav-cta { display: none; }
+            .nav-mobile-toggle { display: block; }
+        }
+
+        .article-container { max-width: 720px; margin: 0 auto; padding: 0 1.5rem; }
+        .article-header { padding: 8rem 0 2rem; }
+        .article-meta { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+        .article-category { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.625rem; border-radius: 9999px; }
+        .category-sam-gov { background: var(--category-sam-gov-bg); color: var(--category-sam-gov-text); border: 1px solid var(--category-sam-gov-border); }
+        .article-date { font-size: 0.875rem; color: var(--text-muted); }
+        .article-reading-time { font-size: 0.875rem; color: var(--text-muted); }
+        .article-meta-separator { color: var(--text-muted); }
+        .article-header h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 0; }
+
+        .article-body { padding-bottom: 3rem; }
+        .article-body p { font-size: 1.125rem; line-height: 1.75; color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .article-body h2 { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin-top: 2.5rem; margin-bottom: 1rem; letter-spacing: -0.01em; }
+        .article-body h3 { font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 2rem; margin-bottom: 0.75rem; }
+        .article-body ul, .article-body ol { font-size: 1.125rem; line-height: 1.75; color: var(--text-secondary); margin-bottom: 1.5rem; padding-left: 1.5rem; }
+        .article-body li { margin-bottom: 0.5rem; }
+        .article-body blockquote { border-left: 3px solid var(--accent); background: var(--accent-subtle); padding: 1rem 1.25rem; margin: 1.5rem 0; border-radius: 0 0.375rem 0.375rem 0; }
+        .article-body blockquote p { margin-bottom: 0; color: var(--text-primary); font-size: 1rem; }
+        .article-body code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-elevated); padding: 0.125rem 0.375rem; border-radius: 0.25rem; color: var(--code-text); }
+        .article-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+        .article-body a:hover { color: var(--accent-hover); }
+
+        .article-back { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.9375rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 3rem; transition: color var(--transition-fast); }
+        .article-back:hover { color: var(--text-primary); }
+
+        .article-cta { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 0.5rem; padding: 2.5rem; text-align: center; margin-bottom: 4rem; }
+        .article-cta h3 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .article-cta p { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
+        .article-cta .btn { text-decoration: none; }
+
+        .article-disclaimer { font-size: 0.875rem; color: var(--text-muted); font-style: italic; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); margin-top: 2rem; margin-bottom: 3rem; }
+
+        .footer { padding: 4rem 0 2rem; border-top: 1px solid var(--border-subtle); }
+        .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 2rem; margin-bottom: 3rem; }
+        .footer-brand { max-width: 280px; }
+        .footer-logo { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .footer-logo svg { color: var(--accent); }
+        .footer-brand p { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+        .footer-links { display: flex; flex-wrap: wrap; gap: 3rem; }
+        .footer-links-group .footer-heading { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; }
+        .footer-links-group ul { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+        .footer-links-group a { font-size: 0.875rem; color: var(--text-secondary); transition: color var(--transition-fast); }
+        .footer-links-group a:hover { color: var(--text-primary); }
+        .footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle); font-size: 0.875rem; color: var(--text-muted); }
+
+        @media (max-width: 640px) {
+            .footer-content { flex-direction: column; }
+            .footer-links { flex-direction: column; gap: 2rem; }
+            .footer-bottom { flex-direction: column; text-align: center; }
+        }
+    </style>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "headline": "SAM.gov Has Three Ways to Access Contract Data — Here's What Each One Actually Does",
+      "description": "SAM.gov offers bulk CSV downloads, archived data, and a public API for contract opportunities — but each has tradeoffs. Learn what each data channel provides, what it's missing, and how GovTrove combines them into a faster, more reliable search.",
+      "datePublished": "2026-02-25",
+      "author": {
+        "@type": "Organization",
+        "name": "GovTrove",
+        "url": "https://govtrove.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "GovTrove",
+        "url": "https://govtrove.com"
+      },
+      "url": "https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html",
+      "mainEntityOfPage": "https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html"
+    }
+    </script>
+    <script>if(!localStorage.getItem('govtrove_notrack'))document.write('<script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"><\/script>')</script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="container nav-inner">
+            <a href="/" class="nav-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                GovTrove
+            </a>
+            <ul class="nav-links">
+                <li><a href="/#problem">Why GovTrove</a></li>
+                <li><a href="/#faq">FAQ</a></li>
+                <li><a href="/blog/" class="active">Blog</a></li>
+            </ul>
+            <a href="https://app.govtrove.com" class="btn nav-cta">Start Searching</a>
+            <button class="nav-mobile-toggle" id="nav-toggle" aria-label="Toggle menu">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <div class="nav-mobile-menu" id="mobile-menu">
+        <ul>
+            <li><a href="/#problem" class="mobile-link">Why GovTrove</a></li>
+            <li><a href="/#faq" class="mobile-link">FAQ</a></li>
+            <li><a href="/blog/" class="mobile-link">Blog</a></li>
+        </ul>
+        <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
+    </div>
+
+    <main>
+        <article>
+            <header class="article-header">
+                <div class="article-container">
+                    <div class="article-meta">
+                        <span class="article-category category-sam-gov">SAM.gov Tips</span>
+                        <span class="article-meta-separator">&middot;</span>
+                        <span class="article-date">February 25, 2026</span>
+                        <span class="article-meta-separator">&middot;</span>
+                        <span class="article-reading-time">12 min read</span>
+                    </div>
+                    <h1>SAM.gov Has Three Ways to Access Contract Data &mdash; Here's What Each One Actually Does</h1>
+                </div>
+            </header>
+
+            <div class="article-body">
+                <div class="article-container">
+                    <p>If you've spent any time searching for federal contract opportunities, you've probably used SAM.gov's search interface. And if you've used that interface, you've probably been frustrated by it.</p>
+
+                    <p>But here's something most contractors don't know: the search page on SAM.gov isn't the only way to access contract opportunity data. Behind the scenes, SAM.gov publishes the same data through three separate channels &mdash; a daily CSV bulk export, a weekly archive export, and a public REST API. Each one serves a different purpose, each has different strengths, and each has real limitations.</p>
+
+                    <p>Understanding these data channels won't just satisfy your curiosity. It'll help you understand why SAM.gov search behaves the way it does, why certain opportunities seem to appear and disappear, and how tools like GovTrove are able to offer a fundamentally different search experience using the exact same underlying data.</p>
+
+                    <h2>The Three SAM.gov Data Channels</h2>
+
+                    <p>SAM.gov's Data Services section &mdash; buried several clicks deep from the main page &mdash; is where the General Services Administration publishes bulk data extracts. For contract opportunities specifically, there are three ways to get the data out.</p>
+
+                    <h3>1. The Active Opportunities CSV (Updated Daily)</h3>
+
+                    <p>Every day, SAM.gov publishes a single CSV file containing every currently active contract opportunity. We're talking about a file with roughly 80,000&ndash;100,000 rows, covering every open presolicitation, solicitation, combined synopsis, sources sought notice, special notice, and award notice that hasn't been archived yet.</p>
+
+                    <p>This file is freely available. No API key required. No special account needed. You can download it right now from SAM.gov's Data Services page.</p>
+
+                    <p>The CSV includes the core metadata that contractors care about when screening opportunities:</p>
+
+                    <ul>
+                        <li>Title and solicitation number</li>
+                        <li>Notice type (presolicitation, solicitation, award, etc.)</li>
+                        <li>Posting date and response deadline</li>
+                        <li>NAICS code and set-aside designation</li>
+                        <li>Contracting office and place of performance</li>
+                        <li>Point of contact information and award details</li>
+                        <li>The full opportunity description text</li>
+                    </ul>
+
+                    <p>That description field is a big deal. It's the narrative that contracting officers write about what they're actually looking for, and it's essential for keyword search. But there's a catch: the CSV description is plain text only. No formatting, no headings, no bullet points. If the contracting officer wrote a nicely structured description with sections and tables on SAM.gov, all of that structure gets flattened into a single unformatted text block in the CSV.</p>
+
+                    <p>For anyone building a search tool, though, this CSV is the workhorse. Plain text descriptions are actually better for full-text search indexing &mdash; there's no HTML to strip, no formatting tags to work around. The CSV is comprehensive, updated daily, and downloading it doesn't count against any API rate limits.</p>
+
+                    <h3>2. The Archived Opportunities CSV (Updated Weekly)</h3>
+
+                    <p>Opportunities don't stay active forever. Once a response deadline passes, or a contracting officer manually archives a notice, it moves from the active set into the archive. SAM.gov publishes these archived records as a separate CSV, updated weekly.</p>
+
+                    <p>This matters more than you might think. If you're doing market research &mdash; trying to understand what agencies have bought in the past, who won previous contracts for similar work, or how a particular program's procurement patterns have evolved &mdash; the archive is where that historical data lives.</p>
+
+                    <p>The archive uses the same column structure as the active CSV, which makes combining the two datasets straightforward. Between the active and archived files, you can reconstruct a fairly complete picture of federal contracting activity.</p>
+
+                    <h3>3. The Contract Opportunities Public API</h3>
+
+                    <p>The <a href="https://open.gsa.gov/api/get-opportunities-public-api/">SAM.gov Opportunities API</a> is the most flexible channel, but also the most constrained. It's a REST API that lets you query opportunities with filters for date ranges, notice types, keywords, agencies, NAICS codes, and more. It returns JSON, supports pagination, and &mdash; critically &mdash; can return the full description text with original formatting.</p>
+
+                    <p>The tradeoff is rate limits:</p>
+
+                    <ul>
+                        <li><strong>Basic SAM.gov account:</strong> 10 API requests per day</li>
+                        <li><strong>Registered entity account:</strong> 1,000 requests per day (requires a valid UEI number)</li>
+                        <li><strong>Federal system accounts:</strong> up to 10,000 requests per day</li>
+                        <li><strong>Hard hourly cap:</strong> 1,000 requests on a rolling basis</li>
+                    </ul>
+
+                    <p>At 1,000 records per page, you can theoretically pull the entire active dataset in around 100 API calls. But here's where it gets interesting: the search API doesn't return descriptions inline. Instead, it returns a <code>description_url</code> for each opportunity. To get the actual description content, you need to make a separate API call to the <code>/v1/noticedesc</code> endpoint &mdash; one request per opportunity. And those descriptions come back as rich HTML, with all the formatting, headings, and structure that the contracting officer originally wrote.</p>
+
+                    <p>So if you want nicely formatted descriptions for 100,000 active opportunities, you'd need 100,000 individual API requests &mdash; well beyond what even a federal system account's daily limits allow.</p>
+
+                    <blockquote><p>The API also only returns the latest version of each opportunity. If a solicitation was amended, the amendment usually gets its own notice ID. But occasionally an amendment overwrites the original without a new ID, and when that happens, the previous version is simply gone from both data sources.</p></blockquote>
+
+                    <h2>What SAM.gov's Search Page Does with This Data</h2>
+
+                    <p>SAM.gov's own search interface sits on top of these same data sources &mdash; but it doesn't always use them well. The keyword search is basic text matching, which means it misses relevant results when contracting officers use different terminology than what contractors search for. The agency hierarchy filter has been broken for years; GSA's own documentation has acknowledged this, and agencies have published workarounds telling contractors to skip the filter entirely and search by keyword instead.</p>
+
+                    <p>Filtering by NAICS code is flat &mdash; you can't search at a parent level and automatically include all child codes. And the overall search experience lacks features that contractors expect from a modern search tool: no boolean operators, no phrase matching, no faceted counts showing how many results match each filter value.</p>
+
+                    <p>These aren't unsolvable problems. They're search engineering problems that a dedicated team could fix. But SAM.gov is maintained under a complex, multi-vendor government IT contract, and its priorities are spread across entity registration, exclusions management, contract awards reporting, and half a dozen other domains. Contract opportunity search is just one piece of a much larger system.</p>
+
+                    <h2>How GovTrove Combines All Three Channels</h2>
+
+                    <p>We built GovTrove on a simple premise: the data SAM.gov publishes is good &mdash; it's the search and filtering on top of it that needs work. So rather than trying to replace SAM.gov's data, we built a pipeline that ingests it through official channels and layers a better search experience on top.</p>
+
+                    <h3>Daily CSV Ingestion as the Foundation</h3>
+
+                    <p>Every day, our system downloads the full active opportunities CSV from SAM.gov's Data Services. This is the primary data source &mdash; the most complete, most reliable, and most efficient way to keep our database current.</p>
+
+                    <p>We don't scrape SAM.gov. We don't reverse-engineer any private endpoints. We download the same CSV file that SAM.gov makes available to anyone. The download doesn't require an API key and doesn't count against any rate limits, because it's a published data extract &mdash; this is exactly how GSA intends the data to be consumed at scale.</p>
+
+                    <p>Our ingestion pipeline parses the CSV (handling encoding quirks like Windows-1252 characters), maps the columns to our database schema, and performs a batch upsert &mdash; inserting new opportunities and updating existing ones if anything has changed. The whole process handles roughly 80,000&ndash;100,000 records in a matter of minutes.</p>
+
+                    <p>We also use conditional HTTP requests (<code>If-Modified-Since</code> and <code>ETag</code> headers) so that if the CSV hasn't been updated since our last download, we skip the download entirely. No wasted bandwidth, no unnecessary database writes.</p>
+
+                    <h3>API for Enrichment and Gap-Filling</h3>
+
+                    <p>The CSV gives us descriptions for every opportunity, but they're plain text &mdash; stripped of all the formatting that contracting officers put into them. The API's description endpoint returns rich HTML, which is what you see when you view an opportunity on SAM.gov directly: structured sections, bullet points, tables, and links.</p>
+
+                    <p>We use our API allocation strategically, fetching rich HTML descriptions for opportunities that are most likely to benefit from the formatting &mdash; like active solicitations with detailed requirements &mdash; rather than trying to pull formatted descriptions for every single record.</p>
+
+                    <p>Our pipeline also cross-references the CSV and API data to identify any opportunities that appear in one source but not the other. In practice, the CSV and API are highly consistent, but the cross-reference gives us confidence that we're not missing anything and lets us track data quality over time.</p>
+
+                    <h3>Better Search Built on the Same Data</h3>
+
+                    <p>Once the data is in our database, the search experience is where GovTrove really diverges from SAM.gov.</p>
+
+                    <p>We use PostgreSQL's full-text search with weighted vectors &mdash; so a match in the title ranks higher than a match in the description, which ranks higher than a match in the agency name. Because the CSV gives us description text for every opportunity, our search index covers the full content of each notice, not just titles and metadata.</p>
+
+                    <p>We support boolean operators (<code>AND</code>, <code>OR</code>, <code>NOT</code>) and phrase matching, meaning you can search for <code>"cybersecurity" OR "information security"</code> and get both sets of results in a single query. SAM.gov's search doesn't support this.</p>
+
+                    <p>Our filters are built from the actual data. When you filter by set-aside type, you see only the set-aside codes that exist in the current dataset, with counts showing how many opportunities match each one. Same for notice types, states, and NAICS codes. This eliminates the "zero results" problem where you select a filter combination and get nothing back with no indication of why.</p>
+
+                    <p>Every opportunity in GovTrove links directly back to its SAM.gov page. We're not trying to replace SAM.gov &mdash; it's the authoritative source, and when you're ready to download attachments, read the full solicitation package, or submit a response, that's where you need to go. We're trying to make the <em>finding</em> part faster and less painful.</p>
+
+                    <h2>Why This Matters for Small Businesses</h2>
+
+                    <p>If you're a small business pursuing federal contracts, your time is your scarcest resource. You probably don't have a dedicated BD team refreshing SAM.gov searches all day. You need to quickly identify relevant opportunities, assess whether they're worth pursuing, and move on.</p>
+
+                    <p>SAM.gov's data is comprehensive and authoritative &mdash; it has to be, because federal agencies are legally required to post opportunities there. The problem has never been the data itself. It's the interface sitting on top of it.</p>
+
+                    <p>That's the gap GovTrove fills. Same official data, updated daily from SAM.gov's own published data services, presented through search and filtering that's designed specifically for how contractors actually screen opportunities.</p>
+
+                    <p>If you've been fighting with SAM.gov's search, <a href="https://app.govtrove.com">give GovTrove a try</a>. The core search is free, and everything is built on the same public data that SAM.gov publishes for exactly this purpose.</p>
+
+                    <p class="article-disclaimer">GovTrove is powered by official SAM.gov public data, updated daily. We are not affiliated with or endorsed by SAM.gov or the General Services Administration.</p>
+
+                    <a href="/blog/" class="article-back">&larr; Back to Blog</a>
+
+                    <div class="article-cta">
+                        <h3>Search federal contracts the way you actually work</h3>
+                        <p>Boolean search, smart filters, and deadline tracking &mdash; built on official SAM.gov data.</p>
+                        <a href="https://app.govtrove.com" class="btn btn-primary">Start Searching</a>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <a href="/" class="footer-logo">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        GovTrove
+                    </a>
+                    <p>A free SAM.gov search alternative. Find federal contract opportunities in seconds, not hours.</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-links-group">
+                        <p class="footer-heading">Product</p>
+                        <ul>
+                            <li><a href="/#problem">Why GovTrove</a></li>
+                            <li><a href="/#faq">FAQ</a></li>
+                            <li><a href="/blog/">Blog</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-links-group">
+                        <p class="footer-heading">Legal</p>
+                        <ul>
+                            <li><a href="/terms.html">Terms of Service</a></li>
+                            <li><a href="/privacy.html">Privacy Policy</a></li>
+                            <li><a href="/contact.html">Contact</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>Data sourced from SAM.gov</span>
+                <span>&copy; 2026 GovTrove. All rights reserved.</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        var navToggle = document.getElementById('nav-toggle');
+        var mobileMenu = document.getElementById('mobile-menu');
+        var menuOpen = false;
+
+        navToggle.addEventListener('click', function() {
+            menuOpen = !menuOpen;
+            mobileMenu.classList.toggle('open', menuOpen);
+            navToggle.innerHTML = menuOpen
+                ? '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+                : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>';
+            document.body.style.overflow = menuOpen ? 'hidden' : '';
+        });
+
+        document.querySelectorAll('.mobile-link').forEach(function(link) {
+            link.addEventListener('click', function() {
+                menuOpen = false;
+                mobileMenu.classList.remove('open');
+                navToggle.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>';
+                document.body.style.overflow = '';
+            });
+        });
+    </script>
+</body>
+</html>
