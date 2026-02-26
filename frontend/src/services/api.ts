@@ -328,3 +328,24 @@ export async function deleteUpdate(token: string, id: string): Promise<void> {
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete update: ${response.statusText}`); }
 }
+
+// Admin
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  plan: string;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getAdminUsers(token: string): Promise<AdminUser[]> {
+  const response = await fetch(`${API_BASE}/admin/users`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
