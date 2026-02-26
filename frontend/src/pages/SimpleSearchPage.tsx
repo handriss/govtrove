@@ -6,6 +6,7 @@ import QuickFilterChips from '../components/QuickFilterChips';
 import AuthButton from '../components/AuthButton';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
+import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
 import { useFilterState } from '../hooks/useFilterState';
 import { useFacetCounts } from '../hooks/useFacetCounts';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
@@ -13,6 +14,7 @@ import { useSavedSearches } from '../hooks/useSavedSearches';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
+import { getFacetCounts } from '../services/api';
 import { preloadWhatsNew } from '../services/whatsNewCache';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
@@ -33,11 +35,13 @@ export default function SimpleSearchPage() {
   const isInitialSearch = useRef(true);
   const lastSearchedRef = useRef('');
 
-  // Snapshot the first opportunity count so it stays stable in hero mode
+  // Fetch unfiltered active count once for the hero badge
   const [heroTotal, setHeroTotal] = useState(0);
   useEffect(() => {
-    if (facetTotal > 0 && heroTotal === 0) setHeroTotal(facetTotal);
-  }, [facetTotal, heroTotal]);
+    getFacetCounts({})
+      .then((r) => setHeroTotal(r.total))
+      .catch(() => {});
+  }, []);
 
   const [pageSize, setPageSize] = useState(() => {
     const stored = localStorage.getItem(PAGE_SIZE_KEY);
@@ -76,6 +80,9 @@ export default function SimpleSearchPage() {
 
   const hasActiveFilters = useMemo(() => {
     const f = fs.filters;
+    const nonDefaultNoticeType =
+      f.noticeType.length !== DEFAULT_NOTICE_TYPES.length ||
+      f.noticeType.slice().sort().join(',') !== DEFAULT_NOTICE_TYPES.slice().sort().join(',');
     return (
       f.keyword.length >= 2 ||
       f.setAside.length > 0 ||
@@ -83,7 +90,7 @@ export default function SimpleSearchPage() {
       f.state !== '' ||
       f.naics.length > 0 ||
       f.psc.length > 0 ||
-      f.noticeType.length > 0 ||
+      nonDefaultNoticeType ||
       f.deadlinePreset !== '' ||
       f.postedFrom !== '' ||
       f.postedTo !== ''
