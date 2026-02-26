@@ -43,6 +43,8 @@ type MockStore struct {
 	GetLatestBulkCSVHeadersFn func(ctx context.Context, source string) (string, string, error)
 	GetLatestBulkCSVS3KeyFn   func(ctx context.Context, source string) (string, error)
 
+	RefreshAgenciesFn func(ctx context.Context) (int, error)
+
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
 }
 
@@ -220,6 +222,13 @@ func (m *MockStore) GetLatestBulkCSVS3Key(ctx context.Context, source string) (s
 		return m.GetLatestBulkCSVS3KeyFn(ctx, source)
 	}
 	return "", nil
+}
+
+func (m *MockStore) RefreshAgencies(ctx context.Context) (int, error) {
+	if m.RefreshAgenciesFn != nil {
+		return m.RefreshAgenciesFn(ctx)
+	}
+	return 0, nil
 }
 
 func (m *MockStore) DeleteOldSearchEvents(ctx context.Context, days int) (int64, error) {

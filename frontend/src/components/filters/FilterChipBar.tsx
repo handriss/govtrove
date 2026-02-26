@@ -84,11 +84,13 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       }
     }
 
-    if (filters.department) {
+    for (const path of filters.agency) {
+      const name = path.split('.').pop() || path;
       result.push({
-        id: 'department',
-        filterKey: 'department',
-        label: filters.department,
+        id: `agency:${path}`,
+        filterKey: 'agency',
+        value: path,
+        label: name,
       });
     }
 

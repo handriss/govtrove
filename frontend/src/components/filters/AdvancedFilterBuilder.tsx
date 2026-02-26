@@ -4,6 +4,7 @@ import SearchableDropdownFilter from './SearchableDropdownFilter';
 import SimpleToggleFilter from './SimpleToggleFilter';
 import NaicsTreeSelector from './NaicsTreeSelector';
 import PscTreeSelector from './PscTreeSelector';
+import AgencyFilter from './AgencyFilter';
 import { NOTICE_TYPE_OPTIONS, STATE_NAMES } from './constants';
 import { SET_ASIDE_FILTER_OPTIONS } from '../ResultsList';
 import type { FilterState, UseFilterStateReturn } from '../../hooks/useFilterState';
@@ -67,12 +68,12 @@ const FIELD_DEFS: FieldDef[] = [
     supported: true,
   },
   {
-    key: 'department',
+    key: 'agency',
     label: 'Agency',
-    filterKeys: ['department'],
-    type: 'single-value',
-    operators: [{ value: 'is', label: 'is' }],
-    defaultOperator: 'is',
+    filterKeys: ['agency'],
+    type: 'multi-value',
+    operators: [{ value: 'is_any_of', label: 'is any of' }],
+    defaultOperator: 'is_any_of',
     supported: true,
   },
   {
@@ -195,8 +196,8 @@ function isFieldActive(fieldKey: string, filters: FilterState): boolean {
       return filters.psc.length > 0;
     case 'setAside':
       return filters.setAside.length > 0;
-    case 'department':
-      return filters.department !== '';
+    case 'agency':
+      return filters.agency.length > 0;
     case 'noticeType':
       return filters.noticeType.length > 0;
     case 'deadline':
@@ -256,15 +257,6 @@ export default function AdvancedFilterBuilder({
       count: countMap.get(o.value),
     }));
   }, [facets?.set_aside]);
-
-  const agencyOptions = useMemo(() => {
-    if (!facets?.agency) return [];
-    return facets.agency.map((f) => ({
-      value: f.value,
-      label: f.label || f.value,
-      count: f.count,
-    }));
-  }, [facets?.agency]);
 
   const noticeTypeOptions = useMemo(() => {
     const countMap = new Map(facets?.notice_type?.map((f) => [f.value, f.count]) ?? []);
@@ -492,7 +484,6 @@ export default function AdvancedFilterBuilder({
                     naicsFacets={facets?.naics}
                     pscFacets={facets?.psc}
                     setAsideOptions={setAsideOptions}
-                    agencyOptions={agencyOptions}
                     noticeTypeOptions={noticeTypeOptions}
                     facetsLoading={facetsLoading}
                   />
@@ -552,7 +543,6 @@ interface RowValueInputProps {
   naicsFacets?: FacetValue[];
   pscFacets?: FacetValue[];
   setAsideOptions: Array<{ value: string; label: string; count?: number }>;
-  agencyOptions: Array<{ value: string; label: string; count?: number }>;
   noticeTypeOptions: Array<{ value: string; label: string; count?: number }>;
   facetsLoading: boolean;
 }
@@ -565,7 +555,6 @@ function RowValueInput({
   naicsFacets,
   pscFacets,
   setAsideOptions,
-  agencyOptions,
   noticeTypeOptions,
   facetsLoading,
 }: RowValueInputProps) {
@@ -611,15 +600,11 @@ function RowValueInput({
         />
       );
 
-    case 'department':
+    case 'agency':
       return (
-        <SearchableDropdownFilter
-          label="Select agency"
-          options={agencyOptions}
-          selected={filters.department ? [filters.department] : []}
-          onSelectionChange={(sel) => setFilter('department', sel[0] || '')}
-          searchPlaceholder="Search agencies..."
-          loading={facetsLoading}
+        <AgencyFilter
+          selected={filters.agency}
+          onChange={(sel) => setFilter('agency', sel)}
         />
       );
 

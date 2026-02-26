@@ -78,6 +78,7 @@ type SearchParams struct {
 	PSCPrefix    string
 	States       []string
 	Department   string
+	AgencyPaths  []string
 	PostedFrom   *time.Time
 	PostedTo     *time.Time
 	DeadlineFrom *time.Time
