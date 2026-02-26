@@ -154,7 +154,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, userUpdateRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -251,6 +251,7 @@ func main() {
 					r.Use(authmw.RequireAdmin(adminLookup))
 					r.Get("/analytics", analyticsHandler.GetAnalytics)
 					r.Get("/users", adminHandler.ListUsers)
+					r.Get("/notifications", adminHandler.ListNotifications)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
