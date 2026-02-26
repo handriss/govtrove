@@ -12,6 +12,7 @@ import (
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	sesv2 "github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/getsentry/sentry-go"
 	"github.com/MicahParks/keyfunc/v3"
@@ -22,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/handriss/govtrove/api/internal/config"
+	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/handlers"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/ogimage"
@@ -95,13 +97,22 @@ func main() {
 	logger.Info("connected to database")
 
 	var snsClient *sns.Client
-	if cfg.SNSTopicARN != "" {
+	var emailSvc *email.Service
+	needsAWS := cfg.SNSTopicARN != "" || cfg.SESFromEmail != ""
+	if needsAWS {
 		awsCfg, awsErr := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
 		if awsErr != nil {
-			logger.Warn("failed to load AWS config, SNS notifications disabled", "error", awsErr)
+			logger.Warn("failed to load AWS config, SNS/SES disabled", "error", awsErr)
 		} else {
-			snsClient = sns.NewFromConfig(awsCfg)
-			logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
+			if cfg.SNSTopicARN != "" {
+				snsClient = sns.NewFromConfig(awsCfg)
+				logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
+			}
+			if cfg.SESFromEmail != "" {
+				sesClient := sesv2.NewFromConfig(awsCfg)
+				emailSvc = email.NewService(sesClient, cfg.SESFromEmail, cfg.SESConfigSet, logger)
+				logger.Info("SES email service configured", "from", cfg.SESFromEmail, "config_set", cfg.SESConfigSet)
+			}
 		}
 	}
 
@@ -144,7 +155,7 @@ func main() {
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
-	authHandler := handlers.NewAuthHandler(userRepo, logger)
+	authHandler := handlers.NewAuthHandler(userRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)

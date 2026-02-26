@@ -18,7 +18,13 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
 }
 
-func (r *UserRepository) Upsert(ctx context.Context, input *models.UpsertUserInput) (*models.User, error) {
+type UpsertResult struct {
+	User  *models.User
+	IsNew bool
+}
+
+func (r *UserRepository) Upsert(ctx context.Context, input *models.UpsertUserInput) (*UpsertResult, error) {
+	// xmax = 0 means the row was inserted (not updated)
 	query := `
 		INSERT INTO users (workos_id, email, first_name, last_name)
 		VALUES ($1, $2, $3, $4)
@@ -27,20 +33,21 @@ func (r *UserRepository) Upsert(ctx context.Context, input *models.UpsertUserInp
 			first_name = EXCLUDED.first_name,
 			last_name = EXCLUDED.last_name,
 			updated_at = NOW()
-		RETURNING id, workos_id, email, first_name, last_name, plan, created_at, updated_at
+		RETURNING id, workos_id, email, first_name, last_name, plan, created_at, updated_at, (xmax = 0) AS is_new
 	`
 
 	var u models.User
+	var isNew bool
 	err := r.pool.QueryRow(ctx, query,
 		input.WorkOSID,
 		input.Email,
 		input.FirstName,
 		input.LastName,
-	).Scan(&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName, &u.Plan, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName, &u.Plan, &u.CreatedAt, &u.UpdatedAt, &isNew)
 	if err != nil {
 		return nil, fmt.Errorf("upserting user: %w", err)
 	}
-	return &u, nil
+	return &UpsertResult{User: &u, IsNew: isNew}, nil
 }
 
 func (r *UserRepository) GetByWorkOSID(ctx context.Context, workosID string) (*models.User, error) {
