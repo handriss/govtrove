@@ -1,0 +1,57 @@
+;;
+;; Domain:     govtrove.com.
+;; Exported:   2026-02-26 10:17:31
+;;
+;; This file is intended for use for informational and archival
+;; purposes ONLY and MUST be edited before use on a production
+;; DNS server.  In particular, you must:
+;;   -- update the SOA record with the correct authoritative name server
+;;   -- update the SOA record with the contact e-mail address information
+;;   -- update the NS record(s) with the authoritative name servers for this domain.
+;;
+;; For further information, please consult the BIND documentation
+;; located on the following website:
+;;
+;; http://www.isc.org/
+;;
+;; And RFC 1035:
+;;
+;; http://www.ietf.org/rfc/rfc1035.txt
+;;
+;; Please note that we do NOT offer technical support for any use
+;; of this zone data, the BIND name server, or any other third-party
+;; DNS software.
+;;
+;; Use at your own risk.
+;; SOA Record
+govtrove.com	3600	IN	SOA	elliot.ns.cloudflare.com. dns.cloudflare.com. 2052376765 10000 2400 604800 3600
+
+;; NS Records
+govtrove.com.	86400	IN	NS	elliot.ns.cloudflare.com.
+govtrove.com.	86400	IN	NS	kate.ns.cloudflare.com.
+
+;; CNAME Records
+_142c06266698220f70630accfcb66932.govtrove.com.	1	IN	CNAME	_b64522bae3a619647c0c4321ee32da0d.jkddzztszm.acm-validations.aws. ; cf_tags=cf-proxied:false
+_283cf53511edae86fefba3c63d2c0546.www.api.govtrove.com.	1	IN	CNAME	_e2ccc9f11253ca4146a71dc46762d61a.jkddzztszm.acm-validations.aws. ; cf_tags=cf-proxied:false
+_76a91857d55209ace4075909777da38a.api.govtrove.com.	1	IN	CNAME	_eb33c440995e868b46f869141d890771.jkddzztszm.acm-validations.aws. ; cf_tags=cf-proxied:false
+api.govtrove.com.	1	IN	CNAME	qnaugzyyvy.us-east-1.awsapprunner.com. ; cf_tags=cf-proxied:true
+app.govtrove.com.	1	IN	CNAME	d3w3n5alnnwtj5.cloudfront.net. ; cf_tags=cf-proxied:false
+f3djljhkxtdaypcieyuuptychtnkggyo._domainkey.govtrove.com.	1	IN	CNAME	f3djljhkxtdaypcieyuuptychtnkggyo.dkim.amazonses.com. ; cf_tags=cf-proxied:false
+_fcad72ef209899e0b1a407e11d098c6f.gy6rg5x0evznp4eqmzb2oiduqtiavkq.api.govtrove.com.	1	IN	CNAME	_2b1f3ed65593e4adb4edf74af10e7230.jkddzztszm.acm-validations.aws. ; cf_tags=cf-proxied:false
+govtrove.com.	1	IN	CNAME	d220m6cv6pvgvv.cloudfront.net. ; cf_tags=cf-proxied:false
+naplyhzxxzgl37nlndmpdvoqmwgpacg6._domainkey.govtrove.com.	1	IN	CNAME	naplyhzxxzgl37nlndmpdvoqmwgpacg6.dkim.amazonses.com. ; cf_tags=cf-proxied:false
+p5o3ybft5u5wwjax77uibf2r65naygzq._domainkey.govtrove.com.	1	IN	CNAME	p5o3ybft5u5wwjax77uibf2r65naygzq.dkim.amazonses.com. ; cf_tags=cf-proxied:false
+zb85436989.govtrove.com.	600	IN	CNAME	zmverify.zoho.eu. ; cf_tags=cf-proxied:false
+
+;; MX Records
+bounce.govtrove.com.	600	IN	MX	10 feedback-smtp.us-east-1.amazonses.com. ; cf_tags=cf-proxied:false
+govtrove.com.	600	IN	MX	50 mx3.zoho.eu.
+govtrove.com.	600	IN	MX	10 mx.zoho.eu.
+govtrove.com.	600	IN	MX	20 mx2.zoho.eu.
+
+;; TXT Records
+_dmarc.govtrove.com.	1	IN	TXT	"v=DMARC1; p=reject; rua=mailto:privacy@govtrove.com; ruf=mailto:privacy@govtrove.com; sp=reject; adkim=r; aspf=r; pct=100"
+govtrove.com.	3600	IN	TXT	"google-site-verification=RucDhrdlPENZjWZuqDzWi6Uf4QhLfmvxoeRFS96TPrM"
+bounce.govtrove.com.	600	IN	TXT	"v=spf1 include:amazonses.com ~all"
+govtrove.com.	3600	IN	TXT	"v=spf1 include:zohomail.eu include:amazonses.com ~all"
+zmail._domainkey.govtrove.com.	600	IN	TXT	"v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCt4MIZ1JIg5Fx/QnQGVKyCvgz07qobU3BcDjHY2JvCCmoOmMvy2yPYyPp8BzsBOH3ECGQiDc/kpgz3NR0QHdHDgBlCdu+QHCOjm6gSt9RBOglPnD80LlJA6ItGNinbRENqa/+wnXLHX/sDjwIaAfkSCj2JakSK8DQ4OFTWfK3f+wIDAQAB"
