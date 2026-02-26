@@ -49,6 +49,9 @@ type Store interface {
 	GetLatestBulkCSVHeaders(ctx context.Context, source string) (string, string, error)
 	GetLatestBulkCSVS3Key(ctx context.Context, source string) (string, error)
 
+	// Agencies
+	RefreshAgencies(ctx context.Context) (int, error)
+
 	// Analytics retention
 	DeleteOldSearchEvents(ctx context.Context, days int) (int64, error)
 }

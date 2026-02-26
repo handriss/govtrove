@@ -151,9 +151,19 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
-	if params.Department != "" && exclude != "department" {
+	if params.Department != "" && exclude != "department" && exclude != "agency" {
 		conditions = append(conditions, fmt.Sprintf("department ILIKE $%d", argNum))
 		args = append(args, "%"+params.Department+"%")
+		argNum++
+	}
+
+	if len(params.AgencyPaths) > 0 && exclude != "agency" {
+		patterns := make([]string, len(params.AgencyPaths))
+		for i, p := range params.AgencyPaths {
+			patterns[i] = p + "%"
+		}
+		conditions = append(conditions, fmt.Sprintf("full_parent_path_name LIKE ANY($%d::text[])", argNum))
+		args = append(args, patterns)
 		argNum++
 	}
 
@@ -333,7 +343,7 @@ func (r *OpportunityRepository) GetFacetCounts(ctx context.Context, params model
 	specs := []facetSpec{
 		{"set_aside", "set_aside", "set_aside_code", "set_aside_description", 0},
 		{"notice_type", "type", "type", "", 0},
-		{"agency", "department", "department", "", 50},
+		{"agency", "agency", "department", "", 50},
 		{"naics", "naics", "naics_code", "", 50},
 		{"psc", "psc", "classification_code", "", 50},
 	}

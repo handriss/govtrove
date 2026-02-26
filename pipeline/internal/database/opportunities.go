@@ -221,7 +221,8 @@ const csvInsertSQL = `
 		secondary_contact_title, secondary_contact_fullname, secondary_contact_email, secondary_contact_phone, secondary_contact_fax,
 		ui_link,
 		version, is_latest, content_hash,
-		data_sources, last_csv_run_id, last_seen_csv
+		data_sources, last_csv_run_id, last_seen_csv,
+		full_parent_path_name
 	) VALUES (
 		$1, $2, $3, $4, $5, $6, $7,
 		$8, $9, $10, $11, $12,
@@ -234,7 +235,13 @@ const csvInsertSQL = `
 		$41, $42, $43, $44, $45,
 		$46,
 		$47, $48, $49,
-		'csv', $50, $51
+		'csv', $50, $51,
+		CASE
+			WHEN $19::text IS NOT NULL THEN CONCAT_WS('.', $17::text, $18::text, $19::text)
+			WHEN $18::text IS NOT NULL THEN CONCAT_WS('.', $17::text, $18::text)
+			WHEN $17::text IS NOT NULL THEN $17::text
+			ELSE NULL
+		END
 	)`
 
 func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {

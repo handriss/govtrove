@@ -140,6 +140,7 @@ func main() {
 	logger.Info("OG image renderer initialized")
 
 	oppRepo := repository.NewOpportunityRepository(pool)
+	agencyRepo := repository.NewAgencyRepository(pool)
 	eventRepo := repository.NewEventRepository(pool)
 	analyticsRepo := repository.NewAnalyticsRepository(pool)
 	contactRepo := repository.NewContactRepository(pool)
@@ -151,6 +152,7 @@ func main() {
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
+	agencyHandler := handlers.NewAgencyHandler(agencyRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
@@ -231,6 +233,7 @@ func main() {
 			r.Get("/opportunities/{id}", oppHandler.GetByID)
 		})
 
+		r.Get("/agencies", agencyHandler.Search)
 		r.Get("/opportunities/facets", oppHandler.GetFacets)
 		r.Get("/opportunities/{id}/history", oppHandler.GetSolicitationHistory)
 		r.Get("/filters", oppHandler.GetFilters)

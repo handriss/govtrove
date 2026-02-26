@@ -10,7 +10,7 @@ export interface FilterState {
   naics: string[];
   psc: string[];
   setAside: string[];
-  department: string;
+  agency: string[];
   state: string;
   noticeType: string[];
   deadlinePreset: string;
@@ -29,7 +29,7 @@ const DEFAULTS: FilterState = {
   naics: [],
   psc: [],
   setAside: [],
-  department: '',
+  agency: [],
   state: '',
   noticeType: [...DEFAULT_NOTICE_TYPES],
   deadlinePreset: '',
@@ -48,8 +48,8 @@ const SORT_STORAGE_KEY = 'govtrove_sort';
 type Action =
   | { type: 'SET'; key: keyof FilterState; value: FilterState[keyof FilterState] }
   | { type: 'SET_MANY'; partial: Partial<FilterState> }
-  | { type: 'ADD'; key: 'naics' | 'psc' | 'setAside' | 'noticeType'; value: string }
-  | { type: 'REMOVE'; key: 'naics' | 'psc' | 'setAside' | 'noticeType'; value: string }
+  | { type: 'ADD'; key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency'; value: string }
+  | { type: 'REMOVE'; key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency'; value: string }
   | { type: 'CLEAR'; key: keyof FilterState }
   | { type: 'CLEAR_ALL' }
   | { type: 'INIT'; state: FilterState };
@@ -105,7 +105,7 @@ const URL_MAP: [keyof FilterState, string][] = [
   ['naics', 'naics'],
   ['psc', 'psc'],
   ['setAside', 'set_aside'],
-  ['department', 'department'],
+  ['agency', 'agency'],
   ['state', 'state'],
   ['noticeType', 'type'],
   ['deadlinePreset', 'deadline'],
@@ -119,7 +119,7 @@ const URL_MAP: [keyof FilterState, string][] = [
   ['page', 'page'],
 ];
 
-const ARRAY_FIELDS = new Set<keyof FilterState>(['naics', 'psc', 'setAside', 'noticeType']);
+const ARRAY_FIELDS = new Set<keyof FilterState>(['naics', 'psc', 'setAside', 'noticeType', 'agency']);
 
 function parseStateFromURL(urlParams: URLSearchParams): FilterState {
   const state = { ...DEFAULTS };
@@ -219,8 +219,8 @@ function deadlinePresetToDate(preset: string): string | undefined {
 export interface UseFilterStateReturn {
   filters: FilterState;
   setFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
-  addFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => void;
-  removeFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => void;
+  addFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency', value: string) => void;
+  removeFilter: (key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency', value: string) => void;
   clearFilter: (key: keyof FilterState) => void;
   clearAllFilters: () => void;
   setFilters: (partial: Partial<FilterState>) => void;
@@ -279,11 +279,11 @@ export function useFilterState(): UseFilterStateReturn {
     dispatch({ type: 'SET', key, value: value as FilterState[keyof FilterState] });
   }, []);
 
-  const addFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => {
+  const addFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency', value: string) => {
     dispatch({ type: 'ADD', key, value });
   }, []);
 
-  const removeFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType', value: string) => {
+  const removeFilter = useCallback((key: 'naics' | 'psc' | 'setAside' | 'noticeType' | 'agency', value: string) => {
     dispatch({ type: 'REMOVE', key, value });
   }, []);
 
@@ -305,7 +305,7 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.naics.length) count++;
     if (filters.psc.length) count++;
     if (filters.setAside.length) count++;
-    if (filters.department) count++;
+    if (filters.agency.length) count++;
     if (filters.state) count++;
     if (JSON.stringify(filters.noticeType.slice().sort()) !== JSON.stringify(DEFAULTS.noticeType.slice().sort())) count++;
     if (filters.deadlinePreset) count++;
@@ -322,7 +322,7 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.naics.length) p.naics = expandToLeafCodes(filters.naics).join(',');
     if (filters.psc.length) p.psc = expandPscToLeafCodes(filters.psc).join(',');
     if (filters.state) p.state = filters.state;
-    if (filters.department) p.department = filters.department;
+    if (filters.agency.length) p.agency = filters.agency.join(',');
     if (filters.postedFrom) p.posted_from = filters.postedFrom;
     if (filters.postedTo) p.posted_to = filters.postedTo;
 

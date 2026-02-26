@@ -114,7 +114,7 @@ export default function SearchResults({
     const activeFilters: { key: string; label: string }[] = [];
     if (filters.naics.length) activeFilters.push({ key: 'naics', label: 'NAICS' });
     if (filters.setAside.length) activeFilters.push({ key: 'setAside', label: 'Set-Aside' });
-    if (filters.department) activeFilters.push({ key: 'department', label: 'Agency' });
+    if (filters.agency.length) activeFilters.push({ key: 'agency', label: 'Agency' });
     if (filters.noticeType.length) activeFilters.push({ key: 'noticeType', label: 'Notice Type' });
     if (filters.deadlinePreset) activeFilters.push({ key: 'deadline', label: 'Deadline' });
     if (activeFilters.length > 0) {

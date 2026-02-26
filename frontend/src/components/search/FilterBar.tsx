@@ -9,6 +9,7 @@ import {
   FilterChipBar,
   NaicsTreeSelector,
   PscTreeSelector,
+  AgencyFilter,
   NOTICE_TYPE_OPTIONS,
 } from '../filters';
 import { useDropdownPosition } from '../filters/useDropdownPosition';
@@ -61,16 +62,6 @@ export default function FilterBar({
     }));
   }, [facets?.set_aside]);
 
-  // Agency options from facets
-  const agencyOptions = useMemo(() => {
-    if (!facets?.agency) return [];
-    return facets.agency.map((f) => ({
-      value: f.value,
-      label: f.label || f.value,
-      count: f.count,
-    }));
-  }, [facets?.agency]);
-
   // Notice type options with facet counts
   const noticeTypeOptions = useMemo(() => {
     const countMap = new Map(facets?.notice_type?.map((f) => [f.value, f.count]) ?? []);
@@ -104,7 +95,7 @@ export default function FilterBar({
         setFilter('activeOnly', true);
         return;
       }
-      if (value && (key === 'naics' || key === 'psc' || key === 'setAside' || key === 'noticeType')) {
+      if (value && (key === 'naics' || key === 'psc' || key === 'setAside' || key === 'noticeType' || key === 'agency')) {
         removeFilter(key, value);
       } else {
         clearFilter(key);
@@ -163,14 +154,9 @@ export default function FilterBar({
           searchPlaceholder="Search set-asides..."
           loading={facetsLoading}
         />
-        <SearchableDropdownFilter
-          label="Agency"
-          options={agencyOptions}
-          selected={filters.department ? [filters.department] : []}
-          onSelectionChange={(sel) => setFilter('department', sel[0] || '')}
-          searchPlaceholder="Search agencies..."
-          loading={facetsLoading}
-          disabled
+        <AgencyFilter
+          selected={filters.agency}
+          onChange={(sel) => setFilter('agency', sel)}
         />
         <EnhancedDeadlineFilter
           deadlinePreset={filters.deadlinePreset}

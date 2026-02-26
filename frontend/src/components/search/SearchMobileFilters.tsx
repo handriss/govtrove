@@ -7,6 +7,7 @@ import {
   SearchableDropdownFilter,
   EnhancedDeadlineFilter,
   SimpleToggleFilter,
+  AgencyFilter,
   NOTICE_TYPE_OPTIONS,
 } from '../filters';
 import { SET_ASIDE_FILTER_OPTIONS } from '../ResultsList';
@@ -74,15 +75,6 @@ export default function SearchMobileFilters({
       count: countMap.get(o.value),
     }));
   }, [facets?.set_aside]);
-
-  const agencyOptions = useMemo(() => {
-    if (!facets?.agency) return [];
-    return facets.agency.map((f) => ({
-      value: f.value,
-      label: f.label || f.value,
-      count: f.count,
-    }));
-  }, [facets?.agency]);
 
   const noticeTypeOptions = useMemo(() => {
     const countMap = new Map(facets?.notice_type?.map((f) => [f.value, f.count]) ?? []);
@@ -183,14 +175,9 @@ export default function SearchMobileFilters({
 
           {/* Agency */}
           <FilterSection label="Agency">
-            <SearchableDropdownFilter
-              label="Agency"
-              options={agencyOptions}
-              selected={filters.department ? [filters.department] : []}
-              onSelectionChange={(sel) => setFilter('department', sel[0] || '')}
-              searchPlaceholder="Search agencies..."
-              loading={facetsLoading}
-              disabled
+            <AgencyFilter
+              selected={filters.agency}
+              onChange={(sel) => setFilter('agency', sel)}
             />
           </FilterSection>
 

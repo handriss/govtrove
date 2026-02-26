@@ -86,7 +86,7 @@ export default function SimpleSearchPage() {
     return (
       f.keyword.length >= 2 ||
       f.setAside.length > 0 ||
-      f.department !== '' ||
+      f.agency.length > 0 ||
       f.state !== '' ||
       f.naics.length > 0 ||
       f.psc.length > 0 ||

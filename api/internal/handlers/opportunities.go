@@ -371,6 +371,10 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 
 	params.Department = truncate(q.Get("department"), 200)
 
+	if agencyStr := q.Get("agency"); agencyStr != "" {
+		params.AgencyPaths = capSlice(strings.Split(agencyStr, ","), 20)
+	}
+
 	if stateStr := q.Get("state"); stateStr != "" {
 		params.States = capSlice(strings.Split(stateStr, ","), 50)
 	}
@@ -436,6 +440,9 @@ func (h *OpportunityHandler) buildFilters(params models.SearchParams) map[string
 	}
 	if params.Department != "" {
 		f["department"] = params.Department
+	}
+	if len(params.AgencyPaths) > 0 {
+		f["agency"] = params.AgencyPaths
 	}
 	if params.PostedFrom != nil {
 		f["posted_from"] = params.PostedFrom.Format("2006-01-02")

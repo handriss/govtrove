@@ -110,6 +110,7 @@ export interface SearchParams {
   psc_prefix?: string;
   state?: string;
   department?: string;
+  agency?: string;
   posted_from?: string;
   posted_to?: string;
   deadline_from?: string;
@@ -118,6 +119,19 @@ export interface SearchParams {
   order?: string;
   page?: number;
   limit?: number;
+}
+
+export interface AgencyResult {
+  name: string;
+  short_name: string | null;
+  level: string;
+  parent_path: string;
+  breadcrumb: string;
+  count: number;
+}
+
+export interface AgencySearchResponse {
+  agencies: AgencyResult[];
 }
 
 export interface StatusResponse {
