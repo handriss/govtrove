@@ -15,6 +15,8 @@ type Config struct {
 	WorkOSAPIKey   string `envconfig:"WORKOS_API_KEY"`
 	AdminEmails    string `envconfig:"ADMIN_EMAILS"`
 	SentryDSN      string `envconfig:"SENTRY_DSN"`
+	SESFromEmail   string `envconfig:"SES_FROM_EMAIL"`
+	SESConfigSet   string `envconfig:"SES_CONFIG_SET"`
 }
 
 func Load() (*Config, error) {

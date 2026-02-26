@@ -6,18 +6,20 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
 type AuthHandler struct {
-	repo   *repository.UserRepository
-	logger *slog.Logger
+	repo     *repository.UserRepository
+	emailSvc *email.Service
+	logger   *slog.Logger
 }
 
-func NewAuthHandler(repo *repository.UserRepository, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{repo: repo, logger: logger}
+func NewAuthHandler(repo *repository.UserRepository, emailSvc *email.Service, logger *slog.Logger) *AuthHandler {
+	return &AuthHandler{repo: repo, emailSvc: emailSvc, logger: logger}
 }
 
 type syncRequest struct {
@@ -54,7 +56,7 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		req.LastName = req.LastName[:200]
 	}
 
-	user, err := h.repo.Upsert(r.Context(), &models.UpsertUserInput{
+	result, err := h.repo.Upsert(r.Context(), &models.UpsertUserInput{
 		WorkOSID:  workosID,
 		Email:     req.Email,
 		FirstName: req.FirstName,
@@ -66,8 +68,14 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("user synced", "workos_id", workosID, "user_id", user.ID)
+	if result.IsNew && h.emailSvc != nil {
+		if err := h.emailSvc.SendWelcome(r.Context(), req.Email, req.FirstName); err != nil {
+			h.logger.Error("failed to send welcome email", "error", err, "user_id", result.User.ID)
+		}
+	}
+
+	h.logger.Info("user synced", "workos_id", workosID, "user_id", result.User.ID, "is_new", result.IsNew)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(result.User)
 }
