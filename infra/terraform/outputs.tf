@@ -132,3 +132,8 @@ output "sentry_frontend_dsn" {
   description = "Sentry DSN for frontend (used by deploy-frontend)"
   value       = var.sentry_frontend_dsn
 }
+
+output "ses_dkim_tokens" {
+  description = "DKIM CNAME records to add to DNS: {token}._domainkey.govtrove.com -> {token}.dkim.amazonses.com"
+  value       = var.domain_name != "" ? aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens : []
+}

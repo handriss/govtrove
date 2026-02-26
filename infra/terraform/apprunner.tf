@@ -62,6 +62,31 @@ resource "aws_iam_role_policy" "apprunner_secrets" {
   })
 }
 
+# Allow App Runner instance to send SES emails
+resource "aws_iam_role_policy" "apprunner_ses" {
+  name = "${var.project_name}-apprunner-ses"
+  role = aws_iam_role.apprunner_instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "sesv2:SendEmail"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "ses:FromAddress" = "noreply@${var.domain_name}"
+          }
+        }
+      }
+    ]
+  })
+}
+
 # Allow App Runner instance to publish SNS notifications
 resource "aws_iam_role_policy" "apprunner_sns" {
   name = "${var.project_name}-apprunner-sns"
@@ -125,6 +150,8 @@ resource "aws_apprunner_service" "api" {
           AWS_REGION      = var.aws_region
           ADMIN_EMAILS    = var.admin_emails
           SENTRY_DSN      = var.sentry_dsn
+          SES_FROM_EMAIL  = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
+          SES_CONFIG_SET  = aws_sesv2_configuration_set.main.configuration_set_name
         }
       }
     }
