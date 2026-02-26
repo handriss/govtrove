@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -86,4 +87,50 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*models.User, err
 		return nil, fmt.Errorf("getting user by id: %w", err)
 	}
 	return &u, nil
+}
+
+func (r *UserRepository) IsAdmin(ctx context.Context, workosID string) (bool, error) {
+	var isAdmin bool
+	err := r.pool.QueryRow(ctx, `SELECT is_admin FROM users WHERE workos_id = $1`, workosID).Scan(&isAdmin)
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("checking admin status: %w", err)
+	}
+	return isAdmin, nil
+}
+
+type AdminUserRow struct {
+	ID        int
+	Email     string
+	FirstName string
+	LastName  string
+	Plan      string
+	IsAdmin   bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (r *UserRepository) ListUsers(ctx context.Context) ([]AdminUserRow, error) {
+	query := `
+		SELECT id, email, first_name, last_name, plan, is_admin, created_at, updated_at
+		FROM users ORDER BY created_at DESC
+	`
+
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listing users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []AdminUserRow
+	for rows.Next() {
+		var u AdminUserRow
+		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Plan, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scanning user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
 }

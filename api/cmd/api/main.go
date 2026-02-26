@@ -154,6 +154,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -195,24 +196,27 @@ func main() {
 	r.Get("/health", healthHandler.Check)
 	r.Get("/og/opportunities/{id}/card.png", oppHandler.GetOGImage)
 	r.Get("/og/opportunities/{id}", oppHandler.GetOGCard)
-	var adminEmails []string
+	// Admin access: check is_admin column first, fall back to ADMIN_EMAILS allowlist
+	adminEmailSet := make(map[string]bool)
 	if cfg.AdminEmails != "" {
 		for _, e := range strings.Split(cfg.AdminEmails, ",") {
 			if trimmed := strings.TrimSpace(e); trimmed != "" {
-				adminEmails = append(adminEmails, trimmed)
+				adminEmailSet[strings.ToLower(trimmed)] = true
 			}
 		}
 	}
-
-	emailLookup := func(ctx context.Context, workosID string) (string, error) {
-		user, err := userRepo.GetByWorkOSID(ctx, workosID)
-		if err != nil {
-			return "", err
+	adminLookup := func(ctx context.Context, workosID string) (bool, error) {
+		isAdmin, err := userRepo.IsAdmin(ctx, workosID)
+		if err == nil && isAdmin {
+			return true, nil
 		}
-		if user == nil {
-			return "", nil
+		if len(adminEmailSet) > 0 {
+			user, userErr := userRepo.GetByWorkOSID(ctx, workosID)
+			if userErr == nil && user != nil && adminEmailSet[strings.ToLower(user.Email)] {
+				return true, nil
+			}
 		}
-		return user.Email, nil
+		return false, err
 	}
 
 	r.Route("/api", func(r chi.Router) {
@@ -244,8 +248,9 @@ func main() {
 				r.Post("/account/requests", accountRequestHandler.Create)
 
 				r.Route("/admin", func(r chi.Router) {
-					r.Use(authmw.RequireAdmin(adminEmails, emailLookup))
+					r.Use(authmw.RequireAdmin(adminLookup))
 					r.Get("/analytics", analyticsHandler.GetAnalytics)
+					r.Get("/users", adminHandler.ListUsers)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
