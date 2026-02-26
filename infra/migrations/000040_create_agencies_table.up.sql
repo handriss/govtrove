@@ -9,8 +9,6 @@ CREATE TABLE agencies (
   UNIQUE(parent_path)
 );
 
-CREATE INDEX idx_agencies_search ON agencies
-  USING gin(to_tsvector('simple', name || ' ' || coalesce(short_name, '') || ' ' || array_to_string(aliases, ' ')));
 CREATE INDEX idx_agencies_path ON agencies(parent_path text_pattern_ops);
 CREATE INDEX idx_agencies_count ON agencies(opportunity_count DESC);
 
