@@ -169,7 +169,9 @@ function stateToURL(state: FilterState): URLSearchParams {
     const def = DEFAULTS[field];
 
     if (Array.isArray(value)) {
-      if (value.length > 0) params.set(param, value.join(','));
+      const defArr = def as string[];
+      const same = value.length === defArr.length && value.slice().sort().join(',') === defArr.slice().sort().join(',');
+      if (value.length > 0 && !same) params.set(param, value.join(','));
     } else if (typeof value === 'boolean') {
       if (value !== def) params.set(param, String(value));
     } else if (typeof value === 'number') {
