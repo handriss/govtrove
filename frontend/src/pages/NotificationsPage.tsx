@@ -1,8 +1,9 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bell, Check, CheckCheck, Trash2, Loader2, Search, FileText, AlertCircle } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { useUpdates, useUpdatesCount } from '../hooks/useUpdates';
-import type { UserUpdate } from '../types/api';
+import { useSavedSearches } from '../hooks/useSavedSearches';
+import type { UserUpdate, SavedSearch } from '../types/api';
 import AuthButton from '../components/AuthButton';
 
 function formatDate(dateStr: string): string {
@@ -41,20 +42,63 @@ function UpdateIcon({ type }: { type: string }) {
   }
 }
 
-function UpdateCard({ update, onMarkRead, onDelete }: {
+function filtersToURLParams(filters: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  if (filters.keyword) params.set('q', String(filters.keyword));
+  if (Array.isArray(filters.naics) && filters.naics.length) params.set('naics', filters.naics.join(','));
+  if (Array.isArray(filters.psc) && filters.psc.length) params.set('psc', filters.psc.join(','));
+  if (Array.isArray(filters.setAside) && filters.setAside.length) params.set('set_aside', filters.setAside.join(','));
+  if (Array.isArray(filters.noticeType) && filters.noticeType.length) params.set('type', filters.noticeType.join(','));
+  if (filters.department) params.set('department', String(filters.department));
+  if (filters.state) params.set('state', String(filters.state));
+  if (filters.postedFrom) params.set('posted_from', String(filters.postedFrom));
+  if (filters.postedTo) params.set('posted_to', String(filters.postedTo));
+  if (filters.deadlinePreset) params.set('deadline', String(filters.deadlinePreset));
+  if (filters.deadlineFrom) params.set('deadline_from', String(filters.deadlineFrom));
+  if (filters.deadlineTo) params.set('deadline_to', String(filters.deadlineTo));
+  return params.toString();
+}
+
+function getUpdateHref(update: UserUpdate, savedSearches: SavedSearch[]): string | null {
+  if (update.update_type === 'saved_search_matches' && update.source_id) {
+    const search = savedSearches.find(s => s.id === update.source_id);
+    if (search) return `/?${filtersToURLParams(search.filters)}`;
+  }
+  if ((update.update_type === 'opportunity_amended' || update.update_type === 'opportunity_changed')
+      && update.opportunity_ids?.[0]) {
+    return `/opportunity/${update.opportunity_ids[0]}`;
+  }
+  return null;
+}
+
+function UpdateCard({ update, savedSearches, onMarkRead, onDelete }: {
   update: UserUpdate;
+  savedSearches: SavedSearch[];
   onMarkRead: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const navigate = useNavigate();
   const details = update.details as Record<string, unknown> | undefined;
   const changes = details?.changes as Array<{ field: string; old?: string; new?: string }> | undefined;
+  const href = getUpdateHref(update, savedSearches);
+
+  const handleCardClick = () => {
+    if (!href) return;
+    if (!update.is_read) onMarkRead(update.id);
+    navigate(href);
+  };
 
   return (
-    <div className={`group flex gap-3 px-4 py-3 rounded-xl border transition-all ${
-      update.is_read
-        ? 'border-dark-800/30 bg-dark-900/20'
-        : 'border-accent/20 bg-accent/5 border-l-2 border-l-accent/50'
-    }`}>
+    <div
+      onClick={handleCardClick}
+      className={`group flex gap-3 px-4 py-3 rounded-xl border transition-all ${
+        href ? 'cursor-pointer' : ''
+      } ${
+        update.is_read
+          ? 'border-dark-800/30 bg-dark-900/20 hover:bg-dark-800/30'
+          : 'border-accent/20 bg-accent/5 border-l-2 border-l-accent/50 hover:bg-accent/10'
+      }`}
+    >
       <div className="mt-0.5 shrink-0">
         <UpdateIcon type={update.update_type} />
       </div>
@@ -70,7 +114,10 @@ function UpdateCard({ update, onMarkRead, onDelete }: {
               <Link
                 key={id}
                 to={`/opportunity/${id}`}
-                onClick={() => !update.is_read && onMarkRead(update.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!update.is_read) onMarkRead(update.id);
+                }}
                 className="text-xs text-accent/80 hover:text-accent bg-accent/5 hover:bg-accent/10
                            px-2 py-0.5 rounded transition-colors"
               >
@@ -85,13 +132,9 @@ function UpdateCard({ update, onMarkRead, onDelete }: {
 
         {/* Show amendment link */}
         {update.update_type === 'opportunity_amended' && update.opportunity_ids?.[0] && (
-          <Link
-            to={`/opportunity/${update.opportunity_ids[0]}`}
-            onClick={() => !update.is_read && onMarkRead(update.id)}
-            className="inline-block mt-2 text-xs text-accent/80 hover:text-accent transition-colors"
-          >
+          <span className="inline-block mt-2 text-xs text-accent/80">
             View amendment
-          </Link>
+          </span>
         )}
 
         {/* Show field changes diff */}
@@ -114,7 +157,7 @@ function UpdateCard({ update, onMarkRead, onDelete }: {
       <div className="flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {!update.is_read && (
           <button
-            onClick={() => onMarkRead(update.id)}
+            onClick={(e) => { e.stopPropagation(); onMarkRead(update.id); }}
             className="text-dark-500 hover:text-accent p-1 transition-colors"
             title="Mark as read"
           >
@@ -122,7 +165,7 @@ function UpdateCard({ update, onMarkRead, onDelete }: {
           </button>
         )}
         <button
-          onClick={() => onDelete(update.id)}
+          onClick={(e) => { e.stopPropagation(); onDelete(update.id); }}
           className="text-dark-500 hover:text-red-400 p-1 transition-colors"
           title="Delete"
         >
@@ -141,9 +184,10 @@ export default function NotificationsPage() {
   const { user, isLoading: authLoading, isAuthenticated } = useAppAuth();
   const { count, refetch: refetchCount } = useUpdatesCount();
   const {
-    updates, total, loading, hasMore, filter, setFilter,
+    updates, total, loading, hasMore,
     loadMore, markRead, markAllRead, remove,
   } = useUpdates();
+  const { savedSearches } = useSavedSearches();
 
   if (authLoading) {
     return (
@@ -195,24 +239,8 @@ export default function NotificationsPage() {
           )}
         </div>
 
-        {/* Filter tabs + actions */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex gap-1">
-            {(['all', 'unread'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors capitalize ${
-                  filter === f
-                    ? 'bg-dark-800/60 text-dark-200'
-                    : 'text-dark-500 hover:text-dark-300'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          {count.unread > 0 && (
+        {count.unread > 0 && (
+          <div className="flex justify-end mb-6">
             <button
               onClick={handleMarkAllRead}
               className="flex items-center gap-1.5 text-xs text-dark-500 hover:text-dark-300 transition-colors"
@@ -220,8 +248,8 @@ export default function NotificationsPage() {
               <CheckCheck size={14} />
               Mark all read
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Updates feed */}
         {loading && updates.length === 0 ? (
@@ -234,22 +262,16 @@ export default function NotificationsPage() {
             <div className="w-16 h-16 rounded-2xl bg-dark-800/30 border border-dark-800/50 flex items-center justify-center mb-6">
               <Bell size={28} className="text-dark-700" strokeWidth={1.5} />
             </div>
-            <h2 className="text-lg font-medium text-dark-300 mb-2">
-              {filter === 'unread' ? 'All caught up' : 'No notifications yet'}
-            </h2>
+            <h2 className="text-lg font-medium text-dark-300 mb-2">No notifications yet</h2>
             <p className="text-sm text-dark-500 max-w-md">
-              {filter === 'unread'
-                ? 'You have no unread notifications.'
-                : 'Save a search or star an opportunity to start receiving notifications when new matches appear or details change.'}
+              Save a search or star an opportunity to start receiving notifications when new matches appear or details change.
             </p>
-            {filter === 'all' && (
-              <Link
-                to="/"
-                className="mt-4 text-sm text-accent hover:text-accent/80 transition-colors"
-              >
-                Start searching
-              </Link>
-            )}
+            <Link
+              to="/"
+              className="mt-4 text-sm text-accent hover:text-accent/80 transition-colors"
+            >
+              Start searching
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
@@ -261,6 +283,7 @@ export default function NotificationsPage() {
                     <UpdateCard
                       key={update.id}
                       update={update}
+                      savedSearches={savedSearches}
                       onMarkRead={handleMarkRead}
                       onDelete={handleDelete}
                     />
