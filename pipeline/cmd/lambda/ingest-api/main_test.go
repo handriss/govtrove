@@ -144,7 +144,7 @@ func TestHandle_FallbackProceedsWhenCSVStale(t *testing.T) {
 		return uuid.New(), time.Now().Add(-48 * time.Hour), nil
 	}
 	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, jobType string) (uuid.UUID, error) {
+	store.CreateIngestionRunFn = func(_ context.Context, jobType string, _ *uuid.UUID) (uuid.UUID, error) {
 		ingestionRunCreated = true
 		if jobType != "snapshot-api" {
 			t.Errorf("expected job type snapshot-api, got %q", jobType)
@@ -178,7 +178,7 @@ func TestHandle_FallbackProceedsWhenCSVNeverRan(t *testing.T) {
 	}
 
 	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, _ string) (uuid.UUID, error) {
+	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
 		ingestionRunCreated = true
 		return uuid.New(), nil
 	}
@@ -202,7 +202,7 @@ func TestHandle_DirectInvocationSkipsFallbackCheck(t *testing.T) {
 	}
 
 	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, _ string) (uuid.UUID, error) {
+	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
 		ingestionRunCreated = true
 		return uuid.New(), nil
 	}
@@ -231,7 +231,7 @@ func TestHandle_CreateIngestionRunFailure(t *testing.T) {
 	h, store, _ := stubHandler(t)
 	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
 
-	store.CreateIngestionRunFn = func(_ context.Context, _ string) (uuid.UUID, error) {
+	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("db connection failed")
 	}
 

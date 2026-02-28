@@ -143,7 +143,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	start := time.Now()
 	snapshotDate := time.Now().UTC()
 
-	runID, err := h.Store.CreateIngestionRun(ctx, jobType)
+	runID, err := h.Store.CreateIngestionRun(ctx, jobType, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create ingestion run: %w", err)
 	}
