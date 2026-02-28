@@ -428,7 +428,8 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
 
   const chartData = buckets.map(b => ({
     time: new Date(b.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-    count: b.count,
+    success: b.success,
+    failed: b.failed,
   }));
 
   const periodOptions = [
@@ -439,7 +440,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
 
   return (
     <section>
-      <h2 className="text-lg font-medium text-dark-200 mb-4">API Usage (Rolling 24h)</h2>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">API Usage (per hour)</h2>
 
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <div>
@@ -479,11 +480,15 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
       {!loading && chartData.length > 0 && (
         <div className="rounded-xl border border-dark-700/50 p-4 bg-dark-800/20">
           <ResponsiveContainer width="100%" height={350}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} stackOffset="none">
               <defs>
-                <linearGradient id="usageGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="rgb(var(--color-accent))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="rgb(var(--color-accent))" stopOpacity={0} />
+                <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="failedGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -497,6 +502,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
                 tick={{ fill: '#6b7280', fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
+                allowDecimals={false}
               />
               <Tooltip
                 contentStyle={{
@@ -512,16 +518,26 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
                   y={selectedKeyData.daily_limit}
                   stroke="#ef4444"
                   strokeDasharray="6 3"
-                  label={{ value: `Limit: ${selectedKeyData.daily_limit}`, fill: '#ef4444', fontSize: 11, position: 'right' }}
+                  label={{ value: `Daily limit: ${selectedKeyData.daily_limit}`, fill: '#ef4444', fontSize: 11, position: 'right' }}
                 />
               )}
               <Area
                 type="monotone"
-                dataKey="count"
-                stroke="rgb(var(--color-accent))"
-                fill="url(#usageGradient)"
+                dataKey="success"
+                stackId="1"
+                stroke="#10b981"
+                fill="url(#successGradient)"
                 strokeWidth={2}
-                name="Requests (24h)"
+                name="Success"
+              />
+              <Area
+                type="monotone"
+                dataKey="failed"
+                stackId="1"
+                stroke="#ef4444"
+                fill="url(#failedGradient)"
+                strokeWidth={2}
+                name="Failed"
               />
             </AreaChart>
           </ResponsiveContainer>

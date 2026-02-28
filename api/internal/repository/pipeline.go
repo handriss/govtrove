@@ -39,7 +39,8 @@ type SamgovRequestRow struct {
 
 type UsageBucket struct {
 	Timestamp time.Time `json:"timestamp"`
-	Count     int       `json:"count"`
+	Success   int       `json:"success"`
+	Failed    int       `json:"failed"`
 }
 
 func (r *PipelineRepository) ListApiKeys(ctx context.Context) ([]ApiKeyRow, error) {
@@ -248,12 +249,14 @@ func (r *PipelineRepository) GetApiKeyUsage(ctx context.Context, keyHash string,
 				INTERVAL '1 hour'
 			) AS bucket_time
 		)
-		SELECT b.bucket_time, COUNT(r.id)
+		SELECT b.bucket_time,
+			COUNT(r.id) FILTER (WHERE r.success = true),
+			COUNT(r.id) FILTER (WHERE r.success = false)
 		FROM buckets b
 		LEFT JOIN pipeline.samgov_requests r
 			ON r.api_key_hash = $1
-			AND r.request_timestamp >= b.bucket_time - INTERVAL '24 hours'
-			AND r.request_timestamp < b.bucket_time
+			AND r.request_timestamp >= b.bucket_time
+			AND r.request_timestamp < b.bucket_time + INTERVAL '1 hour'
 		GROUP BY b.bucket_time
 		ORDER BY b.bucket_time
 	`, keyHash, days)
@@ -265,7 +268,7 @@ func (r *PipelineRepository) GetApiKeyUsage(ctx context.Context, keyHash string,
 	var buckets []UsageBucket
 	for rows.Next() {
 		var b UsageBucket
-		if err := rows.Scan(&b.Timestamp, &b.Count); err != nil {
+		if err := rows.Scan(&b.Timestamp, &b.Success, &b.Failed); err != nil {
 			return nil, err
 		}
 		buckets = append(buckets, b)
