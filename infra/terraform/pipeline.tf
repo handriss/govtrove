@@ -8,6 +8,11 @@ locals {
   lambda_ephemeral_storage = {
     "download-csvs" = 2048
   }
+
+  lambda_memory_overrides = {
+    "ingest-active"   = 512
+    "ingest-archived" = 512
+  }
 }
 
 # --- Lambda Zip Archives ---
@@ -30,7 +35,7 @@ resource "aws_lambda_function" "pipeline" {
   handler          = "bootstrap"
   runtime          = "provided.al2023"
   timeout          = var.lambda_timeout
-  memory_size      = var.lambda_memory
+  memory_size      = lookup(local.lambda_memory_overrides, each.key, var.lambda_memory)
   filename         = data.archive_file.lambda[each.key].output_path
   source_code_hash = data.archive_file.lambda[each.key].output_base64sha256
 
