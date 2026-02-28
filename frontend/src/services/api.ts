@@ -383,3 +383,201 @@ export async function getAdminNotifications(
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
 }
+
+export interface AdminApiKey {
+  key_hash: string;
+  email: string;
+  daily_limit: number;
+  created_at: string;
+  expires_at: string;
+}
+
+export async function getAdminApiKeys(token: string): Promise<AdminApiKey[]> {
+  const response = await fetch(`${API_BASE}/admin/api-keys`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export interface AdminSamgovRequest {
+  id: number;
+  request_timestamp: string;
+  endpoint: string;
+  method: string;
+  http_status_code: number | null;
+  response_time_ms: number | null;
+  request_params: string | null;
+  response_size_bytes: number | null;
+  error_message: string | null;
+  success: boolean;
+  api_key_hash: string | null;
+}
+
+export interface AdminSamgovRequestsResponse {
+  requests: AdminSamgovRequest[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminSamgovRequests(
+  token: string,
+  page = 1,
+): Promise<AdminSamgovRequestsResponse> {
+  const response = await fetch(`${API_BASE}/admin/samgov-requests?page=${page}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export interface UsageBucket {
+  timestamp: string;
+  count: number;
+}
+
+// --- Pipeline Runs ---
+
+export interface AdminIngestionRun {
+  run_id: string;
+  job_type: string;
+  status: string;
+  records_fetched: number | null;
+  records_inserted: number | null;
+  records_updated: number | null;
+  records_failed: number | null;
+  records_skipped: number | null;
+  duration_ms: number | null;
+  error_message: string | null;
+}
+
+export interface AdminPipelineRun {
+  id: string;
+  pipeline_name: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  error_message: string | null;
+  ingestion_runs: AdminIngestionRun[] | null;
+}
+
+export interface AdminPipelineRunsResponse {
+  runs: AdminPipelineRun[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminPipelineRuns(
+  token: string,
+  page = 1,
+  fullOnly = true,
+): Promise<AdminPipelineRunsResponse> {
+  const params = new URLSearchParams({ page: String(page) });
+  if (fullOnly) params.set('full_only', 'true');
+  const response = await fetch(`${API_BASE}/admin/pipeline-runs?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  const data = await response.json();
+  return {
+    ...data,
+    runs: (data.runs || []).map((r: AdminPipelineRun & { ingestion_runs: string | null }) => ({
+      ...r,
+      ingestion_runs: r.ingestion_runs ? (typeof r.ingestion_runs === 'string' ? JSON.parse(r.ingestion_runs) : r.ingestion_runs) : null,
+    })),
+  };
+}
+
+// --- Search Events ---
+
+export interface AdminSearchEvent {
+  id: number;
+  query: string | null;
+  filters: string | null;
+  sort_by: string | null;
+  page: number | null;
+  total_results: number | null;
+  user_id: string | null;
+  created_at: string;
+}
+
+export interface AdminSearchEventsResponse {
+  events: AdminSearchEvent[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminSearchEvents(
+  token: string,
+  page = 1,
+  emptyOnly = false,
+): Promise<AdminSearchEventsResponse> {
+  const params = new URLSearchParams({ page: String(page) });
+  if (emptyOnly) params.set('empty_only', 'true');
+  const response = await fetch(`${API_BASE}/admin/search-events?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+// --- Analytics ---
+
+export interface SearchTermStat {
+  query: string;
+  count: number;
+}
+
+export interface FilterStat {
+  value: string;
+  count: number;
+}
+
+export interface SearchAnalytics {
+  popular_searches: SearchTermStat[];
+  zero_result_searches: SearchTermStat[];
+  filter_usage: {
+    types: FilterStat[];
+    set_asides: FilterStat[];
+    states: FilterStat[];
+  };
+  click_stats: {
+    total_views: number;
+    total_searches: number;
+    click_through_rate: number;
+  };
+  event_counts: {
+    searches: number;
+    views: number;
+    saves: number;
+    search_saves: number;
+  };
+}
+
+export async function getAdminAnalytics(
+  token: string,
+  period = '7d',
+): Promise<SearchAnalytics> {
+  const response = await fetch(`${API_BASE}/admin/analytics?period=${period}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminApiKeyUsage(
+  token: string,
+  keyHash: string,
+  days: number,
+): Promise<{ buckets: UsageBucket[] }> {
+  const response = await fetch(
+    `${API_BASE}/admin/api-key-usage?key_hash=${encodeURIComponent(keyHash)}&days=${days}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
