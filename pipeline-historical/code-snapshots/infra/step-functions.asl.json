@@ -1,0 +1,320 @@
+{
+  "Comment": "GovTrove pipeline: download CSVs, ingest, reconcile",
+  "StartAt": "DownloadCSVs",
+  "States": {
+    "DownloadCSVs": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${download_csvs_arn}",
+        "Payload": {
+          "id.$": "$$.Execution.Name"
+        }
+      },
+      "ResultSelector": {
+        "pipeline_run_id.$": "$.Payload.pipeline_run_id",
+        "files.$": "$.Payload.files"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedDownload"
+        }
+      ],
+      "Next": "HasNewFiles"
+    },
+
+    "HasNewFiles": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.files[0]",
+          "IsPresent": true,
+          "Next": "IngestFiles"
+        }
+      ],
+      "Default": "NoNewFiles"
+    },
+
+    "NoNewFiles": {
+      "Type": "Succeed",
+      "Comment": "No new CSV files to process"
+    },
+
+    "IngestFiles": {
+      "Type": "Map",
+      "ItemsPath": "$.files",
+      "Parameters": {
+        "pipeline_run_id.$": "$.pipeline_run_id",
+        "file.$": "$$.Map.Item.Value"
+      },
+      "Iterator": {
+        "StartAt": "RouteByType",
+        "States": {
+          "RouteByType": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Variable": "$.file.type",
+                "StringEquals": "active",
+                "Next": "IngestActive"
+              },
+              {
+                "Variable": "$.file.type",
+                "StringEquals": "archived",
+                "Next": "IngestArchived"
+              }
+            ],
+            "Default": "IngestActive"
+          },
+
+          "IngestActive": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${ingest_active_arn}",
+              "Payload.$": "$"
+            },
+            "ResultSelector": {
+              "status.$": "$.Payload.status",
+              "run_id.$": "$.Payload.run_id",
+              "job_type.$": "$.Payload.job_type"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "MaxAttempts": 3,
+                "IntervalSeconds": 30,
+                "BackoffRate": 2.0
+              }
+            ],
+            "End": true
+          },
+
+          "IngestArchived": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+              "FunctionName": "${ingest_archived_arn}",
+              "Payload.$": "$"
+            },
+            "ResultSelector": {
+              "status.$": "$.Payload.status",
+              "run_id.$": "$.Payload.run_id",
+              "job_type.$": "$.Payload.job_type"
+            },
+            "Retry": [
+              {
+                "ErrorEquals": ["States.ALL"],
+                "MaxAttempts": 3,
+                "IntervalSeconds": 30,
+                "BackoffRate": 2.0
+              }
+            ],
+            "End": true
+          }
+        }
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedIngest"
+        }
+      ],
+      "ResultPath": "$.ingestion_results",
+      "Next": "IngestAPI"
+    },
+
+    "IngestAPI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${ingest_api_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "run_id.$": "$.Payload.run_id",
+        "job_type.$": "$.Payload.job_type",
+        "total_fetched.$": "$.Payload.total_fetched",
+        "upserted.$": "$.Payload.upserted"
+      },
+      "ResultPath": "$.api_result",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedIngestAPI"
+        }
+      ],
+      "Next": "Reconcile"
+    },
+
+    "Reconcile": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${reconcile_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedReconcile"
+        }
+      ],
+      "Next": "GenerateAlerts"
+    },
+
+    "GenerateAlerts": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${generate_alerts_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "search_alerts.$": "$.Payload.search_alerts",
+        "opportunity_alerts.$": "$.Payload.opportunity_alerts"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedAlerts"
+        }
+      ],
+      "Next": "NotifySuccess"
+    },
+
+    "NotifySuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_notifications_arn}",
+        "Subject": "GovTrove Pipeline Succeeded",
+        "Message.$": "States.Format('Pipeline execution completed successfully. Execution: {}', $$.Execution.Name)"
+      },
+      "End": true
+    },
+
+    "MarkFailedDownload": {
+      "Type": "Pass",
+      "Result": "DownloadCSVs",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedIngest": {
+      "Type": "Pass",
+      "Result": "IngestFiles",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedIngestAPI": {
+      "Type": "Pass",
+      "Result": "IngestAPI",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedReconcile": {
+      "Type": "Pass",
+      "Result": "Reconcile",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedAlerts": {
+      "Type": "Pass",
+      "Result": "GenerateAlerts",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "SendToDLQ": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${sqs_dlq_url}",
+        "MessageBody.$": "States.JsonToString($)"
+      },
+      "ResultPath": "$.sqs_result",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure"
+        }
+      ],
+      "Next": "NotifyFailure"
+    },
+
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_notifications_arn}",
+        "Subject.$": "States.Format('GovTrove Pipeline FAILED at {}', $.failed_step)",
+        "Message.$": "States.Format('Pipeline execution {} failed.\n\nFailed step: {}\nError: {}\nCause: {}\n\nCheck the Step Functions console for full details.', $$.Execution.Name, $.failed_step, $.error.Error, $.error.Cause)"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailureFallback"
+        }
+      ],
+      "End": true
+    },
+
+    "NotifyFailureFallback": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_notifications_arn}",
+        "Subject": "GovTrove Pipeline FAILED",
+        "Message.$": "States.Format('Pipeline execution {} failed.\n\nThe detailed error could not be extracted. Check the Step Functions console and SQS dead-letter queue for details.\n\nExecution: {}', $$.Execution.Name, $$.Execution.Id)"
+      },
+      "End": true
+    }
+  }
+}
