@@ -9,6 +9,7 @@ interface SimpleToggleFilterProps {
   selected: string[];
   onSelectionChange: (selected: string[]) => void;
   loading?: boolean;
+  showSelectedValues?: boolean;
 }
 
 export default function SimpleToggleFilter({
@@ -17,6 +18,7 @@ export default function SimpleToggleFilter({
   selected,
   onSelectionChange,
   loading,
+  showSelectedValues,
 }: SimpleToggleFilterProps) {
   const [pending, setPending] = useState<string[]>(selected);
   const pendingRef = useRef(pending);
@@ -65,8 +67,12 @@ export default function SimpleToggleFilter({
 
   const triggerLabel = useMemo(() => {
     if (!active) return label;
-    return `${label} (${selected.length})`;
-  }, [label, active, selected.length]);
+    if (!showSelectedValues) return `${label} (${selected.length})`;
+    const optionMap = new Map(options.map((o) => [o.value, o.label]));
+    const labels = selected.map((v) => optionMap.get(v) || v);
+    if (labels.length <= 2) return labels.join(', ');
+    return `${labels.slice(0, 2).join(', ')} and ${labels.length - 2} more`;
+  }, [label, active, selected, options, showSelectedValues]);
 
   return (
     <>

@@ -11,6 +11,7 @@ interface SearchableDropdownFilterProps {
   searchPlaceholder?: string;
   loading?: boolean;
   disabled?: boolean;
+  showSelectedValues?: boolean;
 }
 
 const ITEM_HEIGHT = 28;
@@ -37,6 +38,7 @@ export default function SearchableDropdownFilter({
   searchPlaceholder = 'Search...',
   loading,
   disabled,
+  showSelectedValues,
 }: SearchableDropdownFilterProps) {
   const [pending, setPending] = useState<string[]>(selected);
   const [search, setSearch] = useState('');
@@ -132,8 +134,12 @@ export default function SearchableDropdownFilter({
 
   const triggerLabel = useMemo(() => {
     if (!active) return label;
-    return `${label} (${selected.length})`;
-  }, [label, active, selected.length]);
+    if (!showSelectedValues) return `${label} (${selected.length})`;
+    const optionMap = new Map(options.map((o) => [o.value, o.label]));
+    const labels = selected.map((v) => optionMap.get(v) || v);
+    if (labels.length <= 2) return labels.join(', ');
+    return `${labels.slice(0, 2).join(', ')} and ${labels.length - 2} more`;
+  }, [label, active, selected, options, showSelectedValues]);
 
   return (
     <>

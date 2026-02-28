@@ -8,6 +8,7 @@ interface AgencyFilterProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   loading?: boolean;
+  showSelectedValues?: boolean;
 }
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -23,7 +24,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   );
 }
 
-export default function AgencyFilter({ selected, onChange }: AgencyFilterProps) {
+export default function AgencyFilter({ selected, onChange, showSelectedValues }: AgencyFilterProps) {
   const [pending, setPending] = useState<string[]>(selected);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<AgencyResult[]>([]);
@@ -135,7 +136,16 @@ export default function AgencyFilter({ selected, onChange }: AgencyFilterProps) 
   );
 
   const active = selected.length > 0;
-  const triggerLabel = active ? `Agency (${selected.length})` : 'Agency';
+  const triggerLabel = useMemo(() => {
+    if (!active) return 'Agency';
+    if (!showSelectedValues) return `Agency (${selected.length})`;
+    const labels = selected.map((path) => {
+      const info = agencyMap.get(path);
+      return info?.short_name || info?.name || path.split('.').pop() || path;
+    });
+    if (labels.length <= 2) return labels.join(', ');
+    return `${labels.slice(0, 2).join(', ')} and ${labels.length - 2} more`;
+  }, [active, selected, agencyMap, showSelectedValues]);
 
   return (
     <>
@@ -185,7 +195,8 @@ export default function AgencyFilter({ selected, onChange }: AgencyFilterProps) 
               <>
                 {/* Pinned selected items */}
                 {selectedAgencies.length > 0 && (
-                  <div className="p-1 border-b border-dark-700/30 max-h-[140px] overflow-y-auto">
+                  <div className="p-1 bg-accent/[0.04] max-h-[140px] overflow-y-auto">
+                    <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-accent/60">Selected</div>
                     {selectedAgencies.map((a) => (
                       <label
                         key={a.parent_path}
@@ -213,7 +224,10 @@ export default function AgencyFilter({ selected, onChange }: AgencyFilterProps) 
 
                 {/* Pending selections not in map (fallback display) */}
                 {pending.filter((p) => !agencyMap.has(p)).length > 0 && (
-                  <div className="p-1 border-b border-dark-700/30">
+                  <div className="p-1 bg-accent/[0.04]">
+                    {!selectedAgencies.length && (
+                      <div className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-accent/60">Selected</div>
+                    )}
                     {pending
                       .filter((p) => !agencyMap.has(p))
                       .map((path) => (
@@ -231,6 +245,11 @@ export default function AgencyFilter({ selected, onChange }: AgencyFilterProps) 
                         </label>
                       ))}
                   </div>
+                )}
+
+                {/* Divider between selected and results */}
+                {pending.length > 0 && (
+                  <div className="border-t-2 border-dark-600/50" />
                 )}
 
                 {/* Search results */}
