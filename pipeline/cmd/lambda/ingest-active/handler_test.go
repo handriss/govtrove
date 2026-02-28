@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,10 +42,10 @@ func (m *mockS3) GetObject(ctx context.Context, params *s3.GetObjectInput, optFn
 
 var _ = Describe("Ingest Active Handler", func() {
 	var (
-		h     *Handler
-		store *testutil.MockStore
+		h      *Handler
+		store  *testutil.MockStore
 		s3mock *mockS3
-		ctx   context.Context
+		ctx    context.Context
 	)
 
 	BeforeEach(func() {
@@ -55,6 +57,19 @@ var _ = Describe("Ingest Active Handler", func() {
 			S3:     s3mock,
 			Bucket: "test-bucket",
 			Logger: slog.Default(),
+		}
+
+		// Default mocks for bulk_csv_log
+		store.GetBulkCSVLogByS3KeyFn = func(_ context.Context, s3Key string) (*database.BulkCSVLogRecord, error) {
+			return &database.BulkCSVLogRecord{
+				ID:     42,
+				Source: "active",
+				Result: "new_file",
+				S3Key:  &s3Key,
+			}, nil
+		}
+		store.UpdateBulkCSVLogIngestionFn = func(_ context.Context, _ int, _ uuid.UUID, _ int, _ string) error {
+			return nil
 		}
 	})
 
@@ -80,13 +95,13 @@ var _ = Describe("Ingest Active Handler", func() {
 
 		It("creates an ingestion run, parses CSV, bulk inserts, and reports stats", func() {
 			runID := uuid.New()
-			store.CreateIngestionRunFn = func(_ context.Context, _ string) (uuid.UUID, error) {
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
 				return runID, nil
 			}
 
 			var insertedCount int
 			store.BulkInsertSnapCSVFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ int64, rows []database.SnapCSVRow) (int64, error) {
-				insertedCount = len(rows)
+				insertedCount += len(rows)
 				return int64(len(rows)), nil
 			}
 
@@ -99,19 +114,69 @@ var _ = Describe("Ingest Active Handler", func() {
 			Expect(insertedCount).To(Equal(2))
 		})
 
-		It("records download entry with correct metadata", func() {
-			var downloadEntry *database.CSVDownloadEntry
-			store.CreateCSVDownloadEntryFn = func(_ context.Context, e *database.CSVDownloadEntry) (int64, error) {
-				downloadEntry = e
-				return 42, nil
+		It("updates bulk_csv_log with correct count and status on success", func() {
+			var finalStatus string
+			var finalCount int
+			store.UpdateBulkCSVLogIngestionFn = func(_ context.Context, _ int, _ uuid.UUID, count int, status string) error {
+				finalStatus = status
+				finalCount = count
+				return nil
 			}
 
 			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(downloadEntry).NotTo(BeNil())
-			Expect(downloadEntry.URL).To(ContainSubstring("test-bucket"))
-			Expect(downloadEntry.Status).To(Equal("downloading"))
+			Expect(finalStatus).To(Equal("completed"))
+			Expect(finalCount).To(Equal(2))
+		})
+	})
+
+	Context("idempotency — file already ingested", func() {
+		It("skips S3 download when bulk_csv_log status is completed", func() {
+			completed := "completed"
+			rowCount := 100
+			store.GetBulkCSVLogByS3KeyFn = func(_ context.Context, s3Key string) (*database.BulkCSVLogRecord, error) {
+				return &database.BulkCSVLogRecord{
+					ID:       42,
+					Source:   "active",
+					Result:   "new_file",
+					S3Key:    &s3Key,
+					Status:   &completed,
+					RowCount: &rowCount,
+				}, nil
+			}
+
+			s3Called := false
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				s3Called = true
+				return nil, errors.New("should not be called")
+			}
+
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
+				return uuid.New(), nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(s3Called).To(BeFalse())
+		})
+	})
+
+	Context("missing bulk_csv_log record", func() {
+		It("returns an error", func() {
+			store.GetBulkCSVLogByS3KeyFn = func(_ context.Context, _ string) (*database.BulkCSVLogRecord, error) {
+				return nil, nil
+			}
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
+				return uuid.New(), nil
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("no bulk_csv_log record"))
 		})
 	})
 
@@ -190,7 +255,7 @@ var _ = Describe("Ingest Active Handler", func() {
 	})
 
 	Context("when bulk insert fails", func() {
-		It("fails the CSV download entry and the ingestion run", func() {
+		It("updates bulk_csv_log to failed and fails the ingestion run", func() {
 			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
 			}
@@ -198,10 +263,11 @@ var _ = Describe("Ingest Active Handler", func() {
 				return 0, errors.New("disk full")
 			}
 
-			downloadFailed := false
-			store.FailCSVDownloadEntryFn = func(_ context.Context, _ int64, errMsg string) error {
-				downloadFailed = true
-				Expect(errMsg).To(ContainSubstring("disk full"))
+			bulkLogFailed := false
+			store.UpdateBulkCSVLogIngestionFn = func(_ context.Context, _ int, _ uuid.UUID, _ int, status string) error {
+				if status == "failed" {
+					bulkLogFailed = true
+				}
 				return nil
 			}
 
@@ -209,7 +275,7 @@ var _ = Describe("Ingest Active Handler", func() {
 
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("bulk insert"))
-			Expect(downloadFailed).To(BeTrue())
+			Expect(bulkLogFailed).To(BeTrue())
 		})
 	})
 
@@ -229,6 +295,136 @@ var _ = Describe("Ingest Active Handler", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output.Status).To(Equal("ok"))
+		})
+	})
+
+	Context("pipeline_run_id propagation", func() {
+		It("passes pipeline_run_id to CreateIngestionRun", func() {
+			pipelineRunID := uuid.New()
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+
+			var receivedPipelineRunID *uuid.UUID
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, prid *uuid.UUID) (uuid.UUID, error) {
+				receivedPipelineRunID = prid
+				return uuid.New(), nil
+			}
+
+			input := Input{PipelineRunID: pipelineRunID.String()}
+			input.File.Type = "active"
+			input.File.S3Key = "raw/csv/2026-02-18.csv.gz"
+			input.File.Source = "active"
+			b, _ := json.Marshal(input)
+
+			_, err := h.Handle(ctx, b)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(receivedPipelineRunID).NotTo(BeNil())
+			Expect(*receivedPipelineRunID).To(Equal(pipelineRunID))
+		})
+
+		It("passes nil when pipeline_run_id is invalid", func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
+			}
+
+			var receivedPipelineRunID *uuid.UUID
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, prid *uuid.UUID) (uuid.UUID, error) {
+				receivedPipelineRunID = prid
+				return uuid.New(), nil
+			}
+
+			input := Input{PipelineRunID: "not-a-uuid"}
+			input.File.Type = "active"
+			input.File.S3Key = "raw/csv/2026-02-18.csv.gz"
+			input.File.Source = "active"
+			b, _ := json.Marshal(input)
+
+			_, err := h.Handle(ctx, b)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(receivedPipelineRunID).To(BeNil())
+		})
+	})
+
+	Context("when CreateIngestionRun fails", func() {
+		It("returns the error without proceeding", func() {
+			store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
+				return uuid.Nil, errors.New("db connection refused")
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("db connection refused"))
+		})
+	})
+
+	Context("when GetBulkCSVLogByS3Key returns a DB error", func() {
+		It("returns the error (distinct from nil record)", func() {
+			store.GetBulkCSVLogByS3KeyFn = func(_ context.Context, _ string) (*database.BulkCSVLogRecord, error) {
+				return nil, errors.New("connection timeout")
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("connection timeout"))
+		})
+	})
+
+	Context("when S3 returns corrupt (non-gzip) content", func() {
+		It("marks bulk_csv_log as failed and returns the error", func() {
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{
+					Body: io.NopCloser(strings.NewReader("this is not gzip data")),
+				}, nil
+			}
+
+			bulkLogFailed := false
+			store.UpdateBulkCSVLogIngestionFn = func(_ context.Context, _ int, _ uuid.UUID, _ int, status string) error {
+				if status == "failed" {
+					bulkLogFailed = true
+				}
+				return nil
+			}
+
+			_, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("gzip"))
+			Expect(bulkLogFailed).To(BeTrue())
+		})
+	})
+
+	Context("batching with large CSV", func() {
+		It("flushes multiple batches when rows exceed batchSize", func() {
+			// Generate a CSV with batchSize+2 rows to trigger at least 2 BulkInsertSnapCSV calls
+			var sb strings.Builder
+			sb.WriteString("NoticeId,Title\n")
+			for i := 0; i < batchSize+2; i++ {
+				sb.WriteString(fmt.Sprintf("OPP-%05d,Title %d\n", i, i))
+			}
+
+			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+				return &s3.GetObjectOutput{Body: gzipCSV(sb.String())}, nil
+			}
+
+			insertCalls := 0
+			totalInserted := 0
+			store.BulkInsertSnapCSVFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ int64, rows []database.SnapCSVRow) (int64, error) {
+				insertCalls++
+				totalInserted += len(rows)
+				return int64(len(rows)), nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(insertCalls).To(Equal(2))
+			Expect(totalInserted).To(Equal(batchSize + 2))
 		})
 	})
 })
