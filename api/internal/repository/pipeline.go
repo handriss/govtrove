@@ -255,8 +255,8 @@ func (r *PipelineRepository) GetApiKeyUsage(ctx context.Context, keyHash string,
 		FROM buckets b
 		LEFT JOIN pipeline.samgov_requests r
 			ON r.api_key_hash = $1
-			AND r.request_timestamp >= b.bucket_time
-			AND r.request_timestamp < b.bucket_time + INTERVAL '1 hour'
+			AND r.request_timestamp > b.bucket_time - INTERVAL '24 hours'
+			AND r.request_timestamp <= b.bucket_time
 		GROUP BY b.bucket_time
 		ORDER BY b.bucket_time
 	`, keyHash, days)

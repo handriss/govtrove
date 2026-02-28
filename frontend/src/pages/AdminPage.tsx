@@ -440,7 +440,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
 
   return (
     <section>
-      <h2 className="text-lg font-medium text-dark-200 mb-4">API Usage (per hour)</h2>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">API Usage (Rolling 24h)</h2>
 
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <div>
