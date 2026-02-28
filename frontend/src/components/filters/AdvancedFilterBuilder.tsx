@@ -574,6 +574,7 @@ function RowValueInput({
           facets={naicsFacets}
           label="Select NAICS"
           loading={facetsLoading}
+          showSelectedValues
         />
       );
 
@@ -585,6 +586,7 @@ function RowValueInput({
           facets={pscFacets}
           label="Select PSC"
           loading={facetsLoading}
+          showSelectedValues
         />
       );
 
@@ -597,6 +599,7 @@ function RowValueInput({
           onSelectionChange={(sel) => setFilter('setAside', sel)}
           searchPlaceholder="Search set-asides..."
           loading={facetsLoading}
+          showSelectedValues
         />
       );
 
@@ -605,6 +608,7 @@ function RowValueInput({
         <AgencyFilter
           selected={filters.agency}
           onChange={(sel) => setFilter('agency', sel)}
+          showSelectedValues
         />
       );
 
@@ -616,6 +620,7 @@ function RowValueInput({
           selected={filters.noticeType}
           onSelectionChange={(sel) => setFilter('noticeType', sel)}
           loading={facetsLoading}
+          showSelectedValues
         />
       );
 

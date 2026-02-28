@@ -21,6 +21,7 @@ interface PscTreeSelectorProps {
   inline?: boolean;
   compact?: boolean;
   loading?: boolean;
+  showSelectedValues?: boolean;
 }
 
 type CheckState = 'checked' | 'unchecked' | 'indeterminate';
@@ -75,6 +76,7 @@ export default function PscTreeSelector({
   inline = false,
   compact = false,
   loading = false,
+  showSelectedValues = false,
 }: PscTreeSelectorProps) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -360,7 +362,12 @@ export default function PscTreeSelector({
   }
 
   const active = selected.length > 0;
-  const triggerLabel = active ? `${label} (${selected.length})` : label;
+  const triggerLabel = useMemo(() => {
+    if (!active) return label;
+    if (!showSelectedValues) return `${label} (${selected.length})`;
+    if (selected.length <= 2) return selected.join(', ');
+    return `${selected.slice(0, 2).join(', ')} and ${selected.length - 2} more`;
+  }, [label, active, selected, showSelectedValues]);
 
   if (compact) {
     const display =
