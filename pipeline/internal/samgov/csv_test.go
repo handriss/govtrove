@@ -1,6 +1,7 @@
 package samgov_test
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -145,6 +146,96 @@ var _ = Describe("ParseCSVFromReader", func() {
 
 			_, err := samgov.ParseCSVFromReader(strings.NewReader(csv), 0, logger)
 
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("headers"))
+		})
+	})
+})
+
+var _ = Describe("ParseCSVStream", func() {
+	Context("with a well-formed CSV", func() {
+		It("streams all valid rows to the callback", func() {
+			csv := "NoticeId,Title,Type\n" +
+				"ID-001,First,Solicitation\n" +
+				"ID-002,Second,Award\n"
+
+			var rows []map[string]string
+			total, parsed, errors, err := samgov.ParseCSVStream(
+				strings.NewReader(csv), logger,
+				func(row map[string]string) error {
+					rows = append(rows, row)
+					return nil
+				},
+			)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(total).To(Equal(2))
+			Expect(parsed).To(Equal(2))
+			Expect(errors).To(Equal(0))
+			Expect(rows).To(HaveLen(2))
+			Expect(rows[0]["NoticeId"]).To(Equal("ID-001"))
+			Expect(rows[1]["NoticeId"]).To(Equal("ID-002"))
+		})
+	})
+
+	Context("when rows have missing NoticeId", func() {
+		It("skips them and counts as errors", func() {
+			csv := "NoticeId,Title\n" +
+				"ID-001,Good Row\n" +
+				",Missing ID\n" +
+				"ID-003,Another Good Row\n"
+
+			var rows []map[string]string
+			total, parsed, errors, err := samgov.ParseCSVStream(
+				strings.NewReader(csv), logger,
+				func(row map[string]string) error {
+					rows = append(rows, row)
+					return nil
+				},
+			)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(total).To(Equal(3))
+			Expect(parsed).To(Equal(2))
+			Expect(errors).To(Equal(1))
+			Expect(rows).To(HaveLen(2))
+			Expect(rows[0]["NoticeId"]).To(Equal("ID-001"))
+			Expect(rows[1]["NoticeId"]).To(Equal("ID-003"))
+		})
+	})
+
+	Context("when callback returns an error", func() {
+		It("stops parsing and returns the error", func() {
+			csv := "NoticeId,Title\n" +
+				"ID-001,Row 1\n" +
+				"ID-002,Row 2\n" +
+				"ID-003,Row 3\n"
+
+			callCount := 0
+			_, _, _, err := samgov.ParseCSVStream(
+				strings.NewReader(csv), logger,
+				func(row map[string]string) error {
+					callCount++
+					if callCount == 2 {
+						return fmt.Errorf("batch insert failed")
+					}
+					return nil
+				},
+			)
+
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("batch insert failed"))
+			Expect(callCount).To(Equal(2))
+		})
+	})
+
+	Context("with no headers", func() {
+		It("returns an error", func() {
+			csv := ""
+			_, _, _, err := samgov.ParseCSVStream(
+				strings.NewReader(csv), logger,
+				func(row map[string]string) error { return nil },
+			)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("headers"))
 		})
