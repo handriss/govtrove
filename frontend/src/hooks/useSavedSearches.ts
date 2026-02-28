@@ -60,7 +60,7 @@ export function useSavedSearches(): UseSavedSearchesReturn {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; fetchedRef.current = false; };
   }, [isAuthenticated, getAccessToken]);
 
   const saveCurrentSearch = useCallback(async (name: string, filters: Record<string, unknown>, alertEnabled?: boolean) => {
