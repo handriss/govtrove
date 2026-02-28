@@ -12,11 +12,12 @@ import (
 type AdminHandler struct {
 	userRepo       *repository.UserRepository
 	userUpdateRepo *repository.UserUpdateRepository
+	pipelineRepo   *repository.PipelineRepository
 	logger         *slog.Logger
 }
 
-func NewAdminHandler(userRepo *repository.UserRepository, userUpdateRepo *repository.UserUpdateRepository, logger *slog.Logger) *AdminHandler {
-	return &AdminHandler{userRepo: userRepo, userUpdateRepo: userUpdateRepo, logger: logger}
+func NewAdminHandler(userRepo *repository.UserRepository, userUpdateRepo *repository.UserUpdateRepository, pipelineRepo *repository.PipelineRepository, logger *slog.Logger) *AdminHandler {
+	return &AdminHandler{userRepo: userRepo, userUpdateRepo: userUpdateRepo, pipelineRepo: pipelineRepo, logger: logger}
 }
 
 type adminUserResponse struct {
@@ -88,5 +89,120 @@ func (h *AdminHandler) ListNotifications(w http.ResponseWriter, r *http.Request)
 		"total":   total,
 		"page":    page,
 		"limit":   50,
+	})
+}
+
+func (h *AdminHandler) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.pipelineRepo.ListApiKeys(r.Context())
+	if err != nil {
+		h.logger.Error("list api keys failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(keys)
+}
+
+func (h *AdminHandler) ListSamgovRequests(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	requests, total, err := h.pipelineRepo.ListSamgovRequests(r.Context(), page, 50)
+	if err != nil {
+		h.logger.Error("list samgov requests failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"requests": requests,
+		"total":    total,
+		"page":     page,
+		"limit":    50,
+	})
+}
+
+func (h *AdminHandler) ListPipelineRuns(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	fullOnly := r.URL.Query().Get("full_only") == "true"
+
+	runs, total, err := h.pipelineRepo.ListPipelineRuns(r.Context(), page, 20, fullOnly)
+	if err != nil {
+		h.logger.Error("list pipeline runs failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"runs":  runs,
+		"total": total,
+		"page":  page,
+		"limit": 20,
+	})
+}
+
+func (h *AdminHandler) ListSearchEvents(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	emptyOnly := r.URL.Query().Get("empty_only") == "true"
+
+	events, total, err := h.pipelineRepo.ListSearchEvents(r.Context(), page, 50, emptyOnly)
+	if err != nil {
+		h.logger.Error("list search events failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"events": events,
+		"total":  total,
+		"page":   page,
+		"limit":  50,
+	})
+}
+
+func (h *AdminHandler) GetApiKeyUsage(w http.ResponseWriter, r *http.Request) {
+	keyHash := r.URL.Query().Get("key_hash")
+	if keyHash == "" {
+		http.Error(w, "key_hash is required", http.StatusBadRequest)
+		return
+	}
+
+	days := 7
+	if d := r.URL.Query().Get("days"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 90 {
+			days = v
+		}
+	}
+
+	buckets, err := h.pipelineRepo.GetApiKeyUsage(r.Context(), keyHash, days)
+	if err != nil {
+		h.logger.Error("get api key usage failed", "key_hash", keyHash, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"buckets": buckets,
 	})
 }

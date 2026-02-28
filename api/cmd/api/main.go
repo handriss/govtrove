@@ -149,6 +149,7 @@ func main() {
 	savedOppRepo := repository.NewSavedOpportunityRepository(pool)
 	savedSearchRepo := repository.NewSavedSearchRepository(pool)
 	userUpdateRepo := repository.NewUserUpdateRepository(pool)
+	pipelineRepo := repository.NewPipelineRepository(pool)
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
@@ -156,7 +157,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, userUpdateRepo, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, userUpdateRepo, pipelineRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -255,6 +256,11 @@ func main() {
 					r.Get("/analytics", analyticsHandler.GetAnalytics)
 					r.Get("/users", adminHandler.ListUsers)
 					r.Get("/notifications", adminHandler.ListNotifications)
+					r.Get("/api-keys", adminHandler.ListApiKeys)
+					r.Get("/samgov-requests", adminHandler.ListSamgovRequests)
+					r.Get("/api-key-usage", adminHandler.GetApiKeyUsage)
+					r.Get("/pipeline-runs", adminHandler.ListPipelineRuns)
+					r.Get("/search-events", adminHandler.ListSearchEvents)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
