@@ -16,7 +16,7 @@ import (
 // simulateIngest mimics what the ingest-active and ingest-archived handlers do:
 // create run, parse CSV, extract snap rows, bulk insert, and (for active) detect changes.
 func simulateIngest(ctx context.Context, store database.Store, csvData string, jobType string, snapshotDate time.Time) (uuid.UUID, error) {
-	runID, err := store.CreateIngestionRun(ctx, jobType)
+	runID, err := store.CreateIngestionRun(ctx, jobType, nil)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create ingestion run: %w", err)
 	}
@@ -33,25 +33,14 @@ func simulateIngest(ctx context.Context, store database.Store, csvData string, j
 		return uuid.Nil, fmt.Errorf("parse CSV: %w", err)
 	}
 
-	downloadID, err := store.CreateCSVDownloadEntry(ctx, &database.CSVDownloadEntry{
-		RunID:  runID,
-		URL:    "test://" + jobType,
-		Status: "downloading",
-	})
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("create download entry: %w", err)
-	}
-
 	snapRows := make([]database.SnapCSVRow, 0, len(result.Rows))
 	for _, raw := range result.Rows {
 		snapRows = append(snapRows, ingest.ExtractSnapCSVRow(raw))
 	}
 
-	if _, err := store.BulkInsertSnapCSV(ctx, runID, snapshotDate, downloadID, snapRows); err != nil {
+	if _, err := store.BulkInsertSnapCSV(ctx, runID, snapshotDate, 0, snapRows); err != nil {
 		return uuid.Nil, fmt.Errorf("bulk insert: %w", err)
 	}
-
-	_ = store.CompleteCSVDownloadEntry(ctx, downloadID, len(snapRows), 0)
 
 	if jobType == "snapshot-csv" {
 		prevRunID, _, prevErr := store.GetLastCompletedRun(ctx, jobType)

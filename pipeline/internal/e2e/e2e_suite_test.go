@@ -72,6 +72,19 @@ var _ = AfterSuite(func() {
 const schemaSQL = `
 CREATE SCHEMA IF NOT EXISTS pipeline;
 
+-- Pipeline runs (must be before ingestion_runs due to FK)
+CREATE TABLE pipeline.pipeline_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pipeline_name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running',
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    completed_at TIMESTAMPTZ,
+    duration_ms INT,
+    stats JSONB,
+    error_message TEXT,
+    metadata JSONB
+);
+
 -- Ingestion runs
 CREATE TABLE pipeline.ingestion_runs (
     run_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,26 +99,11 @@ CREATE TABLE pipeline.ingestion_runs (
     records_skipped   INT DEFAULT 0,
     total_db_count    INT DEFAULT 0,
     error_message   TEXT,
-    duration_ms     INT
+    duration_ms     INT,
+    pipeline_run_id UUID REFERENCES pipeline.pipeline_runs(id)
 );
 CREATE INDEX idx_ingestion_runs_status ON pipeline.ingestion_runs(status);
 CREATE INDEX idx_ingestion_runs_job_type ON pipeline.ingestion_runs(job_type, started_at DESC);
-
--- CSV download log
-CREATE TABLE pipeline.csv_download_log (
-    id              BIGSERIAL PRIMARY KEY,
-    run_id          UUID REFERENCES pipeline.ingestion_runs(run_id),
-    url             TEXT,
-    download_date   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    status          TEXT NOT NULL DEFAULT 'downloading',
-    etag            TEXT,
-    last_modified   TEXT,
-    file_size_bytes BIGINT,
-    record_count    INT,
-    error_message   TEXT,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX idx_csv_download_log_run_id ON pipeline.csv_download_log(run_id);
 
 -- Snapshot CSV
 CREATE TABLE pipeline.snap_csv (
@@ -136,7 +134,7 @@ CREATE TABLE pipeline.snap_csv (
     content_hash    TEXT NOT NULL,
     run_id          UUID NOT NULL REFERENCES pipeline.ingestion_runs(run_id),
     snapshot_date   TIMESTAMPTZ NOT NULL,
-    download_id     BIGINT REFERENCES pipeline.csv_download_log(id),
+    download_id     BIGINT,
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(notice_id, run_id)
 );
@@ -182,19 +180,6 @@ CREATE TABLE pipeline.snap_data_quality (
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX idx_snap_dq_run_id ON pipeline.snap_data_quality(run_id);
-
--- Pipeline runs
-CREATE TABLE pipeline.pipeline_runs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    pipeline_name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'running',
-    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    completed_at TIMESTAMPTZ,
-    duration_ms INT,
-    stats JSONB,
-    error_message TEXT,
-    metadata JSONB
-);
 
 -- Opportunities
 CREATE TABLE opportunities (
