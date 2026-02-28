@@ -50,7 +50,7 @@ func stubHandler(t *testing.T) (*Handler, *testutil.MockStore) {
 
 func TestHandle_CreatePipelineRunFailure(t *testing.T) {
 	h, store := stubHandler(t)
-	store.CreatePipelineRunFn = func(_ context.Context, _ string, _ map[string]any) (uuid.UUID, error) {
+	store.CreatePipelineRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("db error")
 	}
 
@@ -66,7 +66,6 @@ func TestHandle_SourceFailurePropagates(t *testing.T) {
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
 
-	// Empty sources — bulkcsv.Run with no sources should succeed with empty results
 	bulkcsv.Sources = nil
 
 	var pipelineRunCompleted bool
@@ -88,23 +87,13 @@ func TestHandle_SourceFailurePropagates(t *testing.T) {
 }
 
 func TestHandle_OutputFilesFromResults(t *testing.T) {
-	// This tests the file type detection logic (active vs archived)
-	// by verifying the output transformation directly
-
-	// active source → Type = "active"
-	f := File{Source: "active"}
-	if f.Source == "active" {
-		f.Type = "active"
-	}
+	// Verify source type propagation through File output
+	f := File{Source: "active", Type: string(bulkcsv.SourceTypeActive)}
 	if f.Type != "active" {
 		t.Errorf("expected type active, got %q", f.Type)
 	}
 
-	// archived source → Type = "archived"
-	f2 := File{Source: "archived_fy2026"}
-	if f2.Source != "active" {
-		f2.Type = "archived"
-	}
+	f2 := File{Source: "archived_fy2026", Type: string(bulkcsv.SourceTypeArchived)}
 	if f2.Type != "archived" {
 		t.Errorf("expected type archived, got %q", f2.Type)
 	}
@@ -112,20 +101,20 @@ func TestHandle_OutputFilesFromResults(t *testing.T) {
 
 func TestHandle_FileTypeClassification(t *testing.T) {
 	cases := []struct {
-		source   string
-		wantType string
+		source     string
+		sourceType bulkcsv.SourceType
+		wantType   string
 	}{
-		{"active", "active"},
-		{"archived_fy2026", "archived"},
-		{"archived_fy2025", "archived"},
+		{"active", bulkcsv.SourceTypeActive, "active"},
+		{"archived_fy2026", bulkcsv.SourceTypeArchived, "archived"},
+		{"archived_fy2025", bulkcsv.SourceTypeArchived, "archived"},
 	}
 
 	for _, c := range cases {
-		f := File{Source: c.source, S3Key: "test/key.csv.gz"}
-		if c.source == "active" {
-			f.Type = "active"
-		} else if len(c.source) > 8 && c.source[:8] == "archived" {
-			f.Type = "archived"
+		f := File{
+			Source: c.source,
+			S3Key:  "test/key.csv.gz",
+			Type:   string(c.sourceType),
 		}
 		if f.Type != c.wantType {
 			t.Errorf("source %q: got type %q, want %q", c.source, f.Type, c.wantType)
@@ -144,10 +133,103 @@ func TestHandle_PipelineRunIDInOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Verify the output has a valid UUID
 	_, parseErr := uuid.Parse(out.PipelineRunID)
 	if parseErr != nil {
 		t.Errorf("expected valid UUID in PipelineRunID, got %q: %v", out.PipelineRunID, parseErr)
+	}
+}
+
+func TestHandle_UsesInputIDForPipelineRun(t *testing.T) {
+	h, store := stubHandler(t)
+
+	origSrcs := bulkcsv.Sources
+	defer func() { bulkcsv.Sources = origSrcs }()
+	bulkcsv.Sources = nil
+
+	expectedID := uuid.New()
+	var receivedID uuid.UUID
+	store.CreatePipelineRunFn = func(_ context.Context, id uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
+		receivedID = id
+		return id, nil
+	}
+
+	input := fmt.Sprintf(`{"id":"%s"}`, expectedID.String())
+	out, err := h.Handle(context.Background(), json.RawMessage(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedID != expectedID {
+		t.Errorf("expected CreatePipelineRun to receive ID %s, got %s", expectedID, receivedID)
+	}
+	if out.PipelineRunID != expectedID.String() {
+		t.Errorf("expected output PipelineRunID %s, got %s", expectedID, out.PipelineRunID)
+	}
+}
+
+func TestHandle_InvalidInputIDFallsBack(t *testing.T) {
+	h, store := stubHandler(t)
+
+	origSrcs := bulkcsv.Sources
+	defer func() { bulkcsv.Sources = origSrcs }()
+	bulkcsv.Sources = nil
+
+	var receivedID uuid.UUID
+	store.CreatePipelineRunFn = func(_ context.Context, id uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
+		receivedID = id
+		if id == uuid.Nil {
+			return uuid.New(), nil
+		}
+		return id, nil
+	}
+
+	out, err := h.Handle(context.Background(), json.RawMessage(`{"id":"not-a-uuid"}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedID != uuid.Nil {
+		t.Errorf("expected uuid.Nil for invalid input, got %s", receivedID)
+	}
+	_, parseErr := uuid.Parse(out.PipelineRunID)
+	if parseErr != nil {
+		t.Errorf("expected valid UUID in output, got %q", out.PipelineRunID)
+	}
+}
+
+func TestHandle_IdempotencySkipsCompletedRun(t *testing.T) {
+	h, store := stubHandler(t)
+
+	origSrcs := bulkcsv.Sources
+	defer func() { bulkcsv.Sources = origSrcs }()
+	bulkcsv.Sources = nil
+
+	runID := uuid.New()
+	store.GetPipelineRunFn = func(_ context.Context, id uuid.UUID) (*database.PipelineRun, error) {
+		if id == runID {
+			return &database.PipelineRun{
+				ID:     runID,
+				Status: "completed",
+				Stats:  map[string]any{"new_files": float64(0)},
+			}, nil
+		}
+		return nil, nil
+	}
+
+	var createCalled bool
+	store.CreatePipelineRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
+		createCalled = true
+		return runID, nil
+	}
+
+	input := fmt.Sprintf(`{"id":"%s"}`, runID.String())
+	out, err := h.Handle(context.Background(), json.RawMessage(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if createCalled {
+		t.Error("expected CreatePipelineRun to NOT be called for completed run")
+	}
+	if out.PipelineRunID != runID.String() {
+		t.Errorf("expected cached PipelineRunID %s, got %s", runID, out.PipelineRunID)
 	}
 }
 
@@ -157,9 +239,8 @@ func TestHandle_FailPipelineRunOnSourceError(t *testing.T) {
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
 
-	// Create a source with an unreachable URL that will fail
 	bulkcsv.Sources = []bulkcsv.Source{
-		{Key: "bad-source", URL: "http://127.0.0.1:1/nonexistent", S3Prefix: "raw/bad"},
+		{Key: "bad-source", Type: bulkcsv.SourceTypeActive, URL: "http://127.0.0.1:1/nonexistent", S3Prefix: "raw/bad"},
 	}
 
 	var failedMsg string
@@ -168,7 +249,6 @@ func TestHandle_FailPipelineRunOnSourceError(t *testing.T) {
 		return nil
 	}
 
-	// The store also needs bulk CSV log insert for error logging
 	store.InsertBulkCSVLogFn = func(_ context.Context, r *database.BulkCSVLogRecord) (int, error) {
 		return 1, nil
 	}
@@ -211,3 +291,4 @@ func TestHandle_CompletesPipelineRunStats(t *testing.T) {
 		t.Error("expected 'new_files' in stats")
 	}
 }
+
