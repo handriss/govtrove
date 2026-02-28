@@ -35,6 +35,7 @@ const (
 
 type SourceResult struct {
 	Source   string
+	Type    SourceType
 	Outcome string // new_file, not_modified, hash_match, error
 	Size    int64
 	Rows    int
@@ -51,7 +52,7 @@ func Run(ctx context.Context, cfg *config.Config, db BulkCSVStore, s3Client S3Cl
 		r, err := processSource(ctx, cfg, db, s3Client, srcLogger, src)
 		if err != nil {
 			srcLogger.Error("source failed", "error", err)
-			results = append(results, SourceResult{Source: src.Key, Outcome: "error"})
+			results = append(results, SourceResult{Source: src.Key, Type: src.Type, Outcome: "error"})
 			continue
 		}
 
@@ -139,7 +140,7 @@ func processWithConditionalGet(
 
 	if resp.StatusCode == http.StatusNotModified {
 		logger.Info("not modified (304)")
-		return &SourceResult{Source: src.Key, Outcome: "not_modified"}, nil
+		return &SourceResult{Source: src.Key, Type: src.Type, Outcome: "not_modified"}, nil
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -169,7 +170,7 @@ func processWithConditionalGet(
 
 	if prevHash != "" && prevHash == hashHex {
 		logger.Info("hash matches previous, skipping")
-		return &SourceResult{Source: src.Key, Outcome: "hash_match"}, nil
+		return &SourceResult{Source: src.Key, Type: src.Type, Outcome: "hash_match"}, nil
 	}
 
 	return archiveFile(ctx, cfg, db, s3Client, logger, src, tmpPath, fileSize, hashHex, rowCount,
@@ -190,7 +191,7 @@ func processWithRangeProbe(
 
 	if currentETag != "" && currentETag == prevETag {
 		logger.Info("unchanged (ETag match)", "etag", currentETag)
-		return &SourceResult{Source: src.Key, Outcome: "not_modified"}, nil
+		return &SourceResult{Source: src.Key, Type: src.Type, Outcome: "not_modified"}, nil
 	}
 
 	logger.Info("ETag changed or new, downloading",
@@ -210,7 +211,7 @@ func processWithRangeProbe(
 
 	if prevHash != "" && prevHash == hashHex {
 		logger.Info("hash matches previous, skipping")
-		return &SourceResult{Source: src.Key, Outcome: "hash_match"}, nil
+		return &SourceResult{Source: src.Key, Type: src.Type, Outcome: "hash_match"}, nil
 	}
 
 	return archiveFile(ctx, cfg, db, s3Client, logger, src, tmpPath, fileSize, hashHex, rowCount,
@@ -306,6 +307,7 @@ func archiveFile(
 
 	return &SourceResult{
 		Source:  src.Key,
+		Type:   src.Type,
 		Outcome: "new_file",
 		Size:   fileSize,
 		Rows:   rowCount,

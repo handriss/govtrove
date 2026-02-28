@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 )
@@ -21,6 +23,19 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 	return &cfg, nil
+}
+
+func RequireEnv(keys ...string) error {
+	var missing []string
+	for _, key := range keys {
+		if os.Getenv(key) == "" {
+			missing = append(missing, key)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required env vars: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func ParseLogLevel(s string) slog.Level {

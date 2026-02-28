@@ -111,6 +111,81 @@ func ParseCSVFromReader(r io.Reader, limit int, logger *slog.Logger) (*CSVParseR
 	return result, nil
 }
 
+// ParseCSVStream reads a CSV from r and calls fn for each valid row (as a map).
+// Rows missing NoticeId are skipped. If fn returns an error, parsing stops immediately.
+func ParseCSVStream(r io.Reader, logger *slog.Logger, fn func(map[string]string) error) (total, parsed, errors int, err error) {
+	reader := csv.NewReader(r)
+	reader.LazyQuotes = true
+	reader.FieldsPerRecord = -1
+
+	headers, err := reader.Read()
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to read CSV headers: %w", err)
+	}
+
+	cleanHeaders := make([]string, len(headers))
+	for i, h := range headers {
+		cleanHeaders[i] = strings.TrimSpace(h)
+	}
+
+	startTime := time.Now()
+	const progressInterval = 10000
+
+	for {
+		record, readErr := reader.Read()
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			logger.Warn("failed to read CSV row", "error", readErr, "row", total+1)
+			errors++
+			total++
+			continue
+		}
+
+		total++
+
+		row := make(map[string]string, len(cleanHeaders))
+		for i, h := range cleanHeaders {
+			if i < len(record) {
+				val := sanitizeToUTF8(strings.TrimSpace(record[i]))
+				if val != "" {
+					row[h] = val
+				}
+			}
+		}
+
+		if row["NoticeId"] == "" {
+			errors++
+			continue
+		}
+
+		if callErr := fn(row); callErr != nil {
+			return total, parsed, errors, fmt.Errorf("callback error at row %d: %w", total, callErr)
+		}
+		parsed++
+
+		if parsed%progressInterval == 0 {
+			elapsed := time.Since(startTime)
+			rate := float64(parsed) / elapsed.Seconds()
+			logger.Info("CSV parsing progress",
+				"parsed", parsed,
+				"errors", errors,
+				"elapsed", elapsed.Round(time.Second),
+				"rate", fmt.Sprintf("%.0f/sec", rate),
+			)
+		}
+	}
+
+	logger.Info("CSV streaming complete",
+		"total_rows", total,
+		"parsed_rows", parsed,
+		"errors", errors,
+	)
+
+	return total, parsed, errors, nil
+}
+
 func sanitizeToUTF8(s string) string {
 	if s == "" {
 		return s
