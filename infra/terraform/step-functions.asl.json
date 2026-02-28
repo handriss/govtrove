@@ -289,6 +289,13 @@
         "QueueUrl": "${sqs_dlq_url}",
         "MessageBody.$": "States.JsonToString($)"
       },
+      "ResultPath": "$.sqs_result",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure"
+        }
+      ],
       "Next": "NotifyFailure"
     },
 
@@ -299,6 +306,23 @@
         "TopicArn": "${sns_notifications_arn}",
         "Subject.$": "States.Format('GovTrove Pipeline FAILED at {}', $.failed_step)",
         "Message.$": "States.Format('Pipeline execution {} failed.\n\nFailed step: {}\nError: {}\nCause: {}\n\nCheck the Step Functions console for full details.', $$.Execution.Name, $.failed_step, $.error.Error, $.error.Cause)"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailureFallback"
+        }
+      ],
+      "End": true
+    },
+
+    "NotifyFailureFallback": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${sns_notifications_arn}",
+        "Subject": "GovTrove Pipeline FAILED",
+        "Message.$": "States.Format('Pipeline execution {} failed.\n\nThe detailed error could not be extracted. Check the Step Functions console and SQS dead-letter queue for details.\n\nExecution: {}', $$.Execution.Name, $$.Execution.Id)"
       },
       "End": true
     }
