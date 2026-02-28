@@ -11,20 +11,16 @@ import (
 
 type Store interface {
 	// Pipeline runs
-	CreatePipelineRun(ctx context.Context, name string, metadata map[string]any) (uuid.UUID, error)
+	CreatePipelineRun(ctx context.Context, id uuid.UUID, name string, metadata map[string]any) (uuid.UUID, error)
+	GetPipelineRun(ctx context.Context, id uuid.UUID) (*PipelineRun, error)
 	CompletePipelineRun(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
 	FailPipelineRun(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
 
 	// Ingestion runs
-	CreateIngestionRun(ctx context.Context, jobType string) (uuid.UUID, error)
+	CreateIngestionRun(ctx context.Context, jobType string, pipelineRunID *uuid.UUID) (uuid.UUID, error)
 	CompleteIngestionRun(ctx context.Context, runID uuid.UUID, s RunStats) error
 	FailIngestionRun(ctx context.Context, runID uuid.UUID, errMsg string, durationMs int) error
 	GetLastCompletedRun(ctx context.Context, jobType string) (uuid.UUID, time.Time, error)
-
-	// CSV download tracking
-	CreateCSVDownloadEntry(ctx context.Context, e *CSVDownloadEntry) (int64, error)
-	CompleteCSVDownloadEntry(ctx context.Context, id int64, recordCount int, fileSizeBytes int64) error
-	FailCSVDownloadEntry(ctx context.Context, id int64, errMsg string) error
 
 	// Snapshot operations
 	BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []SnapCSVRow) (int64, error)
@@ -48,6 +44,8 @@ type Store interface {
 	GetLatestBulkCSVHash(ctx context.Context, source string) (string, error)
 	GetLatestBulkCSVHeaders(ctx context.Context, source string) (string, string, error)
 	GetLatestBulkCSVS3Key(ctx context.Context, source string) (string, error)
+	GetBulkCSVLogByS3Key(ctx context.Context, s3Key string) (*BulkCSVLogRecord, error)
+	UpdateBulkCSVLogIngestion(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error
 
 	// Agencies
 	RefreshAgencies(ctx context.Context) (int, error)

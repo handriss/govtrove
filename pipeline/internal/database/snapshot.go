@@ -43,52 +43,10 @@ type SnapCSVRow struct {
 	ContentHash string
 }
 
-type CSVDownloadEntry struct {
-	RunID         uuid.UUID
-	URL           string
-	Status        string
-	ETag          string
-	LastModified  string
-	FileSizeBytes int64
-	RecordCount   int
-	ErrorMessage  string
-}
-
 func ComputeContentHash(row map[string]string) string {
 	data, _ := json.Marshal(row)
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:])
-}
-
-func (db *DB) CreateCSVDownloadEntry(ctx context.Context, e *CSVDownloadEntry) (int64, error) {
-	var id int64
-	err := db.pool.QueryRow(ctx, `
-		INSERT INTO pipeline.csv_download_log (run_id, url, status, etag, last_modified)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id
-	`, e.RunID, e.URL, e.Status, nilIfEmpty(e.ETag), nilIfEmpty(e.LastModified)).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create csv_download_log entry: %w", err)
-	}
-	return id, nil
-}
-
-func (db *DB) CompleteCSVDownloadEntry(ctx context.Context, id int64, recordCount int, fileSizeBytes int64) error {
-	_, err := db.pool.Exec(ctx, `
-		UPDATE pipeline.csv_download_log
-		SET status = 'completed', record_count = $2, file_size_bytes = $3
-		WHERE id = $1
-	`, id, recordCount, fileSizeBytes)
-	return err
-}
-
-func (db *DB) FailCSVDownloadEntry(ctx context.Context, id int64, errMsg string) error {
-	_, err := db.pool.Exec(ctx, `
-		UPDATE pipeline.csv_download_log
-		SET status = 'failed', error_message = $2
-		WHERE id = $1
-	`, id, errMsg)
-	return err
 }
 
 func (db *DB) BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []SnapCSVRow) (int64, error) {

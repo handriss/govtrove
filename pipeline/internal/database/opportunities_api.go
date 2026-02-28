@@ -187,8 +187,13 @@ func (db *DB) upsertOpportunitiesFromAPIBatch(ctx context.Context, runID uuid.UU
 
 	batch := &pgx.Batch{}
 	var batchNoticeIDs []string
+	seen := make(map[string]bool, len(noticeIDs))
 
 	for _, nid := range noticeIDs {
+		if seen[nid] {
+			continue
+		}
+		seen[nid] = true
 		o := oppMap[nid]
 		ex, exists := existing[nid]
 
