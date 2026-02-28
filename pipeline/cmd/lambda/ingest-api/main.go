@@ -15,9 +15,18 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/handriss/govtrove/pipeline/internal/config"
 	"github.com/handriss/govtrove/pipeline/internal/database"
 	"github.com/handriss/govtrove/pipeline/internal/reconcile"
 	"github.com/handriss/govtrove/pipeline/internal/samgov"
+)
+
+const (
+	envDatabaseURLSecretARN = "DATABASE_URL_SECRET_ARN"
+	envAWSRegion            = "AWS_REGION_NAME"
+	envSentryDSN            = "SENTRY_DSN"
+	envSAMAPIKeySecretARN   = "SAM_API_KEY_SECRET_ARN"
+	envSAMAPIKey            = "SAM_API_KEY"
 )
 
 var (
@@ -32,12 +41,16 @@ func init() {
 	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	dbSecretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
-	if dbSecretARN == "" {
+	if os.Getenv(envDatabaseURLSecretARN) == "" {
 		return
 	}
 
-	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+	if err := config.RequireEnv(envDatabaseURLSecretARN, envAWSRegion); err != nil {
+		logger.Error("missing required env vars", "error", err)
+		os.Exit(1)
+	}
+
+	if dsn := os.Getenv(envSentryDSN); dsn != "" {
 		sentry.Init(sentry.ClientOptions{
 			Dsn:              dsn,
 			Environment:      "production",
@@ -45,11 +58,7 @@ func init() {
 		})
 	}
 
-	region := os.Getenv("AWS_REGION_NAME")
-	if region == "" {
-		region = "us-east-1"
-	}
-
+	region := os.Getenv(envAWSRegion)
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		logger.Error("failed to load AWS config", "error", err)
@@ -58,6 +67,7 @@ func init() {
 
 	smClient := secretsmanager.NewFromConfig(awsCfg)
 
+	dbSecretARN := os.Getenv(envDatabaseURLSecretARN)
 	dbResult, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: &dbSecretARN,
 	})
@@ -72,7 +82,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	apiKeyARN := os.Getenv("SAM_API_KEY_SECRET_ARN")
+	apiKeyARN := os.Getenv(envSAMAPIKeySecretARN)
 	if apiKeyARN != "" {
 		keyResult, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 			SecretId: &apiKeyARN,
@@ -83,7 +93,7 @@ func init() {
 		}
 		apiKey = *keyResult.SecretString
 	} else {
-		apiKey = os.Getenv("SAM_API_KEY")
+		apiKey = os.Getenv(envSAMAPIKey)
 	}
 
 	if apiKey == "" {
@@ -96,7 +106,6 @@ func init() {
 
 type Input struct {
 	PipelineRunID string `json:"pipeline_run_id"`
-	Source        string `json:"source"`
 }
 
 type Output struct {
@@ -109,34 +118,27 @@ type Output struct {
 
 const jobType = "snapshot-api"
 
+type APIFetcher interface {
+	FetchAll(ctx context.Context, postedFrom, postedTo string) ([]samgov.OpportunityData, []json.RawMessage, int, error)
+}
+
 type Handler struct {
 	Store  database.Store
 	Logger *slog.Logger
-	API    *samgov.APIClient
+	API    APIFetcher
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
 	defer func() {
 		if retErr != nil {
 			sentry.CaptureException(retErr)
+			sentry.Flush(500 * time.Millisecond)
 		}
-		sentry.Flush(2 * time.Second)
 	}()
 
 	var input Input
 	if err := json.Unmarshal(event, &input); err != nil {
 		return nil, fmt.Errorf("unmarshal input: %w", err)
-	}
-
-	if input.Source == "fallback" {
-		_, completedAt, err := h.Store.GetLastCompletedRun(ctx, "snapshot-csv")
-		if err == nil && time.Since(completedAt) < 24*time.Hour {
-			h.Logger.Info("skipping — CSV pipeline ran recently",
-				"last_csv_run", completedAt.Format(time.RFC3339),
-			)
-			return &Output{Status: "skipped", JobType: jobType}, nil
-		}
-		h.Logger.Info("fallback invocation — CSV pipeline stale or missing, proceeding")
 	}
 
 	h.Logger.Info("starting ingest-api")
@@ -152,7 +154,9 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	durationMs := int(time.Since(start).Milliseconds())
 
 	if err != nil {
-		h.Store.FailIngestionRun(ctx, runID, err.Error(), durationMs)
+		if failErr := h.Store.FailIngestionRun(ctx, runID, err.Error(), durationMs); failErr != nil {
+			h.Logger.Error("failed to mark ingestion run as failed", "error", failErr)
+		}
 		return nil, fmt.Errorf("ingest-api failed: %w", err)
 	}
 
