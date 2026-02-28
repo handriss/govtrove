@@ -434,7 +434,8 @@ export async function getAdminSamgovRequests(
 
 export interface UsageBucket {
   timestamp: string;
-  count: number;
+  success: number;
+  failed: number;
 }
 
 // --- Pipeline Runs ---
