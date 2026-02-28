@@ -116,109 +116,6 @@ func stubHandler(t *testing.T) (*Handler, *testutil.MockStore, *mockAPIClient) {
 
 // --- Handler.Handle ---
 
-func TestHandle_FallbackSkipsWhenCSVRecent(t *testing.T) {
-	h, store, _ := stubHandler(t)
-
-	store.GetLastCompletedRunFn = func(_ context.Context, jobType string) (uuid.UUID, time.Time, error) {
-		if jobType == "snapshot-csv" {
-			return uuid.New(), time.Now().Add(-1 * time.Hour), nil
-		}
-		return uuid.Nil, time.Time{}, fmt.Errorf("not found")
-	}
-
-	event, _ := json.Marshal(Input{Source: "fallback"})
-	out, err := h.Handle(context.Background(), event)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if out.Status != "skipped" {
-		t.Errorf("expected skipped status, got %q", out.Status)
-	}
-}
-
-func TestHandle_FallbackProceedsWhenCSVStale(t *testing.T) {
-	h, store, _ := stubHandler(t)
-	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
-
-	store.GetLastCompletedRunFn = func(_ context.Context, jobType string) (uuid.UUID, time.Time, error) {
-		return uuid.New(), time.Now().Add(-48 * time.Hour), nil
-	}
-	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, jobType string, _ *uuid.UUID) (uuid.UUID, error) {
-		ingestionRunCreated = true
-		if jobType != "snapshot-api" {
-			t.Errorf("expected job type snapshot-api, got %q", jobType)
-		}
-		return uuid.New(), nil
-	}
-
-	var failedRun bool
-	store.FailIngestionRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ int) error {
-		failedRun = true
-		return nil
-	}
-
-	event, _ := json.Marshal(Input{Source: "fallback"})
-	// Will fail because real APIClient can't reach SAM.gov, but should create ingestion run
-	_, _ = h.Handle(context.Background(), event)
-	if !ingestionRunCreated {
-		t.Error("expected ingestion run to be created for stale CSV")
-	}
-	if !failedRun {
-		t.Error("expected run to be marked failed (API unreachable)")
-	}
-}
-
-func TestHandle_FallbackProceedsWhenCSVNeverRan(t *testing.T) {
-	h, store, _ := stubHandler(t)
-	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
-
-	store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
-		return uuid.Nil, time.Time{}, fmt.Errorf("no runs found")
-	}
-
-	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
-		ingestionRunCreated = true
-		return uuid.New(), nil
-	}
-	store.FailIngestionRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ int) error { return nil }
-
-	event, _ := json.Marshal(Input{Source: "fallback"})
-	_, _ = h.Handle(context.Background(), event)
-	if !ingestionRunCreated {
-		t.Error("expected ingestion run to be created when CSV never ran")
-	}
-}
-
-func TestHandle_DirectInvocationSkipsFallbackCheck(t *testing.T) {
-	h, store, _ := stubHandler(t)
-	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
-
-	var csvCheckCalled bool
-	store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
-		csvCheckCalled = true
-		return uuid.Nil, time.Time{}, nil
-	}
-
-	var ingestionRunCreated bool
-	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
-		ingestionRunCreated = true
-		return uuid.New(), nil
-	}
-	store.FailIngestionRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ int) error { return nil }
-
-	event, _ := json.Marshal(Input{Source: "direct"})
-	_, _ = h.Handle(context.Background(), event)
-
-	if csvCheckCalled {
-		t.Error("direct invocation should not check CSV pipeline status")
-	}
-	if !ingestionRunCreated {
-		t.Error("direct invocation should create ingestion run")
-	}
-}
-
 func TestHandle_InvalidJSON(t *testing.T) {
 	h, _, _ := stubHandler(t)
 	_, err := h.Handle(context.Background(), json.RawMessage(`{invalid}`))
@@ -228,32 +125,60 @@ func TestHandle_InvalidJSON(t *testing.T) {
 }
 
 func TestHandle_CreateIngestionRunFailure(t *testing.T) {
-	h, store, _ := stubHandler(t)
-	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
+	h, store, api := stubHandler(t)
+	h.API = api
 
 	store.CreateIngestionRunFn = func(_ context.Context, _ string, _ *uuid.UUID) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("db connection failed")
 	}
 
-	event, _ := json.Marshal(Input{Source: "direct"})
+	event, _ := json.Marshal(Input{})
 	_, err := h.Handle(context.Background(), event)
 	if err == nil {
 		t.Error("expected error when CreateIngestionRun fails")
 	}
 }
 
-func TestHandle_OutputFormat(t *testing.T) {
-	h, store, _ := stubHandler(t)
-	h.API = samgov.NewAPIClient("test-key", h.Logger, nil)
+func TestHandle_AlwaysRunsFullPipeline(t *testing.T) {
+	h, store, api := stubHandler(t)
+	h.API = api
 
-	store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
-		return uuid.New(), time.Now().Add(-1 * time.Hour), nil
+	var ingestionRunCreated bool
+	runID := uuid.New()
+	store.CreateIngestionRunFn = func(_ context.Context, jt string, _ *uuid.UUID) (uuid.UUID, error) {
+		ingestionRunCreated = true
+		if jt != "snapshot-api" {
+			t.Errorf("expected job type snapshot-api, got %q", jt)
+		}
+		return runID, nil
 	}
 
-	event, _ := json.Marshal(Input{Source: "fallback"})
+	api.fetchAllFn = func(_ context.Context, _, _ string) ([]samgov.OpportunityData, []json.RawMessage, int, error) {
+		return nil, nil, 0, nil
+	}
+
+	var completed bool
+	store.CompleteIngestionRunFn = func(_ context.Context, id uuid.UUID, _ database.RunStats) error {
+		completed = true
+		if id != runID {
+			t.Errorf("expected run ID %s, got %s", runID, id)
+		}
+		return nil
+	}
+
+	event, _ := json.Marshal(Input{})
 	out, err := h.Handle(context.Background(), event)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ingestionRunCreated {
+		t.Error("expected CreateIngestionRun to be called")
+	}
+	if !completed {
+		t.Error("expected CompleteIngestionRun to be called")
+	}
+	if out.Status != "ok" {
+		t.Errorf("expected status ok, got %q", out.Status)
 	}
 	if out.JobType != "snapshot-api" {
 		t.Errorf("expected job_type snapshot-api, got %q", out.JobType)
