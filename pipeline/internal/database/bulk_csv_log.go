@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -23,6 +25,8 @@ type BulkCSVLogRecord struct {
 	CompressionDurationMs *int
 	UploadDurationMs      *int
 	ErrorMessage          *string
+	PipelineRunID         *uuid.UUID
+	Status                *string
 }
 
 func (db *DB) InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, error) {
@@ -31,8 +35,8 @@ func (db *DB) InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, e
 			source, result, http_status, etag, last_modified, content_length,
 			file_size_bytes, compressed_size_bytes, row_count, sha256_hash,
 			s3_key, download_duration_ms, compression_duration_ms, upload_duration_ms,
-			error_message
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			error_message, pipeline_run_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING id
 	`
 
@@ -41,7 +45,7 @@ func (db *DB) InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, e
 		r.Source, r.Result, r.HTTPStatus, r.ETag, r.LastModified, r.ContentLength,
 		r.FileSizeBytes, r.CompressedSizeBytes, r.RowCount, r.SHA256Hash,
 		r.S3Key, r.DownloadDurationMs, r.CompressionDurationMs, r.UploadDurationMs,
-		r.ErrorMessage,
+		r.ErrorMessage, r.PipelineRunID,
 	).Scan(&id)
 	return id, err
 }
@@ -99,4 +103,33 @@ func (db *DB) GetLatestBulkCSVS3Key(ctx context.Context, source string) (string,
 		return "", nil
 	}
 	return key, err
+}
+
+func (db *DB) GetBulkCSVLogByS3Key(ctx context.Context, s3Key string) (*BulkCSVLogRecord, error) {
+	var r BulkCSVLogRecord
+	err := db.pool.QueryRow(ctx, `
+		SELECT id, source, result, s3_key, row_count, pipeline_run_id, status
+		FROM pipeline.bulk_csv_log
+		WHERE s3_key = $1 AND result = 'new_file'
+		ORDER BY checked_at DESC LIMIT 1
+	`, s3Key).Scan(&r.ID, &r.Source, &r.Result, &r.S3Key, &r.RowCount, &r.PipelineRunID, &r.Status)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (db *DB) UpdateBulkCSVLogIngestion(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error {
+	_, err := db.pool.Exec(ctx, `
+		UPDATE pipeline.bulk_csv_log
+		SET ingestion_run_id = $2, record_count = $3, status = $4
+		WHERE id = $1
+	`, id, ingestionRunID, recordCount, status)
+	if err != nil {
+		return fmt.Errorf("update bulk_csv_log ingestion: %w", err)
+	}
+	return nil
 }

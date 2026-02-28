@@ -19,11 +19,11 @@ type RunStats struct {
 	DurationMs int
 }
 
-func (db *DB) CreateIngestionRun(ctx context.Context, jobType string) (uuid.UUID, error) {
+func (db *DB) CreateIngestionRun(ctx context.Context, jobType string, pipelineRunID *uuid.UUID) (uuid.UUID, error) {
 	var runID uuid.UUID
 	err := db.pool.QueryRow(ctx,
-		`INSERT INTO pipeline.ingestion_runs (job_type, status) VALUES ($1, 'running') RETURNING run_id`,
-		jobType,
+		`INSERT INTO pipeline.ingestion_runs (job_type, status, pipeline_run_id) VALUES ($1, 'running', $2) RETURNING run_id`,
+		jobType, pipelineRunID,
 	).Scan(&runID)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to create ingestion run: %w", err)

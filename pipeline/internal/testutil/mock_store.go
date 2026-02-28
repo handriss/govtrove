@@ -11,18 +11,15 @@ import (
 )
 
 type MockStore struct {
-	CreatePipelineRunFn   func(ctx context.Context, name string, metadata map[string]any) (uuid.UUID, error)
+	CreatePipelineRunFn   func(ctx context.Context, id uuid.UUID, name string, metadata map[string]any) (uuid.UUID, error)
+	GetPipelineRunFn      func(ctx context.Context, id uuid.UUID) (*database.PipelineRun, error)
 	CompletePipelineRunFn func(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
 	FailPipelineRunFn     func(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
 
-	CreateIngestionRunFn   func(ctx context.Context, jobType string) (uuid.UUID, error)
+	CreateIngestionRunFn   func(ctx context.Context, jobType string, pipelineRunID *uuid.UUID) (uuid.UUID, error)
 	CompleteIngestionRunFn func(ctx context.Context, runID uuid.UUID, s database.RunStats) error
 	FailIngestionRunFn     func(ctx context.Context, runID uuid.UUID, errMsg string, durationMs int) error
 	GetLastCompletedRunFn  func(ctx context.Context, jobType string) (uuid.UUID, time.Time, error)
-
-	CreateCSVDownloadEntryFn   func(ctx context.Context, e *database.CSVDownloadEntry) (int64, error)
-	CompleteCSVDownloadEntryFn func(ctx context.Context, id int64, recordCount int, fileSizeBytes int64) error
-	FailCSVDownloadEntryFn     func(ctx context.Context, id int64, errMsg string) error
 
 	BulkInsertSnapCSVFn     func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error)
 	DetectChangesFn         func(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, int, error)
@@ -42,6 +39,8 @@ type MockStore struct {
 	GetLatestBulkCSVHashFn    func(ctx context.Context, source string) (string, error)
 	GetLatestBulkCSVHeadersFn func(ctx context.Context, source string) (string, string, error)
 	GetLatestBulkCSVS3KeyFn   func(ctx context.Context, source string) (string, error)
+	GetBulkCSVLogByS3KeyFn            func(ctx context.Context, s3Key string) (*database.BulkCSVLogRecord, error)
+	UpdateBulkCSVLogIngestionFn       func(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error
 
 	RefreshAgenciesFn func(ctx context.Context) (int, error)
 
@@ -50,11 +49,21 @@ type MockStore struct {
 
 var _ database.Store = (*MockStore)(nil)
 
-func (m *MockStore) CreatePipelineRun(ctx context.Context, name string, metadata map[string]any) (uuid.UUID, error) {
+func (m *MockStore) CreatePipelineRun(ctx context.Context, id uuid.UUID, name string, metadata map[string]any) (uuid.UUID, error) {
 	if m.CreatePipelineRunFn != nil {
-		return m.CreatePipelineRunFn(ctx, name, metadata)
+		return m.CreatePipelineRunFn(ctx, id, name, metadata)
+	}
+	if id != uuid.Nil {
+		return id, nil
 	}
 	return uuid.New(), nil
+}
+
+func (m *MockStore) GetPipelineRun(ctx context.Context, id uuid.UUID) (*database.PipelineRun, error) {
+	if m.GetPipelineRunFn != nil {
+		return m.GetPipelineRunFn(ctx, id)
+	}
+	return nil, nil
 }
 
 func (m *MockStore) CompletePipelineRun(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error {
@@ -71,9 +80,9 @@ func (m *MockStore) FailPipelineRun(ctx context.Context, id uuid.UUID, errMsg st
 	return nil
 }
 
-func (m *MockStore) CreateIngestionRun(ctx context.Context, jobType string) (uuid.UUID, error) {
+func (m *MockStore) CreateIngestionRun(ctx context.Context, jobType string, pipelineRunID *uuid.UUID) (uuid.UUID, error) {
 	if m.CreateIngestionRunFn != nil {
-		return m.CreateIngestionRunFn(ctx, jobType)
+		return m.CreateIngestionRunFn(ctx, jobType, pipelineRunID)
 	}
 	return uuid.New(), nil
 }
@@ -97,27 +106,6 @@ func (m *MockStore) GetLastCompletedRun(ctx context.Context, jobType string) (uu
 		return m.GetLastCompletedRunFn(ctx, jobType)
 	}
 	return uuid.Nil, time.Time{}, nil
-}
-
-func (m *MockStore) CreateCSVDownloadEntry(ctx context.Context, e *database.CSVDownloadEntry) (int64, error) {
-	if m.CreateCSVDownloadEntryFn != nil {
-		return m.CreateCSVDownloadEntryFn(ctx, e)
-	}
-	return 1, nil
-}
-
-func (m *MockStore) CompleteCSVDownloadEntry(ctx context.Context, id int64, recordCount int, fileSizeBytes int64) error {
-	if m.CompleteCSVDownloadEntryFn != nil {
-		return m.CompleteCSVDownloadEntryFn(ctx, id, recordCount, fileSizeBytes)
-	}
-	return nil
-}
-
-func (m *MockStore) FailCSVDownloadEntry(ctx context.Context, id int64, errMsg string) error {
-	if m.FailCSVDownloadEntryFn != nil {
-		return m.FailCSVDownloadEntryFn(ctx, id, errMsg)
-	}
-	return nil
 }
 
 func (m *MockStore) BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error) {
@@ -222,6 +210,20 @@ func (m *MockStore) GetLatestBulkCSVS3Key(ctx context.Context, source string) (s
 		return m.GetLatestBulkCSVS3KeyFn(ctx, source)
 	}
 	return "", nil
+}
+
+func (m *MockStore) GetBulkCSVLogByS3Key(ctx context.Context, s3Key string) (*database.BulkCSVLogRecord, error) {
+	if m.GetBulkCSVLogByS3KeyFn != nil {
+		return m.GetBulkCSVLogByS3KeyFn(ctx, s3Key)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) UpdateBulkCSVLogIngestion(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error {
+	if m.UpdateBulkCSVLogIngestionFn != nil {
+		return m.UpdateBulkCSVLogIngestionFn(ctx, id, ingestionRunID, recordCount, status)
+	}
+	return nil
 }
 
 func (m *MockStore) RefreshAgencies(ctx context.Context) (int, error) {
