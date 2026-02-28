@@ -7,7 +7,9 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "${download_csvs_arn}",
-        "Payload.$": "$"
+        "Payload": {
+          "id.$": "$$.Execution.Name"
+        }
       },
       "ResultSelector": {
         "pipeline_run_id.$": "$.Payload.pipeline_run_id",
@@ -32,18 +34,6 @@
     },
 
     "HasNewFiles": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.files",
-          "IsPresent": true,
-          "Next": "CheckFilesNotEmpty"
-        }
-      ],
-      "Default": "NoNewFiles"
-    },
-
-    "CheckFilesNotEmpty": {
       "Type": "Choice",
       "Choices": [
         {
