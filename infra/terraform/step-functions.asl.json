@@ -39,7 +39,7 @@
         {
           "Variable": "$.files[0]",
           "IsPresent": true,
-          "Next": "IngestFiles"
+          "Next": "IngestActive"
         }
       ],
       "Default": "NoNewFiles"
@@ -50,40 +50,30 @@
       "Comment": "No new CSV files to process"
     },
 
-    "IngestFiles": {
-      "Type": "Map",
-      "ItemsPath": "$.files",
+    "IngestActive": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
-        "pipeline_run_id.$": "$.pipeline_run_id",
-        "file.$": "$$.Map.Item.Value"
-      },
-      "Iterator": {
-        "StartAt": "IngestActive",
-        "States": {
-          "IngestActive": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "Parameters": {
-              "FunctionName": "${ingest_active_arn}",
-              "Payload.$": "$"
-            },
-            "ResultSelector": {
-              "status.$": "$.Payload.status",
-              "run_id.$": "$.Payload.run_id",
-              "job_type.$": "$.Payload.job_type"
-            },
-            "Retry": [
-              {
-                "ErrorEquals": ["States.ALL"],
-                "MaxAttempts": 3,
-                "IntervalSeconds": 30,
-                "BackoffRate": 2.0
-              }
-            ],
-            "End": true
-          }
+        "FunctionName": "${ingest_active_arn}",
+        "Payload": {
+          "pipeline_run_id.$": "$.pipeline_run_id",
+          "file.$": "$.files[0]"
         }
       },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "run_id.$": "$.Payload.run_id",
+        "job_type.$": "$.Payload.job_type"
+      },
+      "ResultPath": "$.ingestion_result",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 3,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
       "Catch": [
         {
           "ErrorEquals": ["States.ALL"],
@@ -91,7 +81,6 @@
           "Next": "MarkFailedIngest"
         }
       ],
-      "ResultPath": "$.ingestion_results",
       "Next": "IngestAPI"
     },
 
@@ -133,7 +122,11 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "${reconcile_arn}",
-        "Payload.$": "$"
+        "Payload": {
+          "pipeline_run_id.$": "$.pipeline_run_id",
+          "ingestion_results.$": "States.Array($.ingestion_result)",
+          "api_result.$": "$.api_result"
+        }
       },
       "ResultSelector": {
         "status.$": "$.Payload.status"
@@ -206,7 +199,7 @@
 
     "MarkFailedIngest": {
       "Type": "Pass",
-      "Result": "IngestFiles",
+      "Result": "IngestActive",
       "ResultPath": "$.failed_step",
       "Next": "SendToDLQ"
     },
