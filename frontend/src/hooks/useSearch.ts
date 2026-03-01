@@ -9,6 +9,7 @@ interface UseSearchState {
   totalPages: number;
   loading: boolean;
   error: string | null;
+  suggestion: string | null;
 }
 
 export function useSearch() {
@@ -19,10 +20,11 @@ export function useSearch() {
     totalPages: 0,
     loading: false,
     error: null,
+    suggestion: null,
   });
 
   const search = useCallback(async (params: SearchParams) => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setState((prev) => ({ ...prev, loading: true, error: null, suggestion: null }));
 
     try {
       const data: SearchResult = await searchOpportunities(params);
@@ -33,6 +35,7 @@ export function useSearch() {
         totalPages: data.total_pages,
         loading: false,
         error: null,
+        suggestion: data.suggestion || null,
       });
     } catch (err) {
       setState((prev) => ({
@@ -51,6 +54,7 @@ export function useSearch() {
       totalPages: data.total_pages,
       loading: false,
       error: null,
+      suggestion: data.suggestion || null,
     });
   }, []);
 
@@ -62,6 +66,7 @@ export function useSearch() {
       totalPages: 0,
       loading: false,
       error: null,
+      suggestion: null,
     });
   }, []);
 

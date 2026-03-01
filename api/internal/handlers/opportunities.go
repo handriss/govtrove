@@ -51,6 +51,14 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if result.Total == 0 && params.Query != "" {
+		if suggestion, err := h.repo.SuggestQuery(r.Context(), params.Query); err == nil && suggestion != "" {
+			result.Suggestion = suggestion
+		} else if err != nil {
+			h.logger.Warn("suggest query failed", "error", err)
+		}
+	}
+
 	h.writeJSON(w, http.StatusOK, result)
 
 	userID := h.resolveOptionalUserID(r)

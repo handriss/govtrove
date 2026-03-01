@@ -35,6 +35,8 @@ interface SearchResultsProps {
   onToggleSave: (id: number) => void;
   onSaveAll: (ids: number[]) => void;
   clearAllFilters: () => void;
+  querySuggestion?: string | null;
+  onQuerySuggestionClick?: (suggestion: string) => void;
   error?: string | null;
   onRetry?: () => void;
 }
@@ -57,6 +59,8 @@ export default function SearchResults({
   savedIds,
   onToggleSave,
   onSaveAll,
+  querySuggestion,
+  onQuerySuggestionClick,
   clearAllFilters,
   error,
   onRetry,
@@ -184,6 +188,8 @@ export default function SearchResults({
         <ZeroResults
           keyword={keyword}
           suggestion={filterSuggestion}
+          querySuggestion={querySuggestion}
+          onQuerySuggestionClick={onQuerySuggestionClick}
           onClearAll={clearAllFilters}
         />
       )}
@@ -271,10 +277,14 @@ function SkeletonCards({ count }: { count: number }) {
 function ZeroResults({
   keyword,
   suggestion,
+  querySuggestion,
+  onQuerySuggestionClick,
   onClearAll,
 }: {
   keyword?: string;
   suggestion: string | null;
+  querySuggestion?: string | null;
+  onQuerySuggestionClick?: (suggestion: string) => void;
   onClearAll: () => void;
 }) {
   return (
@@ -288,6 +298,19 @@ function ZeroResults({
       {keyword && (
         <p className="text-dark-400 text-sm mb-2">
           No results for &ldquo;<span className="text-dark-300">{keyword}</span>&rdquo;
+        </p>
+      )}
+      {querySuggestion && onQuerySuggestionClick && (
+        <p className="text-dark-400 text-xl mb-4 mt-2">
+          Did you mean{' '}
+          <button
+            type="button"
+            onClick={() => onQuerySuggestionClick(querySuggestion)}
+            className="text-accent font-semibold underline underline-offset-4 decoration-accent/40 hover:decoration-accent transition-colors"
+          >
+            {querySuggestion}
+          </button>
+          ?
         </p>
       )}
       {suggestion && (

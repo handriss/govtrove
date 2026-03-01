@@ -69,6 +69,7 @@ export interface SearchResult {
   page: number;
   limit: number;
   total_pages: number;
+  suggestion?: string;
 }
 
 export interface FilterOption {

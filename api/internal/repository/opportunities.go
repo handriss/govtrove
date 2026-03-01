@@ -236,6 +236,52 @@ func (r *OpportunityRepository) buildOrderClause(sort, order string, hasSearch b
 	}
 }
 
+func (r *OpportunityRepository) SuggestQuery(ctx context.Context, query string) (string, error) {
+	// For each word in the query, find the best-matching word from the
+	// top-matching title. Only replaces a word if the per-word similarity
+	// exceeds 0.3 — otherwise keeps the original query word unchanged.
+	var suggestion string
+	err := r.pool.QueryRow(ctx, `
+		WITH best AS (
+			SELECT title
+			FROM opportunities
+			WHERE active = true AND is_latest = true AND word_similarity($1, title) > 0.4
+			ORDER BY word_similarity($1, title) DESC
+			LIMIT 1
+		),
+		query_words AS (
+			SELECT ordinality, word AS qw
+			FROM regexp_split_to_table($1, '\s+') WITH ORDINALITY AS t(word, ordinality)
+			WHERE length(word) > 0
+		),
+		title_words AS (
+			SELECT DISTINCT regexp_replace(word, '[^a-zA-Z0-9''-]', '', 'g') AS tw
+			FROM best, regexp_split_to_table(best.title, '\s+') AS word
+			WHERE length(regexp_replace(word, '[^a-zA-Z0-9''-]', '', 'g')) > 1
+		),
+		matched AS (
+			SELECT qw.ordinality,
+				CASE WHEN (SELECT similarity(qw.qw, tw) FROM title_words ORDER BY similarity(qw.qw, tw) DESC LIMIT 1) > 0.3
+					THEN (SELECT tw FROM title_words ORDER BY similarity(qw.qw, tw) DESC LIMIT 1)
+					ELSE qw.qw
+				END AS replacement
+			FROM query_words qw
+		)
+		SELECT string_agg(replacement, ' ' ORDER BY ordinality)
+		FROM matched
+	`, query).Scan(&suggestion)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(suggestion), strings.TrimSpace(query)) {
+		return "", nil
+	}
+	return suggestion, nil
+}
+
 func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Opportunity, error) {
 	query := `
 		SELECT
