@@ -22,7 +22,7 @@ const PAGE_SIZE_KEY = 'govtrove_page_size';
 export default function SimpleSearchPage() {
   const fs = useFilterState();
   const { facets, total: facetTotal, isLoading: facetsLoading } = useFacetCounts(fs.toFacetParams());
-  const { results, total, page, totalPages, loading, error, search, reset } = useSearch();
+  const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch();
   const saved = useSavedOpportunities();
   const { isAuthenticated } = useAppAuth();
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
@@ -137,6 +137,11 @@ export default function SimpleSearchPage() {
   const handleSubmit = useCallback(() => {
     if (hasActiveFilters) triggerSearch();
   }, [hasActiveFilters, triggerSearch]);
+
+  const handleQuerySuggestion = useCallback((suggested: string) => {
+    fs.setFilter('keyword', suggested);
+    triggerSearch();
+  }, [fs, triggerSearch]);
 
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);
@@ -365,6 +370,8 @@ export default function SimpleSearchPage() {
             savedIds={saved.savedIds}
             onToggleSave={saved.toggleSave}
             onSaveAll={saved.saveAll}
+            querySuggestion={suggestion}
+            onQuerySuggestionClick={handleQuerySuggestion}
             clearAllFilters={fs.clearAllFilters}
             error={error}
             onRetry={handleSubmit}

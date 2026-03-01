@@ -291,13 +291,18 @@ BEGIN
     NEW.search_vector :=
         setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
         setweight(to_tsvector('english', COALESCE(NEW.solicitation_number, '')), 'A') ||
-        setweight(to_tsvector('english', COALESCE(NEW.notice_id, '')), 'B') ||
         setweight(to_tsvector('english', COALESCE(NEW.description, '')), 'B') ||
         setweight(to_tsvector('english', COALESCE(NEW.department, '')), 'C') ||
         setweight(to_tsvector('english', COALESCE(NEW.sub_tier, '')), 'C') ||
         setweight(to_tsvector('english', COALESCE(NEW.office, '')), 'C') ||
-        setweight(to_tsvector('english', COALESCE(NEW.set_aside_description, '')), 'C') ||
-        setweight(to_tsvector('english', COALESCE(NEW.awardee_name, NEW.awardee, '')), 'D');
+        setweight(to_tsvector('english', COALESCE(NEW.notice_id, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.set_aside_description, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.awardee_name, NEW.awardee, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.classification_code, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.naics_code, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.pop_city, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.award_number, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.primary_contact_fullname, '')), 'D');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
