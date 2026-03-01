@@ -5,10 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/handriss/govtrove/pipeline/internal/parse"
 )
+
+var wsRun = regexp.MustCompile(`\s+`)
 
 // Opportunity is the write model for upserting into the opportunities table.
 type Opportunity struct {
@@ -131,8 +135,8 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 		BaseType:           raw["BaseType"],
 		OrganizationType:   raw["OrganizationType"],
 
-		PostedDate:       parse.Date(raw["PostedDate"]),
-		ResponseDeadline: parse.Date(raw["ResponseDeadLine"]),
+		PostedDate:       parse.DateOnly(raw["PostedDate"]),
+		ResponseDeadline: parse.DateOnly(raw["ResponseDeadLine"]),
 		ArchiveDate:      archiveDate,
 		ArchiveType:      raw["ArchiveType"],
 		Active:           parse.Active(raw["Active"]),
@@ -203,11 +207,14 @@ func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
 	}
 
 	var mismatches []ReconcileMismatch
+	normalizeWS := func(s string) string {
+		return strings.TrimSpace(wsRun.ReplaceAllString(s, " "))
+	}
 	cmpStr := func(field, csvVal, apiVal string) {
 		if csvVal == "" || apiVal == "" {
 			return
 		}
-		if csvVal != apiVal {
+		if normalizeWS(csvVal) != normalizeWS(apiVal) {
 			mismatches = append(mismatches, ReconcileMismatch{FieldName: field, IssueType: "field_mismatch", CSVValue: csvVal, APIValue: apiVal})
 		}
 	}

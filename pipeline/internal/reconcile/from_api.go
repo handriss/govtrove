@@ -22,8 +22,8 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		BaseType:           d.BaseType,
 		OrganizationType:   d.OrganizationType,
 
-		PostedDate:       parse.Date(d.PostedDate),
-		ResponseDeadline: parse.Date(d.ResponseDeadLine),
+		PostedDate:       parse.DateOnly(d.PostedDate),
+		ResponseDeadline: parse.DateOnly(d.ResponseDeadLine),
 		ArchiveDate:      archiveDate,
 		ArchiveType:      d.ArchiveType,
 		Active:           parse.Active(d.Active),
