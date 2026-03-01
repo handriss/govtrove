@@ -135,8 +135,13 @@ export default function SimpleSearchPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(() => {
+    // Auto-detect quoted queries: "CMMC Level 2" → strip quotes + enable exact match
+    const kw = fs.filters.keyword;
+    if (kw.length > 2 && kw.startsWith('"') && kw.endsWith('"')) {
+      fs.setFilters({ keyword: kw.slice(1, -1), exactMatch: true });
+    }
     if (hasActiveFilters) triggerSearch();
-  }, [hasActiveFilters, triggerSearch]);
+  }, [hasActiveFilters, triggerSearch, fs]);
 
   const handleQuerySuggestion = useCallback((suggested: string) => {
     fs.setFilter('keyword', suggested);

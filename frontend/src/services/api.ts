@@ -25,6 +25,7 @@ export async function searchOpportunities(params: SearchParams = {}): Promise<Se
   const searchParams = new URLSearchParams();
 
   if (params.q) searchParams.set('q', params.q);
+  if (params.exact) searchParams.set('exact', params.exact);
   if (params.type) searchParams.set('type', params.type);
   if (params.set_aside) searchParams.set('set_aside', params.set_aside);
   if (params.naics) searchParams.set('naics', params.naics);
@@ -64,6 +65,7 @@ export async function getFacetCounts(params: SearchParams = {}, signal?: AbortSi
   const searchParams = new URLSearchParams();
 
   if (params.q) searchParams.set('q', params.q);
+  if (params.exact) searchParams.set('exact', params.exact);
   if (params.type) searchParams.set('type', params.type);
   if (params.set_aside) searchParams.set('set_aside', params.set_aside);
   if (params.naics) searchParams.set('naics', params.naics);

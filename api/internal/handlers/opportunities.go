@@ -351,11 +351,12 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	q := r.URL.Query()
 
 	params := models.SearchParams{
-		Query:  truncate(q.Get("q"), 500),
-		Sort:   q.Get("sort"),
-		Order:  q.Get("order"),
-		Page:   1,
-		Limit:  25,
+		Query:      truncate(q.Get("q"), 500),
+		ExactMatch: q.Get("exact") == "true",
+		Sort:       q.Get("sort"),
+		Order:      q.Get("order"),
+		Page:       1,
+		Limit:      25,
 	}
 
 	if typeStr := q.Get("type"); typeStr != "" {

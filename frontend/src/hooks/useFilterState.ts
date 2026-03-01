@@ -7,6 +7,7 @@ import type { SearchParams } from '../types/api';
 
 export interface FilterState {
   keyword: string;
+  exactMatch: boolean;
   naics: string[];
   psc: string[];
   setAside: string[];
@@ -26,6 +27,7 @@ export interface FilterState {
 
 const DEFAULTS: FilterState = {
   keyword: '',
+  exactMatch: false,
   naics: [],
   psc: [],
   setAside: [],
@@ -102,6 +104,7 @@ function reducer(state: FilterState, action: Action): FilterState {
 // URL param <-> FilterState field mapping
 const URL_MAP: [keyof FilterState, string][] = [
   ['keyword', 'q'],
+  ['exactMatch', 'exact'],
   ['naics', 'naics'],
   ['psc', 'psc'],
   ['setAside', 'set_aside'],
@@ -142,6 +145,8 @@ function parseStateFromURL(urlParams: URLSearchParams): FilterState {
 
     if (ARRAY_FIELDS.has(field)) {
       (state as Record<string, unknown>)[field] = raw.split(',').filter(Boolean);
+    } else if (field === 'exactMatch') {
+      state.exactMatch = raw === 'true';
     } else if (field === 'activeOnly') {
       state.activeOnly = raw !== 'false';
     } else if (field === 'page') {
@@ -317,6 +322,7 @@ export function useFilterState(): UseFilterStateReturn {
   const toSearchParams = useCallback((): SearchParams => {
     const p: SearchParams = {};
     if (filters.keyword) p.q = filters.keyword;
+    if (filters.exactMatch) p.exact = 'true';
     if (filters.noticeType.length) p.type = filters.noticeType.join(',');
     if (filters.setAside.length) p.set_aside = filters.setAside.join(',');
     if (filters.naics.length) p.naics = expandToLeafCodes(filters.naics).join(',');
