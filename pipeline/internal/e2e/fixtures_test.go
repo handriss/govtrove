@@ -93,13 +93,13 @@ var activeCSVRun1 = csvHeaders + "\n" +
 			14: "DHS", 17: "070",
 			22: "1000",
 		}),
-		// WILL-DISAPPEAR: removed in run 2 (present in archived CSV)
+		// WILL-DISAPPEAR: removed in run 2
 		row(map[int]string{
 			0: "WILL-DISAPPEAR", 1: "SOL-DISAP", 2: "Disappearing Record", 3: "Solicitation", 4: "Solicitation",
 			5: "01/01/2026", 7: "03/01/2026", 8: "auto", 11: "541511", 13: "Yes",
 			14: "DoD", 17: "097",
 		}),
-		// WILL-GLITCH: removed in run 2, returns in run 3 (not in archived CSV)
+		// WILL-GLITCH: removed in run 2, returns in run 3
 		row(map[int]string{
 			0: "WILL-GLITCH", 1: "SOL-GLITCH", 2: "Glitch Record", 3: "Solicitation", 4: "Solicitation",
 			5: "01/02/2026", 13: "Yes",
@@ -163,35 +163,6 @@ var activeCSVRun3 = activeCSVRun2 + "\n" +
 		5: "01/02/2026", 13: "Yes",
 		14: "DoD", 17: "097",
 	})
-
-// Archived CSV: static across all 3 runs
-var archivedCSV = csvHeaders + "\n" +
-	strings.Join([]string{
-		// WILL-DISAPPEAR: resolves its disappearance as "archived"
-		row(map[int]string{
-			0: "WILL-DISAPPEAR", 1: "SOL-DISAP", 2: "Disappearing Record", 3: "Solicitation", 4: "Solicitation",
-			5: "01/01/2026", 7: "03/01/2026", 8: "auto", 11: "541511", 13: "No",
-			14: "DoD", 17: "097",
-		}),
-		// ARCHIVED-ONLY: only in archived, never in active
-		row(map[int]string{
-			0: "ARCHIVED-ONLY", 1: "SOL-ARCH", 2: "Archived Only Opportunity", 3: "Solicitation", 4: "Solicitation",
-			5: "11/01/2025", 7: "01/15/2026", 8: "auto", 11: "541511", 13: "No",
-			14: "DoD", 17: "097",
-		}),
-		// HAPPY-001: overlap with active (upsert idempotency)
-		row(map[int]string{
-			0: "HAPPY-001", 1: "SOL-001", 2: "Test Solicitation", 3: "Solicitation", 4: "Solicitation",
-			5: "01/15/2026", 6: "03/01/2026", 7: "06/01/2026", 8: "auto",
-			9: "SBA", 10: "Total Small Business", 11: "541511", 12: "R425", 13: "No",
-			14: "Department of Defense", 15: "Navy", 16: "NAVSEA", 17: "097", 18: "N00024", 19: "AAC001",
-			24: "A test solicitation description", 25: "DoD/Military", 26: "https://sam.gov/opp/HAPPY-001",
-			27: "Mr.", 28: "John Doe", 29: "john@navy.mil", 30: "555-0100", 31: "555-0101",
-			32: "Ms.", 33: "Jane Smith", 34: "jane@navy.mil", 35: "555-0200", 36: "555-0201",
-			37: "123 Main St", 38: "Arlington", 39: "VA", 40: "22201", 41: "US",
-			42: "Washington", 43: "DC", 44: "20001", 45: "US",
-		}),
-	}, "\n")
 
 func gzipCSV(csv string) io.ReadCloser {
 	var buf bytes.Buffer

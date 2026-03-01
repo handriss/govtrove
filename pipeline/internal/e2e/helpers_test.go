@@ -13,8 +13,8 @@ import (
 	"github.com/handriss/govtrove/pipeline/internal/samgov"
 )
 
-// simulateIngest mimics what the ingest-active and ingest-archived handlers do:
-// create run, parse CSV, extract snap rows, bulk insert, and (for active) detect changes.
+// simulateIngest mimics what the ingest-active handler does:
+// create run, parse CSV, extract snap rows, bulk insert, and detect changes.
 func simulateIngest(ctx context.Context, store database.Store, csvData string, jobType string, snapshotDate time.Time) (uuid.UUID, error) {
 	runID, err := store.CreateIngestionRun(ctx, jobType, nil)
 	if err != nil {
@@ -74,15 +74,8 @@ func simulateIngest(ctx context.Context, store database.Store, csvData string, j
 }
 
 // simulateReconcile mimics what the reconcile handler does:
-// load raw data, convert to opportunities, insert DQ issues, upsert, resolve disappearances, mark inactive.
-func simulateReconcile(ctx context.Context, store database.Store, activeRunID uuid.UUID, archivedRunIDs []uuid.UUID, snapshotDate time.Time) error {
-	// Archived first so active CSV gets the last word on the active flag
-	for _, runID := range archivedRunIDs {
-		if err := upsertRun(ctx, store, runID, snapshotDate); err != nil {
-			return err
-		}
-	}
-
+// load raw data, convert to opportunities, insert DQ issues, upsert, mark inactive, deactivate expired.
+func simulateReconcile(ctx context.Context, store database.Store, activeRunID uuid.UUID, snapshotDate time.Time) error {
 	if activeRunID != uuid.Nil {
 		if err := upsertRun(ctx, store, activeRunID, snapshotDate); err != nil {
 			return err
@@ -90,15 +83,13 @@ func simulateReconcile(ctx context.Context, store database.Store, activeRunID uu
 	}
 
 	if activeRunID != uuid.Nil {
-		for _, archivedRunID := range archivedRunIDs {
-			if _, err := store.ResolveExpectedDisappearances(ctx, activeRunID, archivedRunID, snapshotDate); err != nil {
-				return fmt.Errorf("resolve disappearances: %w", err)
-			}
-		}
-
 		if _, err := store.MarkDisappearedInactive(ctx, activeRunID); err != nil {
 			return fmt.Errorf("mark disappeared inactive: %w", err)
 		}
+	}
+
+	if _, _, err := store.DeactivateExpiredOpportunities(ctx); err != nil {
+		return fmt.Errorf("deactivate expired: %w", err)
 	}
 
 	return nil

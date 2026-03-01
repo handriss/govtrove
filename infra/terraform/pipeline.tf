@@ -3,15 +3,14 @@
 # =============================================================================
 
 locals {
-  lambda_functions = ["download-csvs", "ingest-active", "ingest-archived", "reconcile", "generate-alerts", "ingest-api"]
+  lambda_functions = ["download-csvs", "ingest-active", "reconcile", "generate-alerts", "ingest-api"]
 
   lambda_ephemeral_storage = {
     "download-csvs" = 2048
   }
 
   lambda_memory_overrides = {
-    "ingest-active"   = 512
-    "ingest-archived" = 512
+    "ingest-active" = 512
   }
 }
 
@@ -164,7 +163,6 @@ resource "aws_sfn_state_machine" "pipeline" {
   definition = templatefile("${path.module}/step-functions.asl.json", {
     download_csvs_arn      = aws_lambda_function.pipeline["download-csvs"].arn
     ingest_active_arn      = aws_lambda_function.pipeline["ingest-active"].arn
-    ingest_archived_arn    = aws_lambda_function.pipeline["ingest-archived"].arn
     reconcile_arn          = aws_lambda_function.pipeline["reconcile"].arn
     generate_alerts_arn    = aws_lambda_function.pipeline["generate-alerts"].arn
     ingest_api_arn         = aws_lambda_function.pipeline["ingest-api"].arn

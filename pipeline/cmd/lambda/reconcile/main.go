@@ -13,8 +13,16 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/handriss/govtrove/pipeline/internal/config"
 	"github.com/handriss/govtrove/pipeline/internal/database"
 	"github.com/handriss/govtrove/pipeline/internal/reconcile"
+	"github.com/handriss/govtrove/pipeline/internal/samgov"
+)
+
+const (
+	envDatabaseURLSecretARN = "DATABASE_URL_SECRET_ARN"
+	envAWSRegion            = "AWS_REGION_NAME"
+	envSentryDSN            = "SENTRY_DSN"
 )
 
 var (
@@ -28,12 +36,16 @@ func init() {
 	logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
-	secretARN := os.Getenv("DATABASE_URL_SECRET_ARN")
-	if secretARN == "" {
+	if os.Getenv(envDatabaseURLSecretARN) == "" {
 		return
 	}
 
-	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+	if err := config.RequireEnv(envDatabaseURLSecretARN, envAWSRegion); err != nil {
+		logger.Error("missing required env vars", "error", err)
+		os.Exit(1)
+	}
+
+	if dsn := os.Getenv(envSentryDSN); dsn != "" {
 		sentry.Init(sentry.ClientOptions{
 			Dsn:              dsn,
 			Environment:      "production",
@@ -41,11 +53,7 @@ func init() {
 		})
 	}
 
-	region := os.Getenv("AWS_REGION_NAME")
-	if region == "" {
-		region = "us-east-1"
-	}
-
+	region := os.Getenv(envAWSRegion)
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	if err != nil {
 		logger.Error("failed to load AWS config", "error", err)
@@ -53,6 +61,7 @@ func init() {
 	}
 
 	smClient := secretsmanager.NewFromConfig(awsCfg)
+	secretARN := os.Getenv(envDatabaseURLSecretARN)
 	result, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
 		SecretId: &secretARN,
 	})
@@ -80,6 +89,7 @@ type Input struct {
 	PipelineRunID    string            `json:"pipeline_run_id"`
 	Files            []json.RawMessage `json:"files"`
 	IngestionResults []IngestionResult `json:"ingestion_results"`
+	APIResult        *IngestionResult  `json:"api_result"`
 }
 
 type Output struct {
@@ -96,8 +106,8 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	defer func() {
 		if retErr != nil {
 			sentry.CaptureException(retErr)
+			sentry.Flush(500 * time.Millisecond)
 		}
-		sentry.Flush(2 * time.Second)
 	}()
 	var input Input
 	if err := json.Unmarshal(event, &input); err != nil {
@@ -107,10 +117,11 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	h.Logger.Info("reconcile started",
 		"pipeline_run_id", input.PipelineRunID,
 		"ingestion_count", len(input.IngestionResults),
+		"has_api_result", input.APIResult != nil,
 	)
 
+	// 1. Parse CSV ingestion results
 	var activeRunID uuid.UUID
-	var archivedRunIDs []uuid.UUID
 	for i, r := range input.IngestionResults {
 		if r.Status != "ok" {
 			return nil, fmt.Errorf("ingestion %d failed with status %q", i, r.Status)
@@ -119,57 +130,139 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		if err != nil {
 			return nil, fmt.Errorf("parse run_id for ingestion %d: %w", i, err)
 		}
-		switch r.JobType {
-		case "snapshot-csv":
+		if r.JobType == "snapshot-csv" {
 			activeRunID = rid
-		case "ingest-archived":
-			archivedRunIDs = append(archivedRunIDs, rid)
+		}
+	}
+
+	// 2. Extract API run ID
+	var apiRunID uuid.UUID
+	if input.APIResult != nil {
+		if input.APIResult.Status != "ok" {
+			return nil, fmt.Errorf("api ingestion failed with status %q", input.APIResult.Status)
+		}
+		var err error
+		apiRunID, err = uuid.Parse(input.APIResult.RunID)
+		if err != nil {
+			return nil, fmt.Errorf("parse api run_id: %w", err)
 		}
 	}
 
 	start := time.Now()
 	snapshotDate := time.Now().UTC()
-	var totalUpserted int
 
-	// Archived first so active CSV gets the last word on the active flag
-	for _, archivedRunID := range archivedRunIDs {
-		upserted, err := h.upsertFromRun(ctx, archivedRunID, snapshotDate)
-		if err != nil {
-			return nil, fmt.Errorf("upsert archived %s: %w", archivedRunID, err)
-		}
-		totalUpserted += upserted
-		h.Logger.Info("archived opportunities upserted", "run_id", archivedRunID, "count", upserted)
-	}
+	// 3. Load CSV opps
+	csvOpps := make(map[string]reconcile.Opportunity)
+	var allDQEntries []database.DataQualityEntry
 
 	if activeRunID != uuid.Nil {
-		upserted, err := h.upsertFromRun(ctx, activeRunID, snapshotDate)
+		opps, dq, err := h.loadCSVOpps(ctx, activeRunID, snapshotDate)
 		if err != nil {
-			return nil, fmt.Errorf("upsert active: %w", err)
+			return nil, fmt.Errorf("load active: %w", err)
 		}
-		totalUpserted += upserted
-		h.Logger.Info("active opportunities upserted", "run_id", activeRunID, "count", upserted)
+		allDQEntries = append(allDQEntries, dq...)
+		for _, opp := range opps {
+			csvOpps[opp.NoticeID] = opp
+		}
+		h.Logger.Info("active CSV loaded", "run_id", activeRunID, "count", len(opps))
 	}
 
-	if activeRunID != uuid.Nil {
-		for _, archivedRunID := range archivedRunIDs {
-			resolved, err := h.Store.ResolveExpectedDisappearances(ctx, activeRunID, archivedRunID, snapshotDate)
-			if err != nil {
-				h.Logger.Error("failed to resolve expected disappearances", "error", err, "archived_run_id", archivedRunID)
-			} else if resolved > 0 {
-				h.Logger.Info("expected disappearances resolved (archived)", "count", resolved, "archived_run_id", archivedRunID)
+	// 4. Load API opps
+	apiOpps := make(map[string]reconcile.Opportunity)
+	if apiRunID != uuid.Nil {
+		rawRows, err := h.Store.GetSnapAPIRawData(ctx, apiRunID)
+		if err != nil {
+			return nil, fmt.Errorf("load snap_api raw_data: %w", err)
+		}
+		for _, row := range rawRows {
+			var d samgov.OpportunityData
+			if err := json.Unmarshal(row.RawData, &d); err != nil {
+				h.Logger.Warn("skipping unparseable snap_api row", "notice_id", row.NoticeID, "error", err)
+				continue
+			}
+			opp, issues := reconcile.FromAPI(d)
+			apiOpps[opp.NoticeID] = opp
+			for _, iss := range issues {
+				allDQEntries = append(allDQEntries, database.DataQualityEntry{
+					NoticeID:     opp.NoticeID,
+					SnapshotDate: snapshotDate,
+					Source:       "api",
+					IssueType:    iss.IssueType,
+					FieldName:    iss.FieldName,
+					FieldValue:   iss.FieldValue,
+				})
 			}
 		}
+		h.Logger.Info("API opps loaded", "run_id", apiRunID, "count", len(apiOpps))
+	}
 
+	// 5. Insert all DQ entries
+	if len(allDQEntries) > 0 {
+		runID := activeRunID
+		if runID == uuid.Nil && apiRunID != uuid.Nil {
+			runID = apiRunID
+		}
+		h.Logger.Warn("data quality issues found", "count", len(allDQEntries))
+		h.Store.InsertDataQualityIssues(ctx, runID, allDQEntries)
+	}
+
+	// 6. Reconcile: merge CSV + API by notice_id
+	noticeIDs := make(map[string]struct{})
+	for id := range csvOpps {
+		noticeIDs[id] = struct{}{}
+	}
+	for id := range apiOpps {
+		noticeIDs[id] = struct{}{}
+	}
+
+	reconciled := make([]reconcile.Opportunity, 0, len(noticeIDs))
+	for id := range noticeIDs {
+		var csvPtr, apiPtr *reconcile.Opportunity
+		if opp, ok := csvOpps[id]; ok {
+			csvPtr = &opp
+		}
+		if opp, ok := apiOpps[id]; ok {
+			apiPtr = &opp
+		}
+		reconciled = append(reconciled, reconcile.ReconcileRecord(csvPtr, apiPtr))
+	}
+
+	// 7. Upsert reconciled opportunities
+	upsertRunID := activeRunID
+	if upsertRunID == uuid.Nil {
+		upsertRunID = apiRunID
+	}
+	var totalUpserted int
+	if len(reconciled) > 0 && upsertRunID != uuid.Nil {
+		upserted, err := h.Store.UpsertOpportunities(ctx, upsertRunID, snapshotDate, reconciled)
+		if err != nil {
+			return nil, fmt.Errorf("upsert opportunities: %w", err)
+		}
+		totalUpserted = upserted
+	}
+
+	// 8. Disappearances
+	if activeRunID != uuid.Nil {
 		deactivated, err := h.Store.MarkDisappearedInactive(ctx, activeRunID)
 		if err != nil {
 			h.Logger.Error("failed to mark disappeared inactive", "error", err)
 		} else if deactivated > 0 {
-			h.Logger.Info("unexpected disappearances deactivated", "count", deactivated)
+			h.Logger.Info("disappearances deactivated", "count", deactivated)
 		}
+	}
+
+	// 9. Deactivate expired/stale opportunities
+	expired, stale, err := h.Store.DeactivateExpiredOpportunities(ctx)
+	if err != nil {
+		h.Logger.Error("failed to deactivate expired opportunities", "error", err)
+	} else if expired > 0 || stale > 0 {
+		h.Logger.Info("expired opportunities deactivated", "expired", expired, "stale", stale)
 	}
 
 	h.Logger.Info("reconcile complete",
 		"upserted", totalUpserted,
+		"csv_count", len(csvOpps),
+		"api_count", len(apiOpps),
 		"duration_ms", time.Since(start).Milliseconds(),
 	)
 
@@ -188,10 +281,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	return &Output{Status: "ok"}, nil
 }
 
-func (h *Handler) upsertFromRun(ctx context.Context, runID uuid.UUID, snapshotDate time.Time) (int, error) {
+func (h *Handler) loadCSVOpps(ctx context.Context, runID uuid.UUID, snapshotDate time.Time) ([]reconcile.Opportunity, []database.DataQualityEntry, error) {
 	rows, err := h.Store.GetSnapCSVRawData(ctx, runID)
 	if err != nil {
-		return 0, fmt.Errorf("load snap_csv raw_data: %w", err)
+		return nil, nil, fmt.Errorf("load snap_csv raw_data: %w", err)
 	}
 
 	opps := make([]reconcile.Opportunity, 0, len(rows))
@@ -211,17 +304,7 @@ func (h *Handler) upsertFromRun(ctx context.Context, runID uuid.UUID, snapshotDa
 		}
 	}
 
-	if len(dqEntries) > 0 {
-		h.Logger.Warn("data quality issues found", "count", len(dqEntries), "run_id", runID)
-		h.Store.InsertDataQualityIssues(ctx, runID, dqEntries)
-	}
-
-	affected, err := h.Store.UpsertOpportunities(ctx, runID, snapshotDate, opps)
-	if err != nil {
-		return 0, fmt.Errorf("upsert opportunities: %w", err)
-	}
-
-	return affected, nil
+	return opps, dqEntries, nil
 }
 
 func main() {

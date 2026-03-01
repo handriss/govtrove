@@ -260,24 +260,27 @@ func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int
 	return int(tag.RowsAffected()), nil
 }
 
-// ResolveExpectedDisappearances marks disappearances as "archived" when the
-// notice_id appears in the archived CSV run. Returns the count resolved.
-func (db *DB) ResolveExpectedDisappearances(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error) {
+func (db *DB) DeactivateExpiredOpportunities(ctx context.Context) (expired int, stale int, err error) {
 	tag, err := db.pool.Exec(ctx, `
-		UPDATE pipeline.snap_disappearances d
-		SET resolution = 'archived',
-		    resolution_date = $3,
-		    resolution_source = 'archived_csv'
-		FROM pipeline.snap_csv a
-		WHERE a.notice_id = d.notice_id
-		  AND a.run_id = $2
-		  AND d.run_id = $1
-		  AND d.resolution IS NULL
-	`, activeRunID, archivedRunID, snapshotDate)
+		UPDATE opportunities SET active = false
+		WHERE active = true AND is_latest = true AND archive_date < CURRENT_DATE
+	`)
 	if err != nil {
-		return 0, fmt.Errorf("resolve expected disappearances: %w", err)
+		return 0, 0, fmt.Errorf("deactivate expired: %w", err)
 	}
-	return int(tag.RowsAffected()), nil
+	expired = int(tag.RowsAffected())
+
+	tag, err = db.pool.Exec(ctx, `
+		UPDATE opportunities SET active = false
+		WHERE active = true AND is_latest = true AND archive_date IS NULL
+		  AND COALESCE(response_deadline, posted_date) < NOW() - INTERVAL '90 days'
+	`)
+	if err != nil {
+		return expired, 0, fmt.Errorf("deactivate stale: %w", err)
+	}
+	stale = int(tag.RowsAffected())
+
+	return expired, stale, nil
 }
 
 // GetSnapCSVRawData loads raw_data for all rows of a given run from snap_csv.

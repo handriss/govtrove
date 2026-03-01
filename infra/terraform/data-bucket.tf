@@ -50,17 +50,4 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
     }
   }
 
-  rule {
-    id     = "raw-archived-csv-to-ia"
-    status = "Enabled"
-
-    filter {
-      prefix = "raw/archived-csv/"
-    }
-
-    transition {
-      days          = 30
-      storage_class = "STANDARD_IA"
-    }
-  }
 }
