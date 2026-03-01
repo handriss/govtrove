@@ -193,6 +193,8 @@ CREATE TABLE pipeline.snap_reconcile_dq (
     csv_value       TEXT,
     api_value       TEXT,
     resolved        BOOLEAN DEFAULT false,
+    resolved_at     TIMESTAMPTZ,
+    resolution_note TEXT,
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
