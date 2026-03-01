@@ -7,7 +7,7 @@ import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
-  type UsageBucket, type AdminPipelineRun, type AdminSearchEvent,
+  type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics,
 } from '../services/api';
 import type { UserUpdate } from '../types/api';
@@ -568,18 +568,17 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
 
 function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
   const navigate = useNavigate();
-  const [runs, setRuns] = useState<AdminPipelineRun[]>([]);
+  const [runs, setRuns] = useState<PipelineExecution[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [fullOnly, setFullOnly] = useState(true);
   const limit = 20;
 
-  const fetchPage = useCallback(async (p: number, full: boolean) => {
+  const fetchPage = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const token = await getToken();
-      const res = await getAdminPipelineRuns(token, p, full);
+      const res = await getAdminPipelineRuns(token, p);
       setRuns(res.runs || []);
       setTotal(res.total);
       setPage(p);
@@ -591,7 +590,7 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
     }
   }, [getToken]);
 
-  useEffect(() => { fetchPage(1, fullOnly); }, [fetchPage, fullOnly]);
+  useEffect(() => { fetchPage(1); }, [fetchPage]);
 
   const totalPages = Math.ceil(total / limit);
 
@@ -616,27 +615,22 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
     return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
   }
 
+  function stepSummary(exec: PipelineExecution) {
+    const failed = exec.steps.filter(s => s.status === 'failed');
+    if (failed.length > 0) return failed.map(s => s.step_name).join(', ');
+    return `${exec.step_count} steps`;
+  }
+
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-medium text-dark-200">
-            Pipeline Runs <span className="text-dark-500 text-sm font-normal">({total.toLocaleString()})</span>
-          </h2>
-          <label className="flex items-center gap-2 text-sm text-dark-400 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={fullOnly}
-              onChange={(e) => { setFullOnly(e.target.checked); setPage(1); }}
-              className="rounded border-dark-600 bg-dark-800/50 text-accent focus:ring-accent/50"
-            />
-            Full runs only
-          </label>
-        </div>
+        <h2 className="text-lg font-medium text-dark-200">
+          Pipeline Runs <span className="text-dark-500 text-sm font-normal">({total.toLocaleString()})</span>
+        </h2>
         {totalPages > 1 && (
           <div className="flex items-center gap-2 text-sm">
             <button
-              onClick={() => fetchPage(page - 1, fullOnly)}
+              onClick={() => fetchPage(page - 1)}
               disabled={page <= 1 || loading}
               className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
@@ -644,7 +638,7 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
             </button>
             <span className="text-dark-400">{page} / {totalPages}</span>
             <button
-              onClick={() => fetchPage(page + 1, fullOnly)}
+              onClick={() => fetchPage(page + 1)}
               disabled={page >= totalPages || loading}
               className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
@@ -668,27 +662,24 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Started</th>
                 <th className="px-4 py-3 font-medium">Duration</th>
-                <th className="px-4 py-3 font-medium">Ingestion Jobs</th>
-                <th className="px-4 py-3 font-medium">Error</th>
+                <th className="px-4 py-3 font-medium">Steps</th>
+                <th className="px-4 py-3 font-medium">Details</th>
               </tr>
             </thead>
             <tbody>
-              {runs.map((run) => {
-                const ingestionRuns = run.ingestion_runs || [];
-                return (
+              {runs.map((exec) => (
                     <tr
-                      key={run.id}
-                      onClick={() => navigate(`/admin/pipeline/${run.id}`)}
+                      key={exec.execution_id}
+                      onClick={() => navigate(`/admin/pipeline/${exec.execution_id}`)}
                       className="border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 cursor-pointer"
                     >
-                      <td className="px-4 py-3">{statusBadge(run.status)}</td>
-                      <td className="px-4 py-3 text-dark-300 text-xs">{formatDateTime(run.started_at)}</td>
-                      <td className="px-4 py-3 text-dark-300 text-xs">{formatDuration(run.duration_ms)}</td>
-                      <td className="px-4 py-3 text-dark-400 text-xs">{ingestionRuns.length || '—'}</td>
-                      <td className="px-4 py-3 text-red-400/80 text-xs max-w-xs truncate">{run.error_message ?? ''}</td>
+                      <td className="px-4 py-3">{statusBadge(exec.status)}</td>
+                      <td className="px-4 py-3 text-dark-300 text-xs">{formatDateTime(exec.started_at)}</td>
+                      <td className="px-4 py-3 text-dark-300 text-xs">{formatDuration(exec.duration_ms)}</td>
+                      <td className="px-4 py-3 text-dark-400 text-xs">{exec.step_count}</td>
+                      <td className="px-4 py-3 text-dark-400 text-xs max-w-xs truncate">{stepSummary(exec)}</td>
                     </tr>
-                );
-              })}
+              ))}
             </tbody>
           </table>
         </div>

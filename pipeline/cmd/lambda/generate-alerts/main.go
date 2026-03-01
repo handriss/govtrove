@@ -73,14 +73,19 @@ func init() {
 	logger.Info("cold start complete")
 }
 
+type Input struct {
+	ExecutionID string `json:"execution_id"`
+}
+
 type Output struct {
-	Status              string `json:"status"`
-	SearchAlerts        int    `json:"search_alerts"`
-	OpportunityAlerts   int    `json:"opportunity_alerts"`
+	Status            string `json:"status"`
+	SearchAlerts      int    `json:"search_alerts"`
+	OpportunityAlerts int    `json:"opportunity_alerts"`
 }
 
 type Handler struct {
 	Pool   *pgxpool.Pool
+	Store  database.Store
 	Logger *slog.Logger
 }
 
@@ -94,22 +99,59 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 
 	start := time.Now()
 
+	// Parse execution ID from input
+	var input Input
+	if err := json.Unmarshal(event, &input); err != nil {
+		h.Logger.Warn("failed to parse input", "error", err)
+	}
+
+	var stepID uuid.UUID
+	if input.ExecutionID != "" {
+		execID, err := uuid.Parse(input.ExecutionID)
+		if err == nil && h.Store != nil {
+			sid, err := h.Store.CreatePipelineStep(ctx, execID, "generate-alerts")
+			if err != nil {
+				h.Logger.Warn("failed to create pipeline step", "error", err)
+			} else {
+				stepID = sid
+			}
+		}
+	}
+
 	searchAlerts, err := h.processSearchAlerts(ctx)
 	if err != nil {
 		h.Logger.Error("search alerts failed", "error", err)
+		if stepID != uuid.Nil {
+			_ = h.Store.FailPipelineStep(ctx, stepID, err.Error(), int(time.Since(start).Milliseconds()))
+		}
 		return nil, fmt.Errorf("search alerts: %w", err)
 	}
 
 	oppAlerts, err := h.processOpportunityAlerts(ctx)
 	if err != nil {
 		h.Logger.Error("opportunity alerts failed", "error", err)
+		if stepID != uuid.Nil {
+			_ = h.Store.FailPipelineStep(ctx, stepID, err.Error(), int(time.Since(start).Milliseconds()))
+		}
 		return nil, fmt.Errorf("opportunity alerts: %w", err)
+	}
+
+	durationMs := int(time.Since(start).Milliseconds())
+
+	if stepID != uuid.Nil {
+		stepStats := map[string]any{
+			"search_alerts":      searchAlerts,
+			"opportunity_alerts": oppAlerts,
+		}
+		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
+			h.Logger.Warn("failed to complete pipeline step", "error", err)
+		}
 	}
 
 	h.Logger.Info("alerts complete",
 		"search_alerts", searchAlerts,
 		"opportunity_alerts", oppAlerts,
-		"duration_ms", time.Since(start).Milliseconds(),
+		"duration_ms", durationMs,
 	)
 
 	return &Output{
@@ -745,6 +787,6 @@ func (h *Handler) releaseLock(ctx context.Context, jobName string) {
 }
 
 func main() {
-	h := &Handler{Pool: pool, Logger: logger}
+	h := &Handler{Pool: pool, Store: db, Logger: logger}
 	lambda.Start(h.Handle)
 }

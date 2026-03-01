@@ -31,7 +31,7 @@ var _ = Describe("Reconcile Handler", func() {
 
 	buildEvent := func(results []IngestionResult, apiResult *IngestionResult) json.RawMessage {
 		input := Input{
-			PipelineRunID:    uuid.New().String(),
+			ExecutionID:    uuid.New().String(),
 			IngestionResults: results,
 			APIResult:        apiResult,
 		}

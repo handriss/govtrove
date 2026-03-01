@@ -51,6 +51,11 @@ type Store interface {
 	// Agencies
 	RefreshAgencies(ctx context.Context) (int, error)
 
+	// Pipeline steps
+	CreatePipelineStep(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error)
+	CompletePipelineStep(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
+	FailPipelineStep(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
+
 	// Analytics retention
 	DeleteOldSearchEvents(ctx context.Context, days int) (int64, error)
 }

@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -115,6 +115,27 @@ type PipelineRunRow struct {
 	IngestionRuns  *string `json:"ingestion_runs"`
 }
 
+type PipelineStepRow struct {
+	ID           string  `json:"id"`
+	StepName     string  `json:"step_name"`
+	Status       string  `json:"status"`
+	StartedAt    string  `json:"started_at"`
+	CompletedAt  *string `json:"completed_at"`
+	DurationMs   *int    `json:"duration_ms"`
+	Stats        *string `json:"stats"`
+	ErrorMessage *string `json:"error_message"`
+}
+
+type PipelineExecutionRow struct {
+	ExecutionID string            `json:"execution_id"`
+	Status      string            `json:"status"`
+	StartedAt   string            `json:"started_at"`
+	CompletedAt *string           `json:"completed_at"`
+	DurationMs  *int              `json:"duration_ms"`
+	StepCount   int               `json:"step_count"`
+	Steps       []PipelineStepRow `json:"steps"`
+}
+
 type SearchEventRow struct {
 	ID           int     `json:"id"`
 	Query        *string `json:"query"`
@@ -126,76 +147,96 @@ type SearchEventRow struct {
 	CreatedAt    string  `json:"created_at"`
 }
 
-func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit int, fullOnly bool) ([]PipelineRunRow, int, error) {
-	countQuery := `SELECT COUNT(*) FROM pipeline.pipeline_runs`
-	if fullOnly {
-		countQuery += ` WHERE EXISTS (
-			SELECT 1 FROM pipeline.ingestion_runs ir
-			WHERE ir.pipeline_run_id = pipeline_runs.id
-		)`
-	}
-
+func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit int, _ bool) ([]PipelineExecutionRow, int, error) {
 	var total int
-	if err := r.pool.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT execution_id) FROM pipeline.pipeline_steps
+	`).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	fullOnlyClause := ""
-	if fullOnly {
-		fullOnlyClause = `WHERE EXISTS (
-			SELECT 1 FROM pipeline.ingestion_runs ir2
-			WHERE ir2.pipeline_run_id = pr.id
-		)`
-	}
-
 	offset := (page - 1) * limit
-	query := `
-		SELECT pr.id, pr.pipeline_name, pr.status, pr.started_at, pr.completed_at,
-		       pr.duration_ms, pr.error_message,
-		       (SELECT json_agg(json_build_object(
-		           'run_id', ir.run_id,
-		           'job_type', ir.job_type,
-		           'status', ir.status,
-		           'records_fetched', ir.records_fetched,
-		           'records_inserted', ir.records_inserted,
-		           'records_updated', ir.records_updated,
-		           'records_failed', ir.records_failed,
-		           'records_skipped', ir.records_skipped,
-		           'duration_ms', ir.duration_ms,
-		           'error_message', ir.error_message
-		       )) FILTER (WHERE ir.run_id IS NOT NULL)
-		       FROM pipeline.ingestion_runs ir
-		       WHERE ir.pipeline_run_id = pr.id
-		       )::text AS ingestion_runs
-		FROM pipeline.pipeline_runs pr
-		` + fullOnlyClause + `
-		ORDER BY pr.started_at DESC
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+			ps.execution_id,
+			MIN(ps.started_at) AS started_at,
+			MAX(ps.completed_at) AS completed_at,
+			EXTRACT(EPOCH FROM (MAX(ps.completed_at) - MIN(ps.started_at)))::int * 1000 AS duration_ms,
+			BOOL_AND(ps.status = 'completed') AS all_completed,
+			BOOL_OR(ps.status = 'failed') AS any_failed,
+			BOOL_OR(ps.status = 'running') AS any_running,
+			COUNT(*) AS step_count,
+			(SELECT json_agg(json_build_object(
+				'id', ps2.id, 'step_name', ps2.step_name, 'status', ps2.status,
+				'started_at', ps2.started_at, 'completed_at', ps2.completed_at,
+				'duration_ms', ps2.duration_ms, 'stats', ps2.stats,
+				'error_message', ps2.error_message
+			) ORDER BY ps2.started_at)
+			FROM pipeline.pipeline_steps ps2 WHERE ps2.execution_id = ps.execution_id
+			)::text AS steps
+		FROM pipeline.pipeline_steps ps
+		GROUP BY ps.execution_id
+		ORDER BY MIN(ps.started_at) DESC
 		LIMIT $1 OFFSET $2
-	`
-
-	rows, err := r.pool.Query(ctx, query, limit, offset)
+	`, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var runs []PipelineRunRow
+	var executions []PipelineExecutionRow
 	for rows.Next() {
-		var run PipelineRunRow
+		var exec PipelineExecutionRow
 		var startedAt time.Time
 		var completedAt *time.Time
-		if err := rows.Scan(&run.ID, &run.PipelineName, &run.Status, &startedAt, &completedAt,
-			&run.DurationMs, &run.ErrorMessage, &run.IngestionRuns); err != nil {
+		var allCompleted, anyFailed, anyRunning bool
+		var stepsJSON *string
+		if err := rows.Scan(&exec.ExecutionID, &startedAt, &completedAt,
+			&exec.DurationMs, &allCompleted, &anyFailed, &anyRunning,
+			&exec.StepCount, &stepsJSON); err != nil {
 			return nil, 0, err
 		}
-		run.StartedAt = startedAt.Format(time.RFC3339)
+		exec.StartedAt = startedAt.Format(time.RFC3339)
 		if completedAt != nil {
 			s := completedAt.Format(time.RFC3339)
-			run.CompletedAt = &s
+			exec.CompletedAt = &s
 		}
-		runs = append(runs, run)
+		if anyFailed {
+			exec.Status = "failed"
+		} else if anyRunning {
+			exec.Status = "running"
+		} else if allCompleted {
+			exec.Status = "completed"
+		} else {
+			exec.Status = "running"
+		}
+
+		if stepsJSON != nil {
+			var steps []PipelineStepRow
+			if err := json.Unmarshal([]byte(*stepsJSON), &steps); err == nil {
+				for i := range steps {
+					if steps[i].StartedAt != "" {
+						if t, err := time.Parse(time.RFC3339Nano, steps[i].StartedAt); err == nil {
+							steps[i].StartedAt = t.Format(time.RFC3339)
+						}
+					}
+					if steps[i].CompletedAt != nil {
+						if t, err := time.Parse(time.RFC3339Nano, *steps[i].CompletedAt); err == nil {
+							s := t.Format(time.RFC3339)
+							steps[i].CompletedAt = &s
+						}
+					}
+				}
+				exec.Steps = steps
+			}
+		}
+		if exec.Steps == nil {
+			exec.Steps = []PipelineStepRow{}
+		}
+
+		executions = append(executions, exec)
 	}
-	return runs, total, rows.Err()
+	return executions, total, rows.Err()
 }
 
 func (r *PipelineRepository) ListSearchEvents(ctx context.Context, page, limit int, emptyOnly bool) ([]SearchEventRow, int, error) {
@@ -596,72 +637,99 @@ type OpportunityStats struct {
 }
 
 type PipelineRunDetailResponse struct {
-	PipelineRun      PipelineRunRow     `json:"pipeline_run"`
-	IngestionRuns    []IngestionRunDetail `json:"ingestion_runs"`
+	ExecutionID      string             `json:"execution_id"`
+	Status           string             `json:"status"`
+	StartedAt        string             `json:"started_at"`
+	CompletedAt      *string            `json:"completed_at"`
+	DurationMs       *int               `json:"duration_ms"`
+	Steps            []PipelineStepRow  `json:"steps"`
 	TableCounts      TableCounts        `json:"table_counts"`
 	OpportunityStats OpportunityStats   `json:"opportunity_stats"`
 }
 
 var ErrPipelineRunNotFound = errors.New("pipeline run not found")
 
-func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string) (*PipelineRunDetailResponse, error) {
-	// Q1: pipeline run by ID
-	var run PipelineRunRow
-	var startedAt time.Time
-	var completedAt *time.Time
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, pipeline_name, status, started_at, completed_at, duration_ms, error_message
-		FROM pipeline.pipeline_runs WHERE id = $1
-	`, id).Scan(&run.ID, &run.PipelineName, &run.Status, &startedAt, &completedAt,
-		&run.DurationMs, &run.ErrorMessage)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrPipelineRunNotFound
-		}
-		return nil, err
-	}
-	run.StartedAt = startedAt.Format(time.RFC3339)
-	if completedAt != nil {
-		s := completedAt.Format(time.RFC3339)
-		run.CompletedAt = &s
-	}
-
-	// Q2: ingestion runs linked via FK
-	irRows, err := r.pool.Query(ctx, `
-		SELECT run_id, job_type, status, started_at, completed_at,
-		       records_fetched, records_inserted, records_updated,
-		       records_failed, records_skipped, duration_ms, error_message
-		FROM pipeline.ingestion_runs
-		WHERE pipeline_run_id = $1
+func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, executionID string) (*PipelineRunDetailResponse, error) {
+	// Q1: pipeline steps for this execution
+	stepRows, err := r.pool.Query(ctx, `
+		SELECT id, step_name, status, started_at, completed_at, duration_ms, stats::text, error_message
+		FROM pipeline.pipeline_steps
+		WHERE execution_id = $1
 		ORDER BY started_at ASC
-	`, id)
+	`, executionID)
 	if err != nil {
 		return nil, err
 	}
-	defer irRows.Close()
+	defer stepRows.Close()
 
-	var ingestionRuns []IngestionRunDetail
-	for irRows.Next() {
-		var ir IngestionRunDetail
+	var steps []PipelineStepRow
+	var firstStartedAt time.Time
+	var lastCompletedAt *time.Time
+	allCompleted := true
+	anyFailed := false
+	anyRunning := false
+
+	for stepRows.Next() {
+		var s PipelineStepRow
 		var sa time.Time
 		var ca *time.Time
-		if err := irRows.Scan(&ir.RunID, &ir.JobType, &ir.Status, &sa, &ca,
-			&ir.RecordsFetched, &ir.RecordsInserted, &ir.RecordsUpdated,
-			&ir.RecordsFailed, &ir.RecordsSkipped, &ir.DurationMs, &ir.ErrorMessage); err != nil {
+		if err := stepRows.Scan(&s.ID, &s.StepName, &s.Status, &sa, &ca,
+			&s.DurationMs, &s.Stats, &s.ErrorMessage); err != nil {
 			return nil, err
 		}
-		ir.StartedAt = sa.Format(time.RFC3339)
+		s.StartedAt = sa.Format(time.RFC3339)
 		if ca != nil {
-			s := ca.Format(time.RFC3339)
-			ir.CompletedAt = &s
+			cs := ca.Format(time.RFC3339)
+			s.CompletedAt = &cs
 		}
-		ingestionRuns = append(ingestionRuns, ir)
+
+		if len(steps) == 0 {
+			firstStartedAt = sa
+		}
+		if ca != nil && (lastCompletedAt == nil || ca.After(*lastCompletedAt)) {
+			lastCompletedAt = ca
+		}
+		if s.Status != "completed" {
+			allCompleted = false
+		}
+		if s.Status == "failed" {
+			anyFailed = true
+		}
+		if s.Status == "running" {
+			anyRunning = true
+		}
+
+		steps = append(steps, s)
 	}
-	if err := irRows.Err(); err != nil {
+	if err := stepRows.Err(); err != nil {
 		return nil, err
 	}
+	if len(steps) == 0 {
+		return nil, ErrPipelineRunNotFound
+	}
 
-	// Q3: table counts using FK-linked run_ids
+	resp := &PipelineRunDetailResponse{
+		ExecutionID: executionID,
+		StartedAt:   firstStartedAt.Format(time.RFC3339),
+		Steps:       steps,
+	}
+	if anyFailed {
+		resp.Status = "failed"
+	} else if anyRunning {
+		resp.Status = "running"
+	} else if allCompleted {
+		resp.Status = "completed"
+	} else {
+		resp.Status = "running"
+	}
+	if lastCompletedAt != nil {
+		s := lastCompletedAt.Format(time.RFC3339)
+		resp.CompletedAt = &s
+		dur := int(lastCompletedAt.Sub(firstStartedAt).Milliseconds())
+		resp.DurationMs = &dur
+	}
+
+	// Q2: table counts via ingestion_runs linked by execution_id (= pipeline_run_id)
 	var tc TableCounts
 	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
@@ -673,13 +741,14 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 			(SELECT COUNT(*) FROM pipeline.snap_data_quality WHERE run_id IN (SELECT run_id FROM run_ids)),
 			(SELECT COUNT(*) FROM pipeline.snap_disappearances WHERE run_id IN (SELECT run_id FROM run_ids)),
 			(SELECT COUNT(*) FROM pipeline.snap_reconcile_dq WHERE csv_run_id IN (SELECT run_id FROM run_ids) OR api_run_id IN (SELECT run_id FROM run_ids))
-	`, id).Scan(
+	`, executionID).Scan(
 		&tc.SnapCSV, &tc.SnapAPI, &tc.SnapDataQuality, &tc.Disappearances, &tc.ReconcileDQ,
 	); err != nil {
 		return nil, err
 	}
+	resp.TableCounts = tc
 
-	// Q4: opportunity stats
+	// Q3: opportunity stats
 	var oppStats OpportunityStats
 	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
@@ -691,13 +760,12 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 			COUNT(*) FILTER (WHERE created_at < $2)
 		FROM opportunities
 		WHERE last_csv_run_id IN (SELECT run_id FROM run_ids)
-	`, id, startedAt).Scan(
+	`, executionID, firstStartedAt).Scan(
 		&oppStats.TotalAffected, &oppStats.Inserted, &oppStats.Updated,
 	); err != nil {
 		return nil, err
 	}
 
-	// from_both: notice_ids appearing in both snap_csv and snap_api for this pipeline run
 	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
 			SELECT run_id FROM pipeline.ingestion_runs WHERE pipeline_run_id = $1
@@ -706,16 +774,12 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 		FROM pipeline.snap_api sa
 		WHERE sa.run_id IN (SELECT run_id FROM run_ids)
 		  AND sa.notice_id IN (SELECT notice_id FROM pipeline.snap_csv WHERE run_id IN (SELECT run_id FROM run_ids))
-	`, id).Scan(&oppStats.FromBoth); err != nil {
+	`, executionID).Scan(&oppStats.FromBoth); err != nil {
 		return nil, err
 	}
 	oppStats.FromAPI = tc.SnapAPI
 	oppStats.FromCSVOnly = oppStats.TotalAffected - oppStats.FromBoth
+	resp.OpportunityStats = oppStats
 
-	return &PipelineRunDetailResponse{
-		PipelineRun:      run,
-		IngestionRuns:    ingestionRuns,
-		TableCounts:      tc,
-		OpportunityStats: oppStats,
-	}, nil
+	return resp, nil
 }

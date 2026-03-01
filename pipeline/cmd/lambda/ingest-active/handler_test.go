@@ -74,7 +74,7 @@ var _ = Describe("Ingest Active Handler", func() {
 	})
 
 	buildEvent := func(s3Key string) json.RawMessage {
-		input := Input{PipelineRunID: uuid.New().String()}
+		input := Input{ExecutionID: uuid.New().String()}
 		input.File.Type = "active"
 		input.File.S3Key = s3Key
 		input.File.Source = "active"
@@ -305,13 +305,13 @@ var _ = Describe("Ingest Active Handler", func() {
 				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
 			}
 
-			var receivedPipelineRunID *uuid.UUID
+			var receivedExecutionID *uuid.UUID
 			store.CreateIngestionRunFn = func(_ context.Context, _ string, prid *uuid.UUID) (uuid.UUID, error) {
-				receivedPipelineRunID = prid
+				receivedExecutionID = prid
 				return uuid.New(), nil
 			}
 
-			input := Input{PipelineRunID: pipelineRunID.String()}
+			input := Input{ExecutionID: pipelineRunID.String()}
 			input.File.Type = "active"
 			input.File.S3Key = "raw/csv/2026-02-18.csv.gz"
 			input.File.Source = "active"
@@ -320,8 +320,8 @@ var _ = Describe("Ingest Active Handler", func() {
 			_, err := h.Handle(ctx, b)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(receivedPipelineRunID).NotTo(BeNil())
-			Expect(*receivedPipelineRunID).To(Equal(pipelineRunID))
+			Expect(receivedExecutionID).NotTo(BeNil())
+			Expect(*receivedExecutionID).To(Equal(pipelineRunID))
 		})
 
 		It("passes nil when pipeline_run_id is invalid", func() {
@@ -329,13 +329,13 @@ var _ = Describe("Ingest Active Handler", func() {
 				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
 			}
 
-			var receivedPipelineRunID *uuid.UUID
+			var receivedExecutionID *uuid.UUID
 			store.CreateIngestionRunFn = func(_ context.Context, _ string, prid *uuid.UUID) (uuid.UUID, error) {
-				receivedPipelineRunID = prid
+				receivedExecutionID = prid
 				return uuid.New(), nil
 			}
 
-			input := Input{PipelineRunID: "not-a-uuid"}
+			input := Input{ExecutionID: "not-a-uuid"}
 			input.File.Type = "active"
 			input.File.S3Key = "raw/csv/2026-02-18.csv.gz"
 			input.File.Source = "active"
@@ -344,7 +344,7 @@ var _ = Describe("Ingest Active Handler", func() {
 			_, err := h.Handle(ctx, b)
 
 			Expect(err).NotTo(HaveOccurred())
-			Expect(receivedPipelineRunID).To(BeNil())
+			Expect(receivedExecutionID).To(BeNil())
 		})
 	})
 

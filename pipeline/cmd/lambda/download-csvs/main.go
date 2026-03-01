@@ -100,8 +100,8 @@ type File struct {
 }
 
 type Output struct {
-	PipelineRunID string `json:"pipeline_run_id"`
-	Files         []File `json:"files"`
+	ExecutionID string `json:"execution_id"`
+	Files       []File `json:"files"`
 }
 
 // Handler holds dependencies for the download-csvs Lambda.
@@ -127,37 +127,31 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Warn("failed to parse input, will generate run ID", "error", err)
 	}
 
-	var requestedID uuid.UUID
+	var executionID uuid.UUID
 	if input.ID != "" {
 		parsed, err := uuid.Parse(input.ID)
 		if err != nil {
 			h.Logger.Warn("invalid UUID in input, will generate run ID", "id", input.ID, "error", err)
 		} else {
-			requestedID = parsed
+			executionID = parsed
 		}
+	}
+	if executionID == uuid.Nil {
+		executionID = uuid.New()
 	}
 
 	// Idempotency: if this execution already completed, return cached output
-	if requestedID != uuid.Nil {
-		existing, err := h.Store.GetPipelineRun(ctx, requestedID)
-		if err != nil {
-			h.Logger.Warn("failed to check existing pipeline run", "error", err)
-		}
-		if existing != nil && existing.Status == "completed" {
-			h.Logger.Info("pipeline run already completed, returning cached result", "id", requestedID)
-			return h.buildCachedOutput(existing), nil
-		}
-	}
-
-	runID, err := h.Store.CreatePipelineRun(ctx, requestedID, "download-csvs", nil)
+	existing, err := h.Store.GetPipelineRun(ctx, executionID)
 	if err != nil {
-		return nil, fmt.Errorf("create pipeline run: %w", err)
+		h.Logger.Warn("failed to check existing pipeline run", "error", err)
+	}
+	if existing != nil && existing.Status == "completed" {
+		h.Logger.Info("pipeline run already completed, returning cached result", "id", executionID)
+		return h.buildCachedOutput(existing), nil
 	}
 
 	results, err := bulkcsv.Run(ctx, h.Cfg, h.Store, h.S3, h.Logger)
 	if err != nil {
-		dur := int(time.Since(start).Milliseconds())
-		_ = h.Store.FailPipelineRun(ctx, runID, err.Error(), dur)
 		return nil, fmt.Errorf("bulk csv run: %w", err)
 	}
 
@@ -169,8 +163,6 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 	if len(failed) > 0 {
 		errMsg := fmt.Sprintf("sources failed: %s", strings.Join(failed, ", "))
-		dur := int(time.Since(start).Milliseconds())
-		_ = h.Store.FailPipelineRun(ctx, runID, errMsg, dur)
 		return nil, fmt.Errorf("%s", errMsg)
 	}
 
@@ -186,29 +178,53 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		})
 	}
 
-	dur := int(time.Since(start).Milliseconds())
-	stats := map[string]any{
-		"summary":   bulkcsv.FormatSummary(results),
-		"new_files": len(files),
-	}
-	if err := h.Store.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
-		h.Logger.Warn("failed to complete pipeline run", "error", err)
-	}
+	// Only write DB rows when there are new files to process
+	if len(files) > 0 {
+		// Pipeline step tracking
+		stepID, stepErr := h.Store.CreatePipelineStep(ctx, executionID, "download-csvs")
+		if stepErr != nil {
+			h.Logger.Warn("failed to create pipeline step", "error", stepErr)
+		}
 
-	h.Logger.Info("handler complete",
-		"pipeline_run_id", runID.String(),
-		"new_files", len(files),
-		"duration_ms", dur,
-	)
+		dur := int(time.Since(start).Milliseconds())
+		stats := map[string]any{
+			"summary":   bulkcsv.FormatSummary(results),
+			"new_files": len(files),
+		}
+
+		if stepErr == nil {
+			if err := h.Store.CompletePipelineStep(ctx, stepID, stats, dur); err != nil {
+				h.Logger.Warn("failed to complete pipeline step", "error", err)
+			}
+		}
+
+		// Backward compat: still create pipeline_run for ingestion_run FK
+		runID, err := h.Store.CreatePipelineRun(ctx, executionID, "download-csvs", nil)
+		if err != nil {
+			h.Logger.Warn("failed to create pipeline run (compat)", "error", err)
+		} else {
+			if err := h.Store.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
+				h.Logger.Warn("failed to complete pipeline run (compat)", "error", err)
+			}
+		}
+
+		h.Logger.Info("handler complete",
+			"execution_id", executionID.String(),
+			"new_files", len(files),
+			"duration_ms", dur,
+		)
+	} else {
+		h.Logger.Info("no new files, skipping DB writes", "execution_id", executionID.String())
+	}
 
 	return &Output{
-		PipelineRunID: runID.String(),
-		Files:         files,
+		ExecutionID: executionID.String(),
+		Files:       files,
 	}, nil
 }
 
 func (h *Handler) buildCachedOutput(run *database.PipelineRun) *Output {
-	out := &Output{PipelineRunID: run.ID.String()}
+	out := &Output{ExecutionID: run.ID.String()}
 	if run.Stats != nil {
 		if filesRaw, ok := run.Stats["files"]; ok {
 			if filesJSON, err := json.Marshal(filesRaw); err == nil {

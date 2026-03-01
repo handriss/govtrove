@@ -86,7 +86,7 @@ type IngestionResult struct {
 }
 
 type Input struct {
-	PipelineRunID    string            `json:"pipeline_run_id"`
+	ExecutionID      string            `json:"execution_id"`
 	Files            []json.RawMessage `json:"files"`
 	IngestionResults []IngestionResult `json:"ingestion_results"`
 	APIResult        *IngestionResult  `json:"api_result"`
@@ -103,6 +103,7 @@ type Handler struct {
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
+	start := time.Now()
 	defer func() {
 		if retErr != nil {
 			sentry.CaptureException(retErr)
@@ -115,10 +116,35 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 
 	h.Logger.Info("reconcile started",
-		"pipeline_run_id", input.PipelineRunID,
+		"execution_id", input.ExecutionID,
 		"ingestion_count", len(input.IngestionResults),
 		"has_api_result", input.APIResult != nil,
 	)
+
+	// Pipeline step tracking
+	var executionID *uuid.UUID
+	if input.ExecutionID != "" {
+		parsed, err := uuid.Parse(input.ExecutionID)
+		if err == nil {
+			executionID = &parsed
+		}
+	}
+
+	var stepID uuid.UUID
+	if executionID != nil {
+		sid, err := h.Store.CreatePipelineStep(ctx, *executionID, "reconcile")
+		if err != nil {
+			h.Logger.Warn("failed to create pipeline step", "error", err)
+		} else {
+			stepID = sid
+		}
+	}
+
+	defer func() {
+		if retErr != nil && stepID != uuid.Nil {
+			_ = h.Store.FailPipelineStep(ctx, stepID, retErr.Error(), int(time.Since(start).Milliseconds()))
+		}
+	}()
 
 	// 1. Parse CSV ingestion results
 	var activeRunID uuid.UUID
@@ -148,7 +174,6 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 	}
 
-	start := time.Now()
 	snapshotDate := time.Now().UTC()
 
 	// 3. Load CSV opps
@@ -281,12 +306,27 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Info("expired opportunities deactivated", "expired", expired, "stale", stale)
 	}
 
+	durationMs := int(time.Since(start).Milliseconds())
+
 	h.Logger.Info("reconcile complete",
 		"upserted", totalUpserted,
 		"csv_count", len(csvOpps),
 		"api_count", len(apiOpps),
-		"duration_ms", time.Since(start).Milliseconds(),
+		"duration_ms", durationMs,
 	)
+
+	if stepID != uuid.Nil {
+		stepStats := map[string]any{
+			"upserted":       totalUpserted,
+			"csv_count":      len(csvOpps),
+			"api_count":      len(apiOpps),
+			"dq_issues":      len(allDQEntries),
+			"reconcile_dq":   len(reconcileDQ),
+		}
+		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
+			h.Logger.Warn("failed to complete pipeline step", "error", err)
+		}
+	}
 
 	if refreshed, err := h.Store.RefreshAgencies(ctx); err != nil {
 		h.Logger.Error("failed to refresh agencies", "error", err)

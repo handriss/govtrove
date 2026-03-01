@@ -43,6 +43,10 @@ type MockStore struct {
 	GetBulkCSVLogByS3KeyFn            func(ctx context.Context, s3Key string) (*database.BulkCSVLogRecord, error)
 	UpdateBulkCSVLogIngestionFn       func(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error
 
+	CreatePipelineStepFn   func(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error)
+	CompletePipelineStepFn func(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
+	FailPipelineStepFn     func(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
+
 	RefreshAgenciesFn func(ctx context.Context) (int, error)
 
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
@@ -238,6 +242,27 @@ func (m *MockStore) RefreshAgencies(ctx context.Context) (int, error) {
 		return m.RefreshAgenciesFn(ctx)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) CreatePipelineStep(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error) {
+	if m.CreatePipelineStepFn != nil {
+		return m.CreatePipelineStepFn(ctx, executionID, stepName)
+	}
+	return uuid.New(), nil
+}
+
+func (m *MockStore) CompletePipelineStep(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error {
+	if m.CompletePipelineStepFn != nil {
+		return m.CompletePipelineStepFn(ctx, id, stats, durationMs)
+	}
+	return nil
+}
+
+func (m *MockStore) FailPipelineStep(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error {
+	if m.FailPipelineStepFn != nil {
+		return m.FailPipelineStepFn(ctx, id, errMsg, durationMs)
+	}
+	return nil
 }
 
 func (m *MockStore) DeleteOldSearchEvents(ctx context.Context, days int) (int64, error) {
