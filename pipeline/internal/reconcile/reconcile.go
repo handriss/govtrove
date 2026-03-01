@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/handriss/govtrove/pipeline/internal/parse"
@@ -36,6 +37,7 @@ type Opportunity struct {
 	CGAC       string
 	FPDSCode   string
 	AACCode    string
+	MiddleTier string // API-only: intermediate org levels between SubTier and Office
 
 	PopStreetAddress string
 	PopCity          string
@@ -56,6 +58,15 @@ type Opportunity struct {
 	AwardAmount *float64
 	Awardee     string
 	AwardeeName string
+	AwardeeUeiSAM        string
+	AwardeeStreetAddress string
+	AwardeeCity          string
+	AwardeeCityCode      string
+	AwardeeState         string
+	AwardeeStateCode     string
+	AwardeeCountry       string
+	AwardeeCountryCode   string
+	AwardeeZip           string
 
 	PrimaryContactTitle    string
 	PrimaryContactFullname string
@@ -94,6 +105,13 @@ type DataQualityIssue struct {
 	FieldName  string
 	FieldValue string
 	IssueType  string
+}
+
+type ReconcileMismatch struct {
+	FieldName string
+	IssueType string
+	CSVValue  string
+	APIValue  string
 }
 
 // FromCSV maps a raw CSV row (map of header→value) into an Opportunity.
@@ -166,12 +184,139 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 }
 
 // ReconcileRecord merges a CSV and API opportunity for the same notice_id.
-// Stub: prefers CSV when present. Real merge logic comes later.
-func ReconcileRecord(csv, api *Opportunity) Opportunity {
-	if csv != nil {
-		return *csv
+// When both sources are present, compares fields that should be identical
+// and reports mismatches. Prefers CSV for the merged result.
+func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
+	if csv == nil {
+		return *api, []ReconcileMismatch{{
+			FieldName: "source",
+			IssueType: "missing_csv",
+			APIValue:  api.NoticeID,
+		}}
 	}
-	return *api
+	if api == nil {
+		return *csv, []ReconcileMismatch{{
+			FieldName: "source",
+			IssueType: "missing_api",
+			CSVValue:  csv.NoticeID,
+		}}
+	}
+
+	var mismatches []ReconcileMismatch
+	cmpStr := func(field, csvVal, apiVal string) {
+		if csvVal == "" || apiVal == "" {
+			return
+		}
+		if csvVal != apiVal {
+			mismatches = append(mismatches, ReconcileMismatch{FieldName: field, IssueType: "field_mismatch", CSVValue: csvVal, APIValue: apiVal})
+		}
+	}
+	cmpTime := func(field string, csvVal, apiVal *time.Time) {
+		if csvVal == nil || apiVal == nil {
+			return
+		}
+		if !csvVal.Equal(*apiVal) {
+			mismatches = append(mismatches, ReconcileMismatch{
+				FieldName: field, IssueType: "field_mismatch",
+				CSVValue: csvVal.Format(time.DateOnly),
+				APIValue: apiVal.Format(time.DateOnly),
+			})
+		}
+	}
+	cmpAmount := func(field string, csvVal, apiVal *float64) {
+		if csvVal == nil || apiVal == nil {
+			return
+		}
+		if *csvVal != *apiVal {
+			mismatches = append(mismatches, ReconcileMismatch{
+				FieldName: field, IssueType: "field_mismatch",
+				CSVValue: fmt.Sprintf("%.2f", *csvVal),
+				APIValue: fmt.Sprintf("%.2f", *apiVal),
+			})
+		}
+	}
+	cmpBool := func(field string, csvVal, apiVal bool) {
+		if csvVal != apiVal {
+			mismatches = append(mismatches, ReconcileMismatch{
+				FieldName: field, IssueType: "field_mismatch",
+				CSVValue: fmt.Sprintf("%t", csvVal),
+				APIValue: fmt.Sprintf("%t", apiVal),
+			})
+		}
+	}
+
+	cmpStr("SolicitationNumber", csv.SolicitationNumber, api.SolicitationNumber)
+	cmpStr("Title", csv.Title, api.Title)
+	cmpStr("Type", csv.Type, api.Type)
+	cmpStr("BaseType", csv.BaseType, api.BaseType)
+	cmpStr("OrganizationType", csv.OrganizationType, api.OrganizationType)
+	cmpTime("PostedDate", csv.PostedDate, api.PostedDate)
+	cmpTime("ResponseDeadline", csv.ResponseDeadline, api.ResponseDeadline)
+	cmpTime("ArchiveDate", csv.ArchiveDate, api.ArchiveDate)
+	cmpStr("ArchiveType", csv.ArchiveType, api.ArchiveType)
+	cmpBool("Active", csv.Active, api.Active)
+	cmpStr("SetAsideCode", csv.SetAsideCode, api.SetAsideCode)
+	cmpStr("SetAsideDescription", csv.SetAsideDescription, api.SetAsideDescription)
+	cmpStr("NAICSCode", csv.NAICSCode, api.NAICSCode)
+	cmpStr("ClassificationCode", csv.ClassificationCode, api.ClassificationCode)
+	cmpStr("AwardNumber", csv.AwardNumber, api.AwardNumber)
+	cmpTime("AwardDate", csv.AwardDate, api.AwardDate)
+	cmpAmount("AwardAmount", csv.AwardAmount, api.AwardAmount)
+	cmpStr("UILink", csv.UILink, api.UILink)
+
+	// "Should match" fields — both sources populate, same underlying data
+	cmpStr("PopStreetAddress", csv.PopStreetAddress, api.PopStreetAddress)
+	cmpStr("PopCity", csv.PopCity, api.PopCity)
+	cmpStr("PopZip", csv.PopZip, api.PopZip)
+	cmpStr("OfficeCity", csv.OfficeCity, api.OfficeCity)
+	cmpStr("OfficeState", csv.OfficeState, api.OfficeState)
+	cmpStr("OfficeZip", csv.OfficeZip, api.OfficeZip)
+	cmpStr("OfficeCountry", csv.OfficeCountry, api.OfficeCountry)
+	cmpStr("PrimaryContactTitle", csv.PrimaryContactTitle, api.PrimaryContactTitle)
+	cmpStr("PrimaryContactFullname", csv.PrimaryContactFullname, api.PrimaryContactFullname)
+	cmpStr("PrimaryContactEmail", csv.PrimaryContactEmail, api.PrimaryContactEmail)
+	cmpStr("PrimaryContactPhone", csv.PrimaryContactPhone, api.PrimaryContactPhone)
+	cmpStr("PrimaryContactFax", csv.PrimaryContactFax, api.PrimaryContactFax)
+	cmpStr("SecondaryContactTitle", csv.SecondaryContactTitle, api.SecondaryContactTitle)
+	cmpStr("SecondaryContactFullname", csv.SecondaryContactFullname, api.SecondaryContactFullname)
+	cmpStr("SecondaryContactEmail", csv.SecondaryContactEmail, api.SecondaryContactEmail)
+	cmpStr("SecondaryContactPhone", csv.SecondaryContactPhone, api.SecondaryContactPhone)
+	cmpStr("SecondaryContactFax", csv.SecondaryContactFax, api.SecondaryContactFax)
+
+	// Org hierarchy — derived differently (CSV has explicit columns, API splits dot path)
+	cmpStr("Department", csv.Department, api.Department)
+	cmpStr("SubTier", csv.SubTier, api.SubTier)
+	cmpStr("Office", csv.Office, api.Office)
+	cmpStr("CGAC", csv.CGAC, api.CGAC)
+	cmpStr("FPDSCode", csv.FPDSCode, api.FPDSCode)
+	cmpStr("AACCode", csv.AACCode, api.AACCode)
+
+	merged := *csv
+
+	// Carry forward API-only awardee fields (no merging — keep both sides)
+	merged.AwardeeName = api.AwardeeName
+	merged.AwardeeUeiSAM = api.AwardeeUeiSAM
+	merged.AwardeeStreetAddress = api.AwardeeStreetAddress
+	merged.AwardeeCity = api.AwardeeCity
+	merged.AwardeeCityCode = api.AwardeeCityCode
+	merged.AwardeeState = api.AwardeeState
+	merged.AwardeeStateCode = api.AwardeeStateCode
+	merged.AwardeeCountry = api.AwardeeCountry
+	merged.AwardeeCountryCode = api.AwardeeCountryCode
+	merged.AwardeeZip = api.AwardeeZip
+
+	// Carry forward API-only fields
+	merged.MiddleTier = api.MiddleTier
+	merged.DescriptionURL = api.DescriptionURL
+	merged.PopCityCode = api.PopCityCode
+	merged.PopStateCode = api.PopStateCode
+	merged.PopCountryCode = api.PopCountryCode
+	merged.FullParentPathName = api.FullParentPathName
+	merged.FullParentPathCode = api.FullParentPathCode
+	merged.AdditionalInfoLink = api.AdditionalInfoLink
+	merged.ResourceLinks = api.ResourceLinks
+
+	return merged, mismatches
 }
 
 func parseDateField(rawValue, fieldName string, issues *[]DataQualityIssue) *time.Time {

@@ -109,25 +109,71 @@ var _ = Describe("FromCSV", func() {
 			csv := &reconcile.Opportunity{NoticeID: "REC-001", Title: "CSV Title"}
 			api := &reconcile.Opportunity{NoticeID: "REC-001", Title: "API Title"}
 
-			result := reconcile.ReconcileRecord(csv, api)
+			result, mismatches := reconcile.ReconcileRecord(csv, api)
 
 			Expect(result.Title).To(Equal("CSV Title"))
+			Expect(mismatches).To(HaveLen(1))
+			Expect(mismatches[0].FieldName).To(Equal("Title"))
+			Expect(mismatches[0].IssueType).To(Equal("field_mismatch"))
+			Expect(mismatches[0].CSVValue).To(Equal("CSV Title"))
+			Expect(mismatches[0].APIValue).To(Equal("API Title"))
 		})
 
-		It("returns CSV version when only CSV is present", func() {
+		It("reports missing_api when only CSV is present", func() {
 			csv := &reconcile.Opportunity{NoticeID: "REC-002", Title: "CSV Only"}
 
-			result := reconcile.ReconcileRecord(csv, nil)
+			result, mismatches := reconcile.ReconcileRecord(csv, nil)
 
 			Expect(result.Title).To(Equal("CSV Only"))
+			Expect(mismatches).To(HaveLen(1))
+			Expect(mismatches[0].IssueType).To(Equal("missing_api"))
+			Expect(mismatches[0].CSVValue).To(Equal("REC-002"))
 		})
 
-		It("returns API version when only API is present", func() {
+		It("reports missing_csv when only API is present", func() {
 			api := &reconcile.Opportunity{NoticeID: "REC-003", Title: "API Only"}
 
-			result := reconcile.ReconcileRecord(nil, api)
+			result, mismatches := reconcile.ReconcileRecord(nil, api)
 
 			Expect(result.Title).To(Equal("API Only"))
+			Expect(mismatches).To(HaveLen(1))
+			Expect(mismatches[0].IssueType).To(Equal("missing_csv"))
+			Expect(mismatches[0].APIValue).To(Equal("REC-003"))
+		})
+
+		It("reports no mismatches when fields match", func() {
+			csv := &reconcile.Opportunity{NoticeID: "REC-004", Title: "Same", Type: "Solicitation", NAICSCode: "541511"}
+			api := &reconcile.Opportunity{NoticeID: "REC-004", Title: "Same", Type: "Solicitation", NAICSCode: "541511"}
+
+			_, mismatches := reconcile.ReconcileRecord(csv, api)
+
+			Expect(mismatches).To(BeEmpty())
+		})
+
+		It("skips comparison when one side is empty", func() {
+			csv := &reconcile.Opportunity{NoticeID: "REC-005", NAICSCode: "541511"}
+			api := &reconcile.Opportunity{NoticeID: "REC-005", NAICSCode: ""}
+
+			_, mismatches := reconcile.ReconcileRecord(csv, api)
+
+			Expect(mismatches).To(BeEmpty())
+		})
+
+		It("reports multiple mismatches across fields", func() {
+			posted := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
+			postedDiff := time.Date(2026, 1, 16, 0, 0, 0, 0, time.UTC)
+			csv := &reconcile.Opportunity{NoticeID: "REC-006", Title: "A", Type: "X", PostedDate: &posted}
+			api := &reconcile.Opportunity{NoticeID: "REC-006", Title: "B", Type: "Y", PostedDate: &postedDiff}
+
+			_, mismatches := reconcile.ReconcileRecord(csv, api)
+
+			fields := make(map[string]bool)
+			for _, m := range mismatches {
+				fields[m.FieldName] = true
+			}
+			Expect(fields).To(HaveKey("Title"))
+			Expect(fields).To(HaveKey("Type"))
+			Expect(fields).To(HaveKey("PostedDate"))
 		})
 	})
 

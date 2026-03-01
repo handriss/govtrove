@@ -40,22 +40,9 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		ResourceLinks:      d.ResourceLinks,
 	}
 
-	if d.TypeOfSetAside != nil {
-		opp.SetAsideCode = *d.TypeOfSetAside
-	}
-	if d.TypeOfSetAsideDescription != nil {
-		opp.SetAsideDescription = *d.TypeOfSetAsideDescription
-	}
-	if d.AdditionalInfoLink != nil {
-		opp.AdditionalInfoLink = *d.AdditionalInfoLink
-	}
-
-	// Derive department/sub_tier/office from fullParentPathName (dot-separated hierarchy)
+	// Derive org hierarchy from dot-separated paths
 	if d.FullParentPathName != "" {
-		parts := strings.Split(d.FullParentPathName, ".")
-		for i := range parts {
-			parts[i] = strings.TrimSpace(parts[i])
-		}
+		parts := splitAndTrim(d.FullParentPathName)
 		if len(parts) >= 1 {
 			opp.Department = parts[0]
 		}
@@ -65,20 +52,31 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		if len(parts) >= 3 {
 			opp.Office = parts[len(parts)-1]
 		}
+		if len(parts) > 3 {
+			opp.MiddleTier = strings.Join(parts[2:len(parts)-1], ".")
+		}
 	}
-
-	// Derive org codes from fullParentPathCode
 	if d.FullParentPathCode != "" {
-		parts := strings.Split(d.FullParentPathCode, ".")
+		parts := splitAndTrim(d.FullParentPathCode)
 		if len(parts) >= 1 {
-			opp.CGAC = strings.TrimSpace(parts[0])
+			opp.CGAC = parts[0]
 		}
 		if len(parts) >= 2 {
-			opp.FPDSCode = strings.TrimSpace(parts[1])
+			opp.FPDSCode = parts[1]
 		}
 		if len(parts) >= 3 {
-			opp.AACCode = strings.TrimSpace(parts[len(parts)-1])
+			opp.AACCode = parts[len(parts)-1]
 		}
+	}
+
+	if d.TypeOfSetAside != nil {
+		opp.SetAsideCode = *d.TypeOfSetAside
+	}
+	if d.TypeOfSetAsideDescription != nil {
+		opp.SetAsideDescription = *d.TypeOfSetAsideDescription
+	}
+	if d.AdditionalInfoLink != nil {
+		opp.AdditionalInfoLink = *d.AdditionalInfoLink
 	}
 
 	// Place of performance
@@ -132,7 +130,33 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		opp.AwardDate = parseDateField(d.Award.Date, "AwardDate", &issues)
 		opp.AwardAmount = parse.Amount(d.Award.Amount)
 		opp.AwardeeName = d.Award.Awardee.Name
+		opp.AwardeeUeiSAM = d.Award.Awardee.UeiSAM
+
+		if loc := d.Award.Awardee.Location; loc != nil {
+			opp.AwardeeStreetAddress = loc.StreetAddress
+			if loc.City != nil {
+				opp.AwardeeCity = loc.City.Name
+				opp.AwardeeCityCode = loc.City.Code
+			}
+			if loc.State != nil {
+				opp.AwardeeState = loc.State.Name
+				opp.AwardeeStateCode = loc.State.Code
+			}
+			if loc.Country != nil {
+				opp.AwardeeCountry = loc.Country.Name
+				opp.AwardeeCountryCode = loc.Country.Code
+			}
+			opp.AwardeeZip = loc.Zip
+		}
 	}
 
 	return opp, issues
+}
+
+func splitAndTrim(s string) []string {
+	parts := strings.Split(s, ".")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
 }
