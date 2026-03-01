@@ -63,3 +63,10 @@ postgres_data/
 reference/
 *.zip
 api/ogpreview
+
+# Pipeline Lambda binaries
+pipeline/download-csvs
+pipeline/ingest-active
+pipeline/ingest-api
+pipeline/reconcile
+pipeline/generate-alerts
