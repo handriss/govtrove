@@ -58,20 +58,8 @@
         "file.$": "$$.Map.Item.Value"
       },
       "Iterator": {
-        "StartAt": "RouteByType",
+        "StartAt": "IngestActive",
         "States": {
-          "RouteByType": {
-            "Type": "Choice",
-            "Choices": [
-              {
-                "Variable": "$.file.type",
-                "StringEquals": "active",
-                "Next": "IngestActive"
-              }
-            ],
-            "Default": "IngestActive"
-          },
-
           "IngestActive": {
             "Type": "Task",
             "Resource": "arn:aws:states:::lambda:invoke",
