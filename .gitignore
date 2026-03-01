@@ -70,3 +70,4 @@ pipeline/ingest-active
 pipeline/ingest-api
 pipeline/reconcile
 pipeline/generate-alerts
+pipeline/cleanup-versions
