@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -86,29 +87,14 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 	for _, v := range valid {
 		o := v.opp
 		hash := v.hash
+		params := oppContentParams(o)
 
 		ex, exists := existing[o.NoticeID]
 
 		if !exists {
 			// New notice_id → INSERT version 1
-			batch.Queue(csvInsertSQL,
-				o.NoticeID, nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description),
-				nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),
-				o.PostedDate, o.ResponseDeadline, o.ArchiveDate, nilIfEmpty(o.ArchiveType), o.Active,
-				nilIfEmpty(o.SetAsideCode), nilIfEmpty(o.SetAsideDescription), nilIfEmpty(o.NAICSCode), nilIfEmpty(o.ClassificationCode),
-				nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
-				nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
-				nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
-				nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-				nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
-				nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
-				nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
-				nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
-				nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax),
-				nilIfEmpty(o.UILink),
-				1, true, hash,
-				runID, snapshotDate,
-			)
+			args := append(params, 1, true, hash, "csv", runID, snapshotDate)
+			batch.Queue(insertSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else if ex.ContentHash == hash {
 			// Same hash → metadata-only update (includes active flag which is excluded from hash)
@@ -120,40 +106,8 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else if ex.ContentHash == "" {
 			// Pre-migration row with no hash yet — backfill hash + update content, no new version
-			batch.Queue(`
-				UPDATE opportunities SET
-					solicitation_number = $1, title = $2, description = $3, type = $4, base_type = $5, organization_type = $6,
-					posted_date = $7, response_deadline = $8, archive_date = $9, archive_type = $10, active = $11,
-					set_aside_code = $12, set_aside_description = $13, naics_code = $14, classification_code = $15,
-					department = $16, sub_tier = $17, office = $18, cgac = $19, fpds_code = $20, aac_code = $21,
-					pop_street_address = $22, pop_city = $23, pop_state = $24, pop_zip = $25, pop_country = $26,
-					office_city = $27, office_state = $28, office_zip = $29, office_country = $30,
-					award_number = $31, award_date = $32, award_amount = $33, awardee = $34,
-					primary_contact_title = $35, primary_contact_fullname = $36, primary_contact_email = $37,
-					primary_contact_phone = $38, primary_contact_fax = $39,
-					secondary_contact_title = $40, secondary_contact_fullname = $41, secondary_contact_email = $42,
-					secondary_contact_phone = $43, secondary_contact_fax = $44,
-					ui_link = $45, content_hash = $46,
-					data_sources = CASE WHEN data_sources LIKE '%api%' THEN 'csv+api' ELSE 'csv' END,
-					last_csv_run_id = $47, last_seen_csv = $48
-				WHERE notice_id = $49 AND is_latest = true
-			`,
-				nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description),
-				nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),
-				o.PostedDate, o.ResponseDeadline, o.ArchiveDate, nilIfEmpty(o.ArchiveType), o.Active,
-				nilIfEmpty(o.SetAsideCode), nilIfEmpty(o.SetAsideDescription), nilIfEmpty(o.NAICSCode), nilIfEmpty(o.ClassificationCode),
-				nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
-				nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
-				nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
-				nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-				nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
-				nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
-				nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
-				nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
-				nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax),
-				nilIfEmpty(o.UILink), hash,
-				runID, snapshotDate, o.NoticeID,
-			)
+			args := append(params[1:], hash, runID, snapshotDate, o.NoticeID) // skip notice_id ($1 of insert)
+			batch.Queue(backfillSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else {
 			// Different hash → mark old as not-latest, insert new version
@@ -164,24 +118,8 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 			`, o.NoticeID)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID+":demote")
 
-			batch.Queue(csvInsertSQL,
-				o.NoticeID, nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description),
-				nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),
-				o.PostedDate, o.ResponseDeadline, o.ArchiveDate, nilIfEmpty(o.ArchiveType), o.Active,
-				nilIfEmpty(o.SetAsideCode), nilIfEmpty(o.SetAsideDescription), nilIfEmpty(o.NAICSCode), nilIfEmpty(o.ClassificationCode),
-				nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),
-				nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode),
-				nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState), nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),
-				nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry),
-				nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),
-				nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname), nilIfEmpty(o.PrimaryContactEmail),
-				nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax),
-				nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname), nilIfEmpty(o.SecondaryContactEmail),
-				nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax),
-				nilIfEmpty(o.UILink),
-				newVersion, true, hash,
-				runID, snapshotDate,
-			)
+			args := append(params, newVersion, true, hash, "csv", runID, snapshotDate)
+			batch.Queue(insertSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		}
 	}
@@ -208,41 +146,130 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 	return affected, failed, nil
 }
 
-const csvInsertSQL = `
+// oppContentParams builds the ordered content parameters for an Opportunity.
+// Used by both insertSQL and backfillSQL to avoid duplicating the param list.
+func oppContentParams(o reconcile.Opportunity) []interface{} {
+	return []interface{}{
+		o.NoticeID, nilIfEmpty(o.SolicitationNumber), nilIfEmpty(o.Title), nilIfEmpty(o.Description), // 1-4
+		nilIfEmpty(o.Type), nilIfEmpty(o.BaseType), nilIfEmpty(o.OrganizationType),                   // 5-7
+		o.PostedDate, o.ResponseDeadline, o.ArchiveDate, nilIfEmpty(o.ArchiveType), o.Active,         // 8-12
+		nilIfEmpty(o.SetAsideCode), nilIfEmpty(o.SetAsideDescription),                                // 13-14
+		nilIfEmpty(o.NAICSCode), nilIfEmpty(o.ClassificationCode),                                    // 15-16
+		nilIfEmpty(o.Department), nilIfEmpty(o.SubTier), nilIfEmpty(o.Office),                         // 17-19
+		nilIfEmpty(o.CGAC), nilIfEmpty(o.FPDSCode), nilIfEmpty(o.AACCode), nilIfEmpty(o.MiddleTier),  // 20-23
+		nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState),                 // 24-26
+		nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),                                               // 27-28
+		nilIfEmpty(o.PopCityCode), nilIfEmpty(o.PopStateCode), nilIfEmpty(o.PopCountryCode),          // 29-31
+		nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry), // 32-35
+		nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),                 // 36-39
+		nilIfEmpty(o.AwardeeName), nilIfEmpty(o.AwardeeUeiSAM), nilIfEmpty(o.AwardeeStreetAddress),   // 40-42
+		nilIfEmpty(o.AwardeeCity), nilIfEmpty(o.AwardeeCityCode),                                     // 43-44
+		nilIfEmpty(o.AwardeeState), nilIfEmpty(o.AwardeeStateCode),                                   // 45-46
+		nilIfEmpty(o.AwardeeCountry), nilIfEmpty(o.AwardeeCountryCode), nilIfEmpty(o.AwardeeZip),     // 47-49
+		nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname),                       // 50-51
+		nilIfEmpty(o.PrimaryContactEmail), nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax), // 52-54
+		nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname),                   // 55-56
+		nilIfEmpty(o.SecondaryContactEmail), nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax), // 57-59
+		nilIfEmpty(o.UILink), nilIfEmpty(o.AdditionalInfoLink), nilIfEmpty(o.DescriptionURL),          // 60-62
+		resourceLinksJSON(o.ResourceLinks),                                                            // 63
+		computeFullParentPathName(o), nilIfEmpty(o.FullParentPathCode),                                // 64-65
+	}
+}
+
+func resourceLinksJSON(links []string) interface{} {
+	if len(links) == 0 {
+		return nil
+	}
+	b, _ := json.Marshal(links)
+	return string(b)
+}
+
+func computeFullParentPathName(o reconcile.Opportunity) *string {
+	if o.FullParentPathName != "" {
+		return &o.FullParentPathName
+	}
+	var parts []string
+	if o.Department != "" {
+		parts = append(parts, o.Department)
+	}
+	if o.SubTier != "" {
+		parts = append(parts, o.SubTier)
+	}
+	if o.Office != "" {
+		parts = append(parts, o.Office)
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	s := strings.Join(parts, ".")
+	return &s
+}
+
+// insertSQL: 65 content params + version($66), is_latest($67), content_hash($68),
+// data_sources($69), last_csv_run_id($70), last_seen_csv($71)
+const insertSQL = `
 	INSERT INTO opportunities (
 		notice_id, solicitation_number, title, description, type, base_type, organization_type,
 		posted_date, response_deadline, archive_date, archive_type, active,
 		set_aside_code, set_aside_description, naics_code, classification_code,
-		department, sub_tier, office, cgac, fpds_code, aac_code,
+		department, sub_tier, office, cgac, fpds_code, aac_code, middle_tier,
 		pop_street_address, pop_city, pop_state, pop_zip, pop_country,
+		pop_city_code, pop_state_code, pop_country_code,
 		office_city, office_state, office_zip, office_country,
 		award_number, award_date, award_amount, awardee,
+		awardee_name, awardee_uei, awardee_street_address,
+		awardee_city, awardee_city_code, awardee_state, awardee_state_code,
+		awardee_country, awardee_country_code, awardee_zip,
 		primary_contact_title, primary_contact_fullname, primary_contact_email, primary_contact_phone, primary_contact_fax,
 		secondary_contact_title, secondary_contact_fullname, secondary_contact_email, secondary_contact_phone, secondary_contact_fax,
-		ui_link,
+		ui_link, additional_info_link, description_url, resource_links,
+		full_parent_path_name, full_parent_path_code,
 		version, is_latest, content_hash,
-		data_sources, last_csv_run_id, last_seen_csv,
-		full_parent_path_name
+		data_sources, last_csv_run_id, last_seen_csv
 	) VALUES (
 		$1, $2, $3, $4, $5, $6, $7,
 		$8, $9, $10, $11, $12,
 		$13, $14, $15, $16,
-		$17, $18, $19, $20, $21, $22,
-		$23, $24, $25, $26, $27,
-		$28, $29, $30, $31,
+		$17, $18, $19, $20, $21, $22, $23,
+		$24, $25, $26, $27, $28,
+		$29, $30, $31,
 		$32, $33, $34, $35,
-		$36, $37, $38, $39, $40,
-		$41, $42, $43, $44, $45,
-		$46,
+		$36, $37, $38, $39,
+		$40, $41, $42,
+		$43, $44, $45, $46,
 		$47, $48, $49,
-		'csv', $50, $51,
-		CASE
-			WHEN $19::text IS NOT NULL THEN CONCAT_WS('.', $17::text, $18::text, $19::text)
-			WHEN $18::text IS NOT NULL THEN CONCAT_WS('.', $17::text, $18::text)
-			WHEN $17::text IS NOT NULL THEN $17::text
-			ELSE NULL
-		END
+		$50, $51, $52, $53, $54,
+		$55, $56, $57, $58, $59,
+		$60, $61, $62, $63,
+		$64, $65,
+		$66, $67, $68,
+		$69, $70, $71
 	)`
+
+// backfillSQL: same content params (minus notice_id) + content_hash, run tracking, WHERE.
+// Params: content[2:65] as $1-$64, content_hash=$65, run_id=$66, seen=$67, notice_id=$68
+const backfillSQL = `
+	UPDATE opportunities SET
+		solicitation_number = $1, title = $2, description = $3, type = $4, base_type = $5, organization_type = $6,
+		posted_date = $7, response_deadline = $8, archive_date = $9, archive_type = $10, active = $11,
+		set_aside_code = $12, set_aside_description = $13, naics_code = $14, classification_code = $15,
+		department = $16, sub_tier = $17, office = $18, cgac = $19, fpds_code = $20, aac_code = $21, middle_tier = $22,
+		pop_street_address = $23, pop_city = $24, pop_state = $25, pop_zip = $26, pop_country = $27,
+		pop_city_code = $28, pop_state_code = $29, pop_country_code = $30,
+		office_city = $31, office_state = $32, office_zip = $33, office_country = $34,
+		award_number = $35, award_date = $36, award_amount = $37, awardee = $38,
+		awardee_name = $39, awardee_uei = $40, awardee_street_address = $41,
+		awardee_city = $42, awardee_city_code = $43, awardee_state = $44, awardee_state_code = $45,
+		awardee_country = $46, awardee_country_code = $47, awardee_zip = $48,
+		primary_contact_title = $49, primary_contact_fullname = $50, primary_contact_email = $51, primary_contact_phone = $52, primary_contact_fax = $53,
+		secondary_contact_title = $54, secondary_contact_fullname = $55, secondary_contact_email = $56, secondary_contact_phone = $57, secondary_contact_fax = $58,
+		ui_link = $59, additional_info_link = $60, description_url = $61, resource_links = $62,
+		full_parent_path_name = $63, full_parent_path_code = $64,
+		content_hash = $65,
+		data_sources = CASE WHEN data_sources LIKE '%api%' THEN 'csv+api' ELSE 'csv' END,
+		last_csv_run_id = $66, last_seen_csv = $67
+	WHERE notice_id = $68 AND is_latest = true
+`
 
 func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {
 	tag, err := db.pool.Exec(ctx, `
