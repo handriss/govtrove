@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -128,6 +130,28 @@ func (h *AdminHandler) ListSamgovRequests(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (h *AdminHandler) GetPipelineRunDetail(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "missing id", http.StatusBadRequest)
+		return
+	}
+
+	detail, err := h.pipelineRepo.GetPipelineRunDetail(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, repository.ErrPipelineRunNotFound) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		h.logger.Error("get pipeline run detail failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(detail)
+}
+
 func (h *AdminHandler) ListPipelineRuns(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
@@ -205,4 +229,150 @@ func (h *AdminHandler) GetApiKeyUsage(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"buckets": buckets,
 	})
+}
+
+func parseDQListParams(r *http.Request) (page, limit int, sort, order string, resolved *bool) {
+	page = 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	limit = 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
+			limit = v
+		}
+	}
+	sort = r.URL.Query().Get("sort")
+	order = r.URL.Query().Get("order")
+	if rv := r.URL.Query().Get("resolved"); rv != "" {
+		b := rv == "true"
+		resolved = &b
+	}
+	return
+}
+
+func (h *AdminHandler) ListDataQualityIssues(w http.ResponseWriter, r *http.Request) {
+	page, limit, sort, order, resolved := parseDQListParams(r)
+
+	items, total, err := h.pipelineRepo.ListDataQualityIssues(r.Context(), page, limit, sort, order, resolved)
+	if err != nil {
+		h.logger.Error("list data quality issues failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *AdminHandler) GetDataQualityDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	detail, err := h.pipelineRepo.GetDataQualityDetail(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get data quality detail failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(detail)
+}
+
+func (h *AdminHandler) UpdateDataQualityResolution(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		Resolved       bool   `json:"resolved"`
+		ResolutionNote string `json:"resolution_note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.pipelineRepo.UpdateDataQualityResolution(r.Context(), id, body.Resolved, body.ResolutionNote); err != nil {
+		h.logger.Error("update data quality resolution failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) ListReconcileDQIssues(w http.ResponseWriter, r *http.Request) {
+	page, limit, sort, order, resolved := parseDQListParams(r)
+
+	items, total, err := h.pipelineRepo.ListReconcileDQIssues(r.Context(), page, limit, sort, order, resolved)
+	if err != nil {
+		h.logger.Error("list reconcile dq issues failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"items": items,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *AdminHandler) GetReconcileDQDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	detail, err := h.pipelineRepo.GetReconcileDQDetail(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get reconcile dq detail failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(detail)
+}
+
+func (h *AdminHandler) UpdateReconcileDQResolution(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		Resolved       bool   `json:"resolved"`
+		ResolutionNote string `json:"resolution_note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.pipelineRepo.UpdateReconcileDQResolution(r.Context(), id, body.Resolved, body.ResolutionNote); err != nil {
+		h.logger.Error("update reconcile dq resolution failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

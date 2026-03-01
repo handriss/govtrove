@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Shield, Users, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, Key, Globe, BarChart3, Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { useAppAuth } from '../contexts/AuthContext';
+import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
-  getAdminUsers, getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
+  getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
-  type UsageBucket, type AdminPipelineRun, type AdminIngestionRun, type AdminSearchEvent,
+  type UsageBucket, type AdminPipelineRun, type AdminSearchEvent,
   type SearchAnalytics,
 } from '../services/api';
 import type { UserUpdate } from '../types/api';
@@ -427,7 +427,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
   const selectedKeyData = keys.find(k => k.key_hash === selectedKey);
 
   const chartData = buckets.map(b => ({
-    time: new Date(b.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    ts: b.timestamp,
     success: b.success,
     failed: b.failed,
   }));
@@ -480,7 +480,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
       {!loading && chartData.length > 0 && (
         <div className="rounded-xl border border-dark-700/50 p-4 bg-dark-800/20">
           <ResponsiveContainer width="100%" height={350}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} stackOffset="none">
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }} stackOffset="none">
               <defs>
                 <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -493,10 +493,24 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
               <XAxis
-                dataKey="time"
-                tick={{ fill: '#6b7280', fontSize: 11 }}
+                dataKey="ts"
                 tickLine={false}
                 interval="preserveStartEnd"
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                tick={(props: any) => {
+                  const { x, y, payload, index } = props;
+                  const d = new Date(payload.value);
+                  const time = d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' });
+                  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const prevDate = index > 0 ? new Date(chartData[index - 1].ts).toDateString() : '';
+                  const showDate = index === 0 || d.toDateString() !== prevDate;
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text x={0} y={12} textAnchor="middle" fill="#6b7280" fontSize={11}>{time}</text>
+                      {showDate && <text x={0} y={26} textAnchor="middle" fill="#9ca3af" fontSize={10}>{dateStr}</text>}
+                    </g>
+                  );
+                }}
               />
               <YAxis
                 tick={{ fill: '#6b7280', fontSize: 11 }}
@@ -505,6 +519,7 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
                 allowDecimals={false}
               />
               <Tooltip
+                labelFormatter={(val) => new Date(String(val)).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 contentStyle={{
                   backgroundColor: '#1f2937',
                   border: '1px solid rgba(255,255,255,0.1)',
@@ -552,12 +567,12 @@ function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
 }
 
 function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
+  const navigate = useNavigate();
   const [runs, setRuns] = useState<AdminPipelineRun[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [fullOnly, setFullOnly] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const limit = 20;
 
   const fetchPage = useCallback(async (p: number, full: boolean) => {
@@ -650,7 +665,6 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-dark-700/50 text-dark-400 text-left">
-                <th className="px-4 py-3 font-medium w-8"></th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Started</th>
                 <th className="px-4 py-3 font-medium">Duration</th>
@@ -660,59 +674,19 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
             </thead>
             <tbody>
               {runs.map((run) => {
-                const isExpanded = expandedId === run.id;
                 const ingestionRuns = run.ingestion_runs || [];
                 return (
-                  <Fragment key={run.id}>
                     <tr
-                      onClick={() => setExpandedId(isExpanded ? null : run.id)}
-                      className={`border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 cursor-pointer ${isExpanded ? 'bg-dark-800/20' : ''}`}
+                      key={run.id}
+                      onClick={() => navigate(`/admin/pipeline/${run.id}`)}
+                      className="border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 cursor-pointer"
                     >
-                      <td className="px-4 py-3 text-dark-500">
-                        {ingestionRuns.length > 0 && (isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
-                      </td>
                       <td className="px-4 py-3">{statusBadge(run.status)}</td>
                       <td className="px-4 py-3 text-dark-300 text-xs">{formatDateTime(run.started_at)}</td>
                       <td className="px-4 py-3 text-dark-300 text-xs">{formatDuration(run.duration_ms)}</td>
                       <td className="px-4 py-3 text-dark-400 text-xs">{ingestionRuns.length || '—'}</td>
                       <td className="px-4 py-3 text-red-400/80 text-xs max-w-xs truncate">{run.error_message ?? ''}</td>
                     </tr>
-                    {isExpanded && ingestionRuns.length > 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-3 bg-dark-800/30">
-                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {ingestionRuns.map((ir: AdminIngestionRun) => (
-                              <div key={ir.run_id} className="rounded-lg border border-dark-700/40 p-3 bg-dark-800/40">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-medium text-dark-200">{ir.job_type}</span>
-                                  {statusBadge(ir.status)}
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                                  <span className="text-dark-400">Fetched</span>
-                                  <span className="text-dark-200 text-right">{ir.records_fetched?.toLocaleString() ?? '—'}</span>
-                                  <span className="text-dark-400">Inserted</span>
-                                  <span className="text-dark-200 text-right">{ir.records_inserted?.toLocaleString() ?? '—'}</span>
-                                  <span className="text-dark-400">Updated</span>
-                                  <span className="text-dark-200 text-right">{ir.records_updated?.toLocaleString() ?? '—'}</span>
-                                  <span className="text-dark-400">Failed</span>
-                                  <span className={`text-right ${(ir.records_failed ?? 0) > 0 ? 'text-red-400' : 'text-dark-200'}`}>
-                                    {ir.records_failed?.toLocaleString() ?? '—'}
-                                  </span>
-                                  <span className="text-dark-400">Skipped</span>
-                                  <span className="text-dark-200 text-right">{ir.records_skipped?.toLocaleString() ?? '—'}</span>
-                                  <span className="text-dark-400">Duration</span>
-                                  <span className="text-dark-200 text-right">{formatDuration(ir.duration_ms)}</span>
-                                </div>
-                                {ir.error_message && (
-                                  <p className="mt-2 text-xs text-red-400/80 truncate">{ir.error_message}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
                 );
               })}
             </tbody>
@@ -954,93 +928,28 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
 type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches';
 
 export default function AdminPage() {
-  const { isAuthenticated, isLoading, getAccessToken } = useAppAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [denied, setDenied] = useState(false);
-
+  const [searchParams] = useSearchParams();
   const activeTab = (searchParams.get('tab') as Tab) || 'users';
-  const setActiveTab = (tab: Tab) => {
-    setSearchParams(tab === 'users' ? {} : { tab }, { replace: true });
-  };
-
-  useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      setDenied(true);
-      setLoading(false);
-      return;
-    }
-
-    (async () => {
-      try {
-        const token = await getAccessToken();
-        setUsers(await getAdminUsers(token));
-      } catch {
-        setDenied(true);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [isAuthenticated, isLoading, getAccessToken]);
-
-  if (loading || isLoading) {
-    return <div className="min-h-screen flex items-center justify-center" />;
-  }
-
-  if (denied) {
-    return <Navigate to="/" replace />;
-  }
-
-  const tabs: { key: Tab; label: string; icon: typeof Users }[] = [
-    { key: 'users', label: 'Users', icon: Users },
-    { key: 'notifications', label: 'Notifications', icon: Bell },
-    { key: 'api-keys', label: 'API Keys', icon: Key },
-    { key: 'samgov-requests', label: 'SAM.gov Requests', icon: Globe },
-    { key: 'usage', label: 'Usage Chart', icon: BarChart3 },
-    { key: 'pipeline', label: 'Pipeline', icon: Activity },
-    { key: 'searches', label: 'Searches', icon: Search },
-  ];
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6"
-        >
-          <ArrowLeft size={16} />
-          Back to search
-        </Link>
+    <AdminLayout>
+      <AdminPageContent activeTab={activeTab} />
+    </AdminLayout>
+  );
+}
 
-        <h1 className="text-2xl font-semibold text-dark-100 mb-6">Admin</h1>
+function AdminPageContent({ activeTab }: { activeTab: Tab }) {
+  const { users, getToken } = useAdminContext();
 
-        <nav className="flex gap-1 mb-8 border-b border-dark-700/50">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === key
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-dark-400 hover:text-dark-200'
-              }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
-        </nav>
-
-        {activeTab === 'users' && <UsersTab users={users} />}
-        {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getAccessToken} />}
-        {activeTab === 'api-keys' && <ApiKeysTab getToken={getAccessToken} />}
-        {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getAccessToken} />}
-        {activeTab === 'usage' && <UsageChartTab getToken={getAccessToken} />}
-        {activeTab === 'pipeline' && <PipelineRunsTab getToken={getAccessToken} />}
-        {activeTab === 'searches' && <SearchAnalyticsTab getToken={getAccessToken} />}
-      </div>
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-10">
+      {activeTab === 'users' && <UsersTab users={users} />}
+      {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getToken} />}
+      {activeTab === 'api-keys' && <ApiKeysTab getToken={getToken} />}
+      {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getToken} />}
+      {activeTab === 'usage' && <UsageChartTab getToken={getToken} />}
+      {activeTab === 'pipeline' && <PipelineRunsTab getToken={getToken} />}
+      {activeTab === 'searches' && <SearchAnalyticsTab getToken={getToken} />}
     </div>
   );
 }

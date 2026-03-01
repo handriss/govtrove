@@ -2,8 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -274,4 +277,460 @@ func (r *PipelineRepository) GetApiKeyUsage(ctx context.Context, keyHash string,
 		buckets = append(buckets, b)
 	}
 	return buckets, rows.Err()
+}
+
+// --- Data Quality ---
+
+type DataQualityRow struct {
+	ID             int64   `json:"id"`
+	NoticeID       string  `json:"notice_id"`
+	SnapshotDate   string  `json:"snapshot_date"`
+	Source         string  `json:"source"`
+	IssueType      string  `json:"issue_type"`
+	FieldName      *string `json:"field_name"`
+	FieldValue     *string `json:"field_value"`
+	Description    *string `json:"description"`
+	Resolved       bool    `json:"resolved"`
+	ResolvedAt     *string `json:"resolved_at"`
+	ResolutionNote *string `json:"resolution_note"`
+	CreatedAt      string  `json:"created_at"`
+}
+
+type ReconcileDQRow struct {
+	ID             int64   `json:"id"`
+	NoticeID       string  `json:"notice_id"`
+	SnapshotDate   string  `json:"snapshot_date"`
+	IssueType      string  `json:"issue_type"`
+	FieldName      string  `json:"field_name"`
+	CsvValue       *string `json:"csv_value"`
+	ApiValue       *string `json:"api_value"`
+	Resolved       bool    `json:"resolved"`
+	ResolvedAt     *string `json:"resolved_at"`
+	ResolutionNote *string `json:"resolution_note"`
+	CreatedAt      string  `json:"created_at"`
+}
+
+type DataQualityDetail struct {
+	DataQualityRow
+	OppTitle   *string `json:"opp_title"`
+	OppSolNum  *string `json:"opp_sol_num"`
+	OppType    *string `json:"opp_type"`
+	OppActive  *bool   `json:"opp_active"`
+	OppUILink  *string `json:"opp_ui_link"`
+}
+
+type ReconcileDQDetail struct {
+	ReconcileDQRow
+	OppTitle   *string `json:"opp_title"`
+	OppSolNum  *string `json:"opp_sol_num"`
+	OppType    *string `json:"opp_type"`
+	OppActive  *bool   `json:"opp_active"`
+	OppUILink  *string `json:"opp_ui_link"`
+}
+
+var dqSortColumns = map[string]string{
+	"date":       "dq.snapshot_date",
+	"notice_id":  "dq.notice_id",
+	"source":     "dq.source",
+	"issue_type": "dq.issue_type",
+	"field":      "dq.field_name",
+	"resolved":   "dq.resolved",
+	"created_at": "dq.created_at",
+}
+
+var reconcileDQSortColumns = map[string]string{
+	"date":       "dq.snapshot_date",
+	"notice_id":  "dq.notice_id",
+	"issue_type": "dq.issue_type",
+	"field":      "dq.field_name",
+	"resolved":   "dq.resolved",
+	"created_at": "dq.created_at",
+}
+
+func (r *PipelineRepository) ListDataQualityIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool) ([]DataQualityRow, int, error) {
+	where := ""
+	var args []any
+	if resolved != nil {
+		where = "WHERE dq.resolved = $1"
+		args = append(args, *resolved)
+	}
+
+	var total int
+	countQ := "SELECT COUNT(*) FROM pipeline.snap_data_quality dq " + where
+	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	col, ok := dqSortColumns[sort]
+	if !ok {
+		col = "dq.snapshot_date"
+	}
+	dir := "DESC"
+	if order == "asc" {
+		dir = "ASC"
+	}
+
+	offset := (page - 1) * limit
+	nextParam := len(args) + 1
+	query := fmt.Sprintf(`
+		SELECT dq.id, dq.notice_id, dq.snapshot_date, dq.source, dq.issue_type,
+		       dq.field_name, dq.field_value, dq.description, dq.resolved,
+		       dq.resolved_at, dq.resolution_note, dq.created_at
+		FROM pipeline.snap_data_quality dq
+		%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d
+	`, where, col, dir, nextParam, nextParam+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []DataQualityRow
+	for rows.Next() {
+		var row DataQualityRow
+		var snapDate, createdAt time.Time
+		var resolvedAt *time.Time
+		if err := rows.Scan(&row.ID, &row.NoticeID, &snapDate, &row.Source, &row.IssueType,
+			&row.FieldName, &row.FieldValue, &row.Description, &row.Resolved,
+			&resolvedAt, &row.ResolutionNote, &createdAt); err != nil {
+			return nil, 0, err
+		}
+		row.SnapshotDate = snapDate.Format(time.RFC3339)
+		row.CreatedAt = createdAt.Format(time.RFC3339)
+		if resolvedAt != nil {
+			s := resolvedAt.Format(time.RFC3339)
+			row.ResolvedAt = &s
+		}
+		items = append(items, row)
+	}
+	return items, total, rows.Err()
+}
+
+func (r *PipelineRepository) ListReconcileDQIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool) ([]ReconcileDQRow, int, error) {
+	where := ""
+	var args []any
+	if resolved != nil {
+		where = "WHERE dq.resolved = $1"
+		args = append(args, *resolved)
+	}
+
+	var total int
+	countQ := "SELECT COUNT(*) FROM pipeline.snap_reconcile_dq dq " + where
+	if err := r.pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	col, ok := reconcileDQSortColumns[sort]
+	if !ok {
+		col = "dq.snapshot_date"
+	}
+	dir := "DESC"
+	if order == "asc" {
+		dir = "ASC"
+	}
+
+	offset := (page - 1) * limit
+	nextParam := len(args) + 1
+	query := fmt.Sprintf(`
+		SELECT dq.id, dq.notice_id, dq.snapshot_date, dq.issue_type, dq.field_name,
+		       dq.csv_value, dq.api_value, dq.resolved,
+		       dq.resolved_at, dq.resolution_note, dq.created_at
+		FROM pipeline.snap_reconcile_dq dq
+		%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d
+	`, where, col, dir, nextParam, nextParam+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []ReconcileDQRow
+	for rows.Next() {
+		var row ReconcileDQRow
+		var snapDate, createdAt time.Time
+		var resolvedAt *time.Time
+		if err := rows.Scan(&row.ID, &row.NoticeID, &snapDate, &row.IssueType, &row.FieldName,
+			&row.CsvValue, &row.ApiValue, &row.Resolved,
+			&resolvedAt, &row.ResolutionNote, &createdAt); err != nil {
+			return nil, 0, err
+		}
+		row.SnapshotDate = snapDate.Format(time.RFC3339)
+		row.CreatedAt = createdAt.Format(time.RFC3339)
+		if resolvedAt != nil {
+			s := resolvedAt.Format(time.RFC3339)
+			row.ResolvedAt = &s
+		}
+		items = append(items, row)
+	}
+	return items, total, rows.Err()
+}
+
+func (r *PipelineRepository) GetDataQualityDetail(ctx context.Context, id int64) (*DataQualityDetail, error) {
+	var d DataQualityDetail
+	var snapDate, createdAt time.Time
+	var resolvedAt *time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT dq.id, dq.notice_id, dq.snapshot_date, dq.source, dq.issue_type,
+		       dq.field_name, dq.field_value, dq.description, dq.resolved,
+		       dq.resolved_at, dq.resolution_note, dq.created_at,
+		       o.title, o.solicitation_number, o.type, o.active, o.ui_link
+		FROM pipeline.snap_data_quality dq
+		LEFT JOIN opportunities o ON o.notice_id = dq.notice_id AND o.is_latest = true
+		WHERE dq.id = $1
+	`, id).Scan(
+		&d.ID, &d.NoticeID, &snapDate, &d.Source, &d.IssueType,
+		&d.FieldName, &d.FieldValue, &d.Description, &d.Resolved,
+		&resolvedAt, &d.ResolutionNote, &createdAt,
+		&d.OppTitle, &d.OppSolNum, &d.OppType, &d.OppActive, &d.OppUILink,
+	)
+	if err != nil {
+		return nil, err
+	}
+	d.SnapshotDate = snapDate.Format(time.RFC3339)
+	d.CreatedAt = createdAt.Format(time.RFC3339)
+	if resolvedAt != nil {
+		s := resolvedAt.Format(time.RFC3339)
+		d.ResolvedAt = &s
+	}
+	return &d, nil
+}
+
+func (r *PipelineRepository) GetReconcileDQDetail(ctx context.Context, id int64) (*ReconcileDQDetail, error) {
+	var d ReconcileDQDetail
+	var snapDate, createdAt time.Time
+	var resolvedAt *time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT dq.id, dq.notice_id, dq.snapshot_date, dq.issue_type, dq.field_name,
+		       dq.csv_value, dq.api_value, dq.resolved,
+		       dq.resolved_at, dq.resolution_note, dq.created_at,
+		       o.title, o.solicitation_number, o.type, o.active, o.ui_link
+		FROM pipeline.snap_reconcile_dq dq
+		LEFT JOIN opportunities o ON o.notice_id = dq.notice_id AND o.is_latest = true
+		WHERE dq.id = $1
+	`, id).Scan(
+		&d.ID, &d.NoticeID, &snapDate, &d.IssueType, &d.FieldName,
+		&d.CsvValue, &d.ApiValue, &d.Resolved,
+		&resolvedAt, &d.ResolutionNote, &createdAt,
+		&d.OppTitle, &d.OppSolNum, &d.OppType, &d.OppActive, &d.OppUILink,
+	)
+	if err != nil {
+		return nil, err
+	}
+	d.SnapshotDate = snapDate.Format(time.RFC3339)
+	d.CreatedAt = createdAt.Format(time.RFC3339)
+	if resolvedAt != nil {
+		s := resolvedAt.Format(time.RFC3339)
+		d.ResolvedAt = &s
+	}
+	return &d, nil
+}
+
+func (r *PipelineRepository) UpdateDataQualityResolution(ctx context.Context, id int64, resolved bool, note string) error {
+	var resolvedAt *time.Time
+	if resolved {
+		now := time.Now()
+		resolvedAt = &now
+	}
+	_, err := r.pool.Exec(ctx, `
+		UPDATE pipeline.snap_data_quality
+		SET resolved = $2, resolved_at = $3, resolution_note = $4
+		WHERE id = $1
+	`, id, resolved, resolvedAt, note)
+	return err
+}
+
+func (r *PipelineRepository) UpdateReconcileDQResolution(ctx context.Context, id int64, resolved bool, note string) error {
+	var resolvedAt *time.Time
+	if resolved {
+		now := time.Now()
+		resolvedAt = &now
+	}
+	_, err := r.pool.Exec(ctx, `
+		UPDATE pipeline.snap_reconcile_dq
+		SET resolved = $2, resolved_at = $3, resolution_note = $4
+		WHERE id = $1
+	`, id, resolved, resolvedAt, note)
+	return err
+}
+
+// --- Pipeline Run Detail ---
+
+type IngestionRunDetail struct {
+	RunID           string  `json:"run_id"`
+	JobType         string  `json:"job_type"`
+	Status          string  `json:"status"`
+	StartedAt       string  `json:"started_at"`
+	CompletedAt     *string `json:"completed_at"`
+	RecordsFetched  *int    `json:"records_fetched"`
+	RecordsInserted *int    `json:"records_inserted"`
+	RecordsUpdated  *int    `json:"records_updated"`
+	RecordsFailed   *int    `json:"records_failed"`
+	RecordsSkipped  *int    `json:"records_skipped"`
+	DurationMs      *int    `json:"duration_ms"`
+	ErrorMessage    *string `json:"error_message"`
+}
+
+type TableCounts struct {
+	SnapCSV          int `json:"snap_csv"`
+	SnapAPI          int `json:"snap_api"`
+	SnapDataQuality  int `json:"snap_data_quality"`
+	Disappearances   int `json:"snap_disappearances"`
+	ReconcileDQ      int `json:"snap_reconcile_dq"`
+}
+
+type OpportunityStats struct {
+	TotalAffected int `json:"total_affected"`
+	Inserted      int `json:"inserted"`
+	Updated       int `json:"updated"`
+	FromCSVOnly   int `json:"from_csv_only"`
+	FromAPI       int `json:"from_api"`
+	FromBoth      int `json:"from_both"`
+}
+
+type PipelineRunDetailResponse struct {
+	PipelineRun      PipelineRunRow     `json:"pipeline_run"`
+	IngestionRuns    []IngestionRunDetail `json:"ingestion_runs"`
+	TableCounts      TableCounts        `json:"table_counts"`
+	OpportunityStats OpportunityStats   `json:"opportunity_stats"`
+}
+
+var ErrPipelineRunNotFound = errors.New("pipeline run not found")
+
+func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string) (*PipelineRunDetailResponse, error) {
+	// Q1: pipeline run by ID
+	var run PipelineRunRow
+	var startedAt time.Time
+	var completedAt *time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, pipeline_name, status, started_at, completed_at, duration_ms, error_message
+		FROM pipeline.pipeline_runs WHERE id = $1
+	`, id).Scan(&run.ID, &run.PipelineName, &run.Status, &startedAt, &completedAt,
+		&run.DurationMs, &run.ErrorMessage)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPipelineRunNotFound
+		}
+		return nil, err
+	}
+	run.StartedAt = startedAt.Format(time.RFC3339)
+	if completedAt != nil {
+		s := completedAt.Format(time.RFC3339)
+		run.CompletedAt = &s
+	}
+
+	// Build reusable time-window args: $1=startedAt, optionally $2=completedAt
+	endExpr := "NOW()"
+	windowArgs := []any{startedAt}
+	if completedAt != nil {
+		endExpr = "$2"
+		windowArgs = append(windowArgs, *completedAt)
+	}
+
+	// Q2: ingestion runs in the time window
+	irQuery := fmt.Sprintf(`
+		SELECT run_id, job_type, status, started_at, completed_at,
+		       records_fetched, records_inserted, records_updated,
+		       records_failed, records_skipped, duration_ms, error_message
+		FROM pipeline.ingestion_runs
+		WHERE started_at BETWEEN $1 AND %s
+		ORDER BY started_at ASC
+	`, endExpr)
+	irRows, err := r.pool.Query(ctx, irQuery, windowArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer irRows.Close()
+
+	var ingestionRuns []IngestionRunDetail
+	for irRows.Next() {
+		var ir IngestionRunDetail
+		var sa time.Time
+		var ca *time.Time
+		if err := irRows.Scan(&ir.RunID, &ir.JobType, &ir.Status, &sa, &ca,
+			&ir.RecordsFetched, &ir.RecordsInserted, &ir.RecordsUpdated,
+			&ir.RecordsFailed, &ir.RecordsSkipped, &ir.DurationMs, &ir.ErrorMessage); err != nil {
+			return nil, err
+		}
+		ir.StartedAt = sa.Format(time.RFC3339)
+		if ca != nil {
+			s := ca.Format(time.RFC3339)
+			ir.CompletedAt = &s
+		}
+		ingestionRuns = append(ingestionRuns, ir)
+	}
+	if err := irRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Q3: table counts
+	tcQuery := fmt.Sprintf(`
+		WITH run_ids AS (
+			SELECT ir.run_id FROM pipeline.ingestion_runs ir
+			WHERE ir.started_at BETWEEN $1 AND %s
+		)
+		SELECT
+			(SELECT COUNT(*) FROM pipeline.snap_csv WHERE run_id IN (SELECT run_id FROM run_ids)),
+			(SELECT COUNT(*) FROM pipeline.snap_api WHERE run_id IN (SELECT run_id FROM run_ids)),
+			(SELECT COUNT(*) FROM pipeline.snap_data_quality WHERE run_id IN (SELECT run_id FROM run_ids)),
+			(SELECT COUNT(*) FROM pipeline.snap_disappearances WHERE run_id IN (SELECT run_id FROM run_ids)),
+			(SELECT COUNT(*) FROM pipeline.snap_reconcile_dq WHERE csv_run_id IN (SELECT run_id FROM run_ids) OR api_run_id IN (SELECT run_id FROM run_ids))
+	`, endExpr)
+	var tc TableCounts
+	if err := r.pool.QueryRow(ctx, tcQuery, windowArgs...).Scan(
+		&tc.SnapCSV, &tc.SnapAPI, &tc.SnapDataQuality, &tc.Disappearances, &tc.ReconcileDQ,
+	); err != nil {
+		return nil, err
+	}
+
+	// Q4: opportunity stats
+	osQuery := fmt.Sprintf(`
+		WITH run_ids AS (
+			SELECT ir.run_id FROM pipeline.ingestion_runs ir
+			WHERE ir.started_at BETWEEN $1 AND %s
+		)
+		SELECT
+			COUNT(*),
+			COUNT(*) FILTER (WHERE created_at >= $1),
+			COUNT(*) FILTER (WHERE created_at < $1)
+		FROM opportunities
+		WHERE last_csv_run_id IN (SELECT run_id FROM run_ids)
+	`, endExpr)
+	var oppStats OpportunityStats
+	if err := r.pool.QueryRow(ctx, osQuery, windowArgs...).Scan(
+		&oppStats.TotalAffected, &oppStats.Inserted, &oppStats.Updated,
+	); err != nil {
+		return nil, err
+	}
+
+	// from_both: notice_ids appearing in both snap_csv and snap_api
+	fbQuery := fmt.Sprintf(`
+		WITH run_ids AS (
+			SELECT ir.run_id FROM pipeline.ingestion_runs ir
+			WHERE ir.started_at BETWEEN $1 AND %s
+		)
+		SELECT COUNT(DISTINCT sa.notice_id)
+		FROM pipeline.snap_api sa
+		WHERE sa.run_id IN (SELECT run_id FROM run_ids)
+		  AND sa.notice_id IN (SELECT notice_id FROM pipeline.snap_csv WHERE run_id IN (SELECT run_id FROM run_ids))
+	`, endExpr)
+	if err := r.pool.QueryRow(ctx, fbQuery, windowArgs...).Scan(&oppStats.FromBoth); err != nil {
+		return nil, err
+	}
+	oppStats.FromAPI = tc.SnapAPI
+	oppStats.FromCSVOnly = oppStats.TotalAffected - oppStats.FromBoth
+
+	return &PipelineRunDetailResponse{
+		PipelineRun:      run,
+		IngestionRuns:    ingestionRuns,
+		TableCounts:      tc,
+		OpportunityStats: oppStats,
+	}, nil
 }
