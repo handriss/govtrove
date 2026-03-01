@@ -28,6 +28,7 @@ type MockStore struct {
 
 	GetSnapCSVRawDataFn              func(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssuesFn        func(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry)
+	InsertReconcileDQIssuesFn        func(ctx context.Context, csvRunID, apiRunID uuid.UUID, entries []database.ReconcileDQEntry)
 	UpsertOpportunitiesFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
 	MarkDisappearedInactiveFn           func(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunitiesFn func(ctx context.Context) (int, int, error)
@@ -146,6 +147,12 @@ func (m *MockStore) GetSnapCSVRawData(ctx context.Context, runID uuid.UUID) ([]m
 func (m *MockStore) InsertDataQualityIssues(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry) {
 	if m.InsertDataQualityIssuesFn != nil {
 		m.InsertDataQualityIssuesFn(ctx, runID, entries)
+	}
+}
+
+func (m *MockStore) InsertReconcileDQIssues(ctx context.Context, csvRunID, apiRunID uuid.UUID, entries []database.ReconcileDQEntry) {
+	if m.InsertReconcileDQIssuesFn != nil {
+		m.InsertReconcileDQIssuesFn(ctx, csvRunID, apiRunID, entries)
 	}
 }
 

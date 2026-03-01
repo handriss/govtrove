@@ -216,6 +216,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 
 	reconciled := make([]reconcile.Opportunity, 0, len(noticeIDs))
+	var reconcileDQ []database.ReconcileDQEntry
 	for id := range noticeIDs {
 		var csvPtr, apiPtr *reconcile.Opportunity
 		if opp, ok := csvOpps[id]; ok {
@@ -224,7 +225,28 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		if opp, ok := apiOpps[id]; ok {
 			apiPtr = &opp
 		}
-		reconciled = append(reconciled, reconcile.ReconcileRecord(csvPtr, apiPtr))
+		merged, mismatches := reconcile.ReconcileRecord(csvPtr, apiPtr)
+		reconciled = append(reconciled, merged)
+		for _, mm := range mismatches {
+			h.Logger.Warn("reconcile issue",
+				"notice_id", id, "issue_type", mm.IssueType,
+				"field", mm.FieldName,
+				"csv_value", mm.CSVValue, "api_value", mm.APIValue,
+			)
+			reconcileDQ = append(reconcileDQ, database.ReconcileDQEntry{
+				NoticeID:     id,
+				SnapshotDate: snapshotDate,
+				IssueType:    mm.IssueType,
+				FieldName:    mm.FieldName,
+				CSVValue:     mm.CSVValue,
+				APIValue:     mm.APIValue,
+			})
+		}
+	}
+
+	if len(reconcileDQ) > 0 {
+		h.Logger.Warn("reconcile mismatches found", "count", len(reconcileDQ))
+		h.Store.InsertReconcileDQIssues(ctx, activeRunID, apiRunID, reconcileDQ)
 	}
 
 	// 7. Upsert reconciled opportunities
