@@ -90,8 +90,8 @@ func init() {
 }
 
 type Input struct {
-	PipelineRunID string `json:"pipeline_run_id"`
-	File          struct {
+	ExecutionID string `json:"execution_id"`
+	File        struct {
 		Type   string `json:"type"`
 		S3Key  string `json:"s3_key"`
 		Source string `json:"source"`
@@ -136,18 +136,29 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 	h.Logger.Info("starting ingest-active", "s3_key", input.File.S3Key)
 
-	var pipelineRunID *uuid.UUID
-	if input.PipelineRunID != "" {
-		parsed, err := uuid.Parse(input.PipelineRunID)
+	var executionID *uuid.UUID
+	if input.ExecutionID != "" {
+		parsed, err := uuid.Parse(input.ExecutionID)
 		if err == nil {
-			pipelineRunID = &parsed
+			executionID = &parsed
+		}
+	}
+
+	// Pipeline step tracking
+	var stepID uuid.UUID
+	if executionID != nil {
+		sid, err := h.Store.CreatePipelineStep(ctx, *executionID, "ingest-active")
+		if err != nil {
+			h.Logger.Warn("failed to create pipeline step", "error", err)
+		} else {
+			stepID = sid
 		}
 	}
 
 	start := time.Now()
 	snapshotDate := time.Now().UTC()
 
-	runID, err := h.Store.CreateIngestionRun(ctx, jobType, pipelineRunID)
+	runID, err := h.Store.CreateIngestionRun(ctx, jobType, executionID)
 	if err != nil {
 		return nil, fmt.Errorf("create ingestion run: %w", err)
 	}
@@ -159,6 +170,9 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		if failErr := h.Store.FailIngestionRun(ctx, runID, err.Error(), durationMs); failErr != nil {
 			h.Logger.Error("failed to mark ingestion run as failed", "error", failErr)
 		}
+		if stepID != uuid.Nil {
+			_ = h.Store.FailPipelineStep(ctx, stepID, err.Error(), durationMs)
+		}
 		return nil, fmt.Errorf("ingest-active failed: %w", err)
 	}
 
@@ -167,6 +181,18 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		DurationMs: durationMs,
 	}); dbErr != nil {
 		h.Logger.Error("failed to complete ingestion run", "error", dbErr)
+	}
+
+	if stepID != uuid.Nil {
+		stepStats := map[string]any{
+			"records":      stats.recordCount,
+			"new":          stats.newRecords,
+			"changed":      stats.changedRecords,
+			"disappeared":  stats.disappearedRecords,
+		}
+		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
+			h.Logger.Warn("failed to complete pipeline step", "error", err)
+		}
 	}
 
 	h.Logger.Info("ingest-active complete",

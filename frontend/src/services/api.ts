@@ -440,53 +440,35 @@ export interface UsageBucket {
 
 // --- Pipeline Runs ---
 
-export interface AdminIngestionRun {
-  run_id: string;
-  job_type: string;
-  status: string;
-  records_fetched: number | null;
-  records_inserted: number | null;
-  records_updated: number | null;
-  records_failed: number | null;
-  records_skipped: number | null;
-  duration_ms: number | null;
-  error_message: string | null;
-}
-
-export interface AdminPipelineRun {
+export interface PipelineStep {
   id: string;
-  pipeline_name: string;
+  step_name: string;
   status: string;
   started_at: string;
   completed_at: string | null;
   duration_ms: number | null;
+  stats: Record<string, unknown> | null;
   error_message: string | null;
-  ingestion_runs: AdminIngestionRun[] | null;
 }
 
-export interface AdminPipelineRunsResponse {
-  runs: AdminPipelineRun[];
+export interface PipelineExecution {
+  execution_id: string;
+  status: 'completed' | 'failed' | 'running';
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  step_count: number;
+  steps: PipelineStep[];
+}
+
+export interface PipelineExecutionsResponse {
+  runs: PipelineExecution[];
   total: number;
   page: number;
   limit: number;
 }
 
 // --- Pipeline Run Detail ---
-
-export interface IngestionRunDetail {
-  run_id: string;
-  job_type: string;
-  status: string;
-  started_at: string;
-  completed_at: string | null;
-  records_fetched: number | null;
-  records_inserted: number | null;
-  records_updated: number | null;
-  records_failed: number | null;
-  records_skipped: number | null;
-  duration_ms: number | null;
-  error_message: string | null;
-}
 
 export interface TableCounts {
   snap_csv: number;
@@ -506,8 +488,12 @@ export interface OpportunityStats {
 }
 
 export interface PipelineRunDetailResponse {
-  pipeline_run: AdminPipelineRun;
-  ingestion_runs: IngestionRunDetail[];
+  execution_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  steps: PipelineStep[];
   table_counts: TableCounts;
   opportunity_stats: OpportunityStats;
 }
@@ -526,22 +512,13 @@ export async function getAdminPipelineRunDetail(
 export async function getAdminPipelineRuns(
   token: string,
   page = 1,
-  fullOnly = true,
-): Promise<AdminPipelineRunsResponse> {
+): Promise<PipelineExecutionsResponse> {
   const params = new URLSearchParams({ page: String(page) });
-  if (fullOnly) params.set('full_only', 'true');
   const response = await fetch(`${API_BASE}/admin/pipeline-runs?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(`${response.status}`);
-  const data = await response.json();
-  return {
-    ...data,
-    runs: (data.runs || []).map((r: AdminPipelineRun & { ingestion_runs: string | null }) => ({
-      ...r,
-      ingestion_runs: r.ingestion_runs ? (typeof r.ingestion_runs === 'string' ? JSON.parse(r.ingestion_runs) : r.ingestion_runs) : null,
-    })),
-  };
+  return response.json();
 }
 
 // --- Search Events ---

@@ -5,7 +5,7 @@ import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminPipelineRunDetail,
   type PipelineRunDetailResponse,
-  type IngestionRunDetail,
+  type PipelineStep,
   type TableCounts,
   type OpportunityStats,
 } from '../services/api';
@@ -36,12 +36,11 @@ function statusBadge(status: string) {
   }
 }
 
-function StepIcon({ status }: { status: 'completed' | 'failed' | 'running' | 'inferred' | 'none' }) {
+function StepIcon({ status }: { status: 'completed' | 'failed' | 'running' | 'none' }) {
   switch (status) {
     case 'completed': return <CheckCircle2 size={16} className="text-emerald-400" />;
     case 'failed': return <XCircle size={16} className="text-red-400" />;
     case 'running': return <Clock size={16} className="text-amber-400" />;
-    case 'inferred': return <CheckCircle2 size={16} className="text-emerald-400/50" />;
     case 'none': return <Minus size={16} className="text-dark-600" />;
   }
 }
@@ -49,7 +48,6 @@ function StepIcon({ status }: { status: 'completed' | 'failed' | 'running' | 'in
 function borderColor(status: string) {
   switch (status) {
     case 'completed':
-    case 'inferred':
       return 'border-l-emerald-500/60';
     case 'failed':
       return 'border-l-red-500/60';
@@ -60,14 +58,37 @@ function borderColor(status: string) {
   }
 }
 
-interface StepCardProps {
-  name: string;
-  status: 'completed' | 'failed' | 'running' | 'inferred' | 'none';
-  duration: string;
-  metrics?: string;
+const STEP_DISPLAY_NAMES: Record<string, string> = {
+  'download-csvs': 'Download CSVs',
+  'ingest-active': 'Ingest CSV',
+  'ingest-api': 'Ingest API',
+  'reconcile': 'Reconcile',
+  'generate-alerts': 'Generate Alerts',
+};
+
+const ALL_STEPS = ['download-csvs', 'ingest-active', 'ingest-api', 'reconcile', 'generate-alerts'];
+
+function formatStepStats(stats: Record<string, unknown> | null): string | undefined {
+  if (!stats) return undefined;
+  const parts: string[] = [];
+  for (const [key, val] of Object.entries(stats)) {
+    if (val != null && val !== 0) {
+      const label = key.replace(/_/g, ' ');
+      parts.push(`${label}: ${typeof val === 'number' ? val.toLocaleString() : String(val)}`);
+    }
+  }
+  return parts.join(' · ') || undefined;
 }
 
-function StepCard({ name, status, duration, metrics }: StepCardProps) {
+interface StepCardProps {
+  name: string;
+  status: 'completed' | 'failed' | 'running' | 'none';
+  duration: string;
+  metrics?: string;
+  error?: string | null;
+}
+
+function StepCard({ name, status, duration, metrics, error }: StepCardProps) {
   const dimmed = status === 'none';
   return (
     <div className={`rounded-lg border border-dark-700/40 border-l-4 ${borderColor(status)} p-3 bg-dark-800/40 ${dimmed ? 'opacity-40' : ''}`}>
@@ -79,6 +100,7 @@ function StepCard({ name, status, duration, metrics }: StepCardProps) {
         <span className="text-xs text-dark-400">{duration}</span>
       </div>
       {metrics && <p className="text-xs text-dark-400 mt-1.5 ml-6">{metrics}</p>}
+      {error && <p className="text-xs text-red-400/80 mt-1 ml-6 truncate">{error}</p>}
     </div>
   );
 }
@@ -101,67 +123,27 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-function FlowSection({ data }: { data: PipelineRunDetailResponse }) {
-  const { pipeline_run: pr, ingestion_runs: irs, table_counts: tc, opportunity_stats: os } = data;
-
-  const csvRun = irs.find((ir: IngestionRunDetail) => ir.job_type === 'snapshot-csv' || ir.job_type === 'active-csv' || ir.job_type.includes('csv'));
-  const apiRun = irs.find((ir: IngestionRunDetail) => ir.job_type === 'snapshot-api' || ir.job_type === 'api-enrich' || ir.job_type.includes('api'));
-
-  const pipelineOk = pr.status === 'completed';
-  const pipelineFailed = pr.status === 'failed';
-
-  function stepStatus(ir?: IngestionRunDetail): 'completed' | 'failed' | 'running' | 'inferred' | 'none' {
-    if (ir) return ir.status as 'completed' | 'failed' | 'running';
-    return 'none';
-  }
-
-  function inferredStatus(): 'completed' | 'failed' | 'inferred' | 'none' {
-    if (pipelineOk) return 'inferred';
-    if (pipelineFailed) return 'failed';
-    return 'none';
-  }
-
-  function irMetrics(ir?: IngestionRunDetail, tableName?: string, count?: number) {
-    if (!ir) return undefined;
-    const parts: string[] = [];
-    if (ir.records_fetched != null) parts.push(`fetched: ${ir.records_fetched.toLocaleString()}`);
-    if (count != null) parts.push(`${tableName}: ${count.toLocaleString()}`);
-    if ((ir.records_failed ?? 0) > 0) parts.push(`failed: ${ir.records_failed!.toLocaleString()}`);
-    return parts.join(' · ') || undefined;
-  }
-
-  const reconcileMetrics = [
-    tc.snap_data_quality > 0 && `DQ: ${tc.snap_data_quality}`,
-    tc.snap_reconcile_dq > 0 && `Reconcile DQ: ${tc.snap_reconcile_dq}`,
-    os.total_affected > 0 && `Opportunities: ${os.total_affected.toLocaleString()}`,
-  ].filter(Boolean).join(' · ') || undefined;
+function FlowSection({ steps }: { steps: PipelineStep[] }) {
+  const stepMap = new Map(steps.map(s => [s.step_name, s]));
 
   return (
     <div className="space-y-0">
-      <StepCard name="Download CSVs" status={inferredStatus()} duration="—" />
-      <Connector />
-      <StepCard
-        name="Ingest CSV"
-        status={stepStatus(csvRun)}
-        duration={formatDuration(csvRun?.duration_ms ?? null)}
-        metrics={irMetrics(csvRun, 'snap_csv', tc.snap_csv)}
-      />
-      <Connector />
-      <StepCard
-        name="Ingest API"
-        status={stepStatus(apiRun)}
-        duration={formatDuration(apiRun?.duration_ms ?? null)}
-        metrics={irMetrics(apiRun, 'snap_api', tc.snap_api)}
-      />
-      <Connector />
-      <StepCard
-        name="Reconcile"
-        status={inferredStatus()}
-        duration="—"
-        metrics={reconcileMetrics}
-      />
-      <Connector />
-      <StepCard name="Generate Alerts" status={inferredStatus()} duration="—" />
+      {ALL_STEPS.map((stepName, i) => {
+        const step = stepMap.get(stepName);
+        const status = (step?.status as 'completed' | 'failed' | 'running') ?? 'none';
+        return (
+          <div key={stepName}>
+            {i > 0 && <Connector />}
+            <StepCard
+              name={STEP_DISPLAY_NAMES[stepName] ?? stepName}
+              status={status}
+              duration={formatDuration(step?.duration_ms ?? null)}
+              metrics={formatStepStats(step?.stats ?? null)}
+              error={step?.error_message}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -229,7 +211,7 @@ function DetailContent() {
     );
   }
 
-  const { pipeline_run: pr, table_counts: tc, opportunity_stats: os } = data;
+  const failedSteps = data.steps.filter(s => s.status === 'failed');
 
   return (
     <div className="space-y-8">
@@ -241,36 +223,36 @@ function DetailContent() {
         </Link>
 
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-xl font-semibold text-dark-100">Pipeline Run</h1>
-          {statusBadge(pr.status)}
+          <h1 className="text-xl font-semibold text-dark-100">Pipeline Execution</h1>
+          {statusBadge(data.status)}
         </div>
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-dark-400">
-          <span>ID: <code className="text-dark-300">{pr.id.slice(0, 8)}</code></span>
-          <span>Started: {formatDateTime(pr.started_at)}</span>
-          {pr.completed_at && <span>Completed: {formatDateTime(pr.completed_at)}</span>}
-          <span>Duration: {formatDuration(pr.duration_ms)}</span>
+          <span>ID: <code className="text-dark-300">{data.execution_id.slice(0, 8)}</code></span>
+          <span>Started: {formatDateTime(data.started_at)}</span>
+          {data.completed_at && <span>Completed: {formatDateTime(data.completed_at)}</span>}
+          <span>Duration: {formatDuration(data.duration_ms)}</span>
         </div>
 
-        {pr.error_message && (
-          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-            {pr.error_message}
+        {failedSteps.length > 0 && failedSteps.map(s => (
+          <div key={s.id} className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400">
+            <span className="font-medium">{STEP_DISPLAY_NAMES[s.step_name] ?? s.step_name}:</span> {s.error_message}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Step Functions Flow */}
       <div>
         <h2 className="text-sm font-medium text-dark-300 mb-3">Step Functions Flow</h2>
         <div className="max-w-md">
-          <FlowSection data={data} />
+          <FlowSection steps={data.steps} />
         </div>
       </div>
 
       {/* Database Impact */}
       <div>
         <h2 className="text-sm font-medium text-dark-300 mb-3">Database Impact</h2>
-        <DatabaseImpact tc={tc} os={os} />
+        <DatabaseImpact tc={data.table_counts} os={data.opportunity_stats} />
       </div>
     </div>
   );

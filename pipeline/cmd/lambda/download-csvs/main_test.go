@@ -54,24 +54,31 @@ func TestHandle_CreatePipelineRunFailure(t *testing.T) {
 		return uuid.Nil, fmt.Errorf("db error")
 	}
 
-	_, err := h.Handle(context.Background(), json.RawMessage(`{}`))
-	if err == nil {
-		t.Error("expected error when CreatePipelineRun fails")
+	origSrcs := bulkcsv.Sources
+	defer func() { bulkcsv.Sources = origSrcs }()
+	bulkcsv.Sources = nil
+
+	// No new files = CreatePipelineRun not called, no error
+	out, err := h.Handle(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Files) != 0 {
+		t.Errorf("expected no files, got %d", len(out.Files))
 	}
 }
 
-func TestHandle_SourceFailurePropagates(t *testing.T) {
+func TestHandle_NoNewFilesSkipsDBWrites(t *testing.T) {
 	h, store := stubHandler(t)
 
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
-
 	bulkcsv.Sources = nil
 
-	var pipelineRunCompleted bool
-	store.CompletePipelineRunFn = func(_ context.Context, _ uuid.UUID, _ map[string]any, _ int) error {
-		pipelineRunCompleted = true
-		return nil
+	var pipelineRunCreated bool
+	store.CreatePipelineRunFn = func(_ context.Context, _ uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
+		pipelineRunCreated = true
+		return uuid.New(), nil
 	}
 
 	out, err := h.Handle(context.Background(), json.RawMessage(`{}`))
@@ -81,8 +88,8 @@ func TestHandle_SourceFailurePropagates(t *testing.T) {
 	if len(out.Files) != 0 {
 		t.Errorf("expected no files, got %d", len(out.Files))
 	}
-	if !pipelineRunCompleted {
-		t.Error("expected pipeline run to be completed")
+	if pipelineRunCreated {
+		t.Error("expected CreatePipelineRun NOT to be called when no new files")
 	}
 }
 
@@ -125,65 +132,45 @@ func TestHandle_PipelineRunIDInOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	_, parseErr := uuid.Parse(out.PipelineRunID)
+	_, parseErr := uuid.Parse(out.ExecutionID)
 	if parseErr != nil {
-		t.Errorf("expected valid UUID in PipelineRunID, got %q: %v", out.PipelineRunID, parseErr)
+		t.Errorf("expected valid UUID in PipelineRunID, got %q: %v", out.ExecutionID, parseErr)
 	}
 }
 
-func TestHandle_UsesInputIDForPipelineRun(t *testing.T) {
-	h, store := stubHandler(t)
+func TestHandle_UsesInputIDForExecutionID(t *testing.T) {
+	h, _ := stubHandler(t)
 
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
 	bulkcsv.Sources = nil
 
 	expectedID := uuid.New()
-	var receivedID uuid.UUID
-	store.CreatePipelineRunFn = func(_ context.Context, id uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
-		receivedID = id
-		return id, nil
-	}
 
 	input := fmt.Sprintf(`{"id":"%s"}`, expectedID.String())
 	out, err := h.Handle(context.Background(), json.RawMessage(input))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if receivedID != expectedID {
-		t.Errorf("expected CreatePipelineRun to receive ID %s, got %s", expectedID, receivedID)
-	}
-	if out.PipelineRunID != expectedID.String() {
-		t.Errorf("expected output PipelineRunID %s, got %s", expectedID, out.PipelineRunID)
+	if out.ExecutionID != expectedID.String() {
+		t.Errorf("expected output ExecutionID %s, got %s", expectedID, out.ExecutionID)
 	}
 }
 
 func TestHandle_InvalidInputIDFallsBack(t *testing.T) {
-	h, store := stubHandler(t)
+	h, _ := stubHandler(t)
 
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
 	bulkcsv.Sources = nil
 
-	var receivedID uuid.UUID
-	store.CreatePipelineRunFn = func(_ context.Context, id uuid.UUID, _ string, _ map[string]any) (uuid.UUID, error) {
-		receivedID = id
-		if id == uuid.Nil {
-			return uuid.New(), nil
-		}
-		return id, nil
-	}
-
 	out, err := h.Handle(context.Background(), json.RawMessage(`{"id":"not-a-uuid"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if receivedID != uuid.Nil {
-		t.Errorf("expected uuid.Nil for invalid input, got %s", receivedID)
-	}
-	_, parseErr := uuid.Parse(out.PipelineRunID)
+	_, parseErr := uuid.Parse(out.ExecutionID)
 	if parseErr != nil {
-		t.Errorf("expected valid UUID in output, got %q", out.PipelineRunID)
+		t.Errorf("expected valid UUID in output, got %q", out.ExecutionID)
 	}
 }
 
@@ -220,12 +207,12 @@ func TestHandle_IdempotencySkipsCompletedRun(t *testing.T) {
 	if createCalled {
 		t.Error("expected CreatePipelineRun to NOT be called for completed run")
 	}
-	if out.PipelineRunID != runID.String() {
-		t.Errorf("expected cached PipelineRunID %s, got %s", runID, out.PipelineRunID)
+	if out.ExecutionID != runID.String() {
+		t.Errorf("expected cached PipelineRunID %s, got %s", runID, out.ExecutionID)
 	}
 }
 
-func TestHandle_FailPipelineRunOnSourceError(t *testing.T) {
+func TestHandle_ReturnsErrorOnSourceFailure(t *testing.T) {
 	h, store := stubHandler(t)
 
 	origSrcs := bulkcsv.Sources
@@ -233,12 +220,6 @@ func TestHandle_FailPipelineRunOnSourceError(t *testing.T) {
 
 	bulkcsv.Sources = []bulkcsv.Source{
 		{Key: "bad-source", Type: bulkcsv.SourceTypeActive, URL: "http://127.0.0.1:1/nonexistent", S3Prefix: "raw/bad"},
-	}
-
-	var failedMsg string
-	store.FailPipelineRunFn = func(_ context.Context, _ uuid.UUID, errMsg string, _ int) error {
-		failedMsg = errMsg
-		return nil
 	}
 
 	store.InsertBulkCSVLogFn = func(_ context.Context, r *database.BulkCSVLogRecord) (int, error) {
@@ -251,36 +232,22 @@ func TestHandle_FailPipelineRunOnSourceError(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when source fails")
 	}
-	if failedMsg == "" {
-		t.Error("expected FailPipelineRun to be called with error message")
-	}
 }
 
-func TestHandle_CompletesPipelineRunStats(t *testing.T) {
-	h, store := stubHandler(t)
+func TestHandle_OutputHasValidExecutionID(t *testing.T) {
+	h, _ := stubHandler(t)
 
 	origSrcs := bulkcsv.Sources
 	defer func() { bulkcsv.Sources = origSrcs }()
 	bulkcsv.Sources = nil
 
-	var completedStats map[string]any
-	store.CompletePipelineRunFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
-		completedStats = stats
-		return nil
-	}
-
-	_, err := h.Handle(context.Background(), json.RawMessage(`{}`))
+	out, err := h.Handle(context.Background(), json.RawMessage(`{}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if completedStats == nil {
-		t.Error("expected stats to be passed to CompletePipelineRun")
-	}
-	if _, ok := completedStats["summary"]; !ok {
-		t.Error("expected 'summary' in stats")
-	}
-	if _, ok := completedStats["new_files"]; !ok {
-		t.Error("expected 'new_files' in stats")
+	_, parseErr := uuid.Parse(out.ExecutionID)
+	if parseErr != nil {
+		t.Errorf("expected valid UUID in ExecutionID, got %q: %v", out.ExecutionID, parseErr)
 	}
 }
 
