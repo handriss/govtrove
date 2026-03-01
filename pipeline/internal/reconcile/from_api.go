@@ -8,7 +8,12 @@ import (
 )
 
 // FromAPI maps a SAM.gov API OpportunityData to the canonical Opportunity struct.
-func FromAPI(d samgov.OpportunityData) Opportunity {
+// Returns data quality issues for unparseable or sentinel date values.
+func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
+	var issues []DataQualityIssue
+
+	archiveDate := parseDateField(d.ArchiveDate, "ArchiveDate", &issues)
+
 	opp := Opportunity{
 		NoticeID:           d.NoticeID,
 		SolicitationNumber: d.SolicitationNumber,
@@ -19,7 +24,7 @@ func FromAPI(d samgov.OpportunityData) Opportunity {
 
 		PostedDate:       parse.Date(d.PostedDate),
 		ResponseDeadline: parse.Date(d.ResponseDeadLine),
-		ArchiveDate:      parse.DateOnly(d.ArchiveDate),
+		ArchiveDate:      archiveDate,
 		ArchiveType:      d.ArchiveType,
 		Active:           parse.Active(d.Active),
 
@@ -124,10 +129,10 @@ func FromAPI(d samgov.OpportunityData) Opportunity {
 	// Award info
 	if d.Award != nil {
 		opp.AwardNumber = d.Award.Number
-		opp.AwardDate = parse.DateOnly(d.Award.Date)
+		opp.AwardDate = parseDateField(d.Award.Date, "AwardDate", &issues)
 		opp.AwardAmount = parse.Amount(d.Award.Amount)
 		opp.AwardeeName = d.Award.Awardee.Name
 	}
 
-	return opp
+	return opp, issues
 }
