@@ -207,14 +207,16 @@ func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
 	}
 
 	var mismatches []ReconcileMismatch
-	normalizeWS := func(s string) string {
-		return strings.TrimSpace(wsRun.ReplaceAllString(s, " "))
+	normalize := func(s string) string {
+		s = strings.TrimSpace(wsRun.ReplaceAllString(s, " "))
+		s = strings.ReplaceAll(s, "U.S.", "US")
+		return s
 	}
 	cmpStr := func(field, csvVal, apiVal string) {
 		if csvVal == "" || apiVal == "" {
 			return
 		}
-		if normalizeWS(csvVal) != normalizeWS(apiVal) {
+		if normalize(csvVal) != normalize(apiVal) {
 			mismatches = append(mismatches, ReconcileMismatch{FieldName: field, IssueType: "field_mismatch", CSVValue: csvVal, APIValue: apiVal})
 		}
 	}
