@@ -131,7 +131,7 @@ func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit i
 	if fullOnly {
 		countQuery += ` WHERE EXISTS (
 			SELECT 1 FROM pipeline.ingestion_runs ir
-			WHERE ir.started_at BETWEEN pipeline_runs.started_at AND COALESCE(pipeline_runs.completed_at, NOW())
+			WHERE ir.pipeline_run_id = pipeline_runs.id
 		)`
 	}
 
@@ -144,7 +144,7 @@ func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit i
 	if fullOnly {
 		fullOnlyClause = `WHERE EXISTS (
 			SELECT 1 FROM pipeline.ingestion_runs ir2
-			WHERE ir2.started_at BETWEEN pr.started_at AND COALESCE(pr.completed_at, NOW())
+			WHERE ir2.pipeline_run_id = pr.id
 		)`
 	}
 
@@ -165,7 +165,7 @@ func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit i
 		           'error_message', ir.error_message
 		       )) FILTER (WHERE ir.run_id IS NOT NULL)
 		       FROM pipeline.ingestion_runs ir
-		       WHERE ir.started_at BETWEEN pr.started_at AND COALESCE(pr.completed_at, NOW())
+		       WHERE ir.pipeline_run_id = pr.id
 		       )::text AS ingestion_runs
 		FROM pipeline.pipeline_runs pr
 		` + fullOnlyClause + `
@@ -626,24 +626,15 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 		run.CompletedAt = &s
 	}
 
-	// Build reusable time-window args: $1=startedAt, optionally $2=completedAt
-	endExpr := "NOW()"
-	windowArgs := []any{startedAt}
-	if completedAt != nil {
-		endExpr = "$2"
-		windowArgs = append(windowArgs, *completedAt)
-	}
-
-	// Q2: ingestion runs in the time window
-	irQuery := fmt.Sprintf(`
+	// Q2: ingestion runs linked via FK
+	irRows, err := r.pool.Query(ctx, `
 		SELECT run_id, job_type, status, started_at, completed_at,
 		       records_fetched, records_inserted, records_updated,
 		       records_failed, records_skipped, duration_ms, error_message
 		FROM pipeline.ingestion_runs
-		WHERE started_at BETWEEN $1 AND %s
+		WHERE pipeline_run_id = $1
 		ORDER BY started_at ASC
-	`, endExpr)
-	irRows, err := r.pool.Query(ctx, irQuery, windowArgs...)
+	`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -670,11 +661,11 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 		return nil, err
 	}
 
-	// Q3: table counts
-	tcQuery := fmt.Sprintf(`
+	// Q3: table counts using FK-linked run_ids
+	var tc TableCounts
+	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
-			SELECT ir.run_id FROM pipeline.ingestion_runs ir
-			WHERE ir.started_at BETWEEN $1 AND %s
+			SELECT run_id FROM pipeline.ingestion_runs WHERE pipeline_run_id = $1
 		)
 		SELECT
 			(SELECT COUNT(*) FROM pipeline.snap_csv WHERE run_id IN (SELECT run_id FROM run_ids)),
@@ -682,46 +673,40 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, id string
 			(SELECT COUNT(*) FROM pipeline.snap_data_quality WHERE run_id IN (SELECT run_id FROM run_ids)),
 			(SELECT COUNT(*) FROM pipeline.snap_disappearances WHERE run_id IN (SELECT run_id FROM run_ids)),
 			(SELECT COUNT(*) FROM pipeline.snap_reconcile_dq WHERE csv_run_id IN (SELECT run_id FROM run_ids) OR api_run_id IN (SELECT run_id FROM run_ids))
-	`, endExpr)
-	var tc TableCounts
-	if err := r.pool.QueryRow(ctx, tcQuery, windowArgs...).Scan(
+	`, id).Scan(
 		&tc.SnapCSV, &tc.SnapAPI, &tc.SnapDataQuality, &tc.Disappearances, &tc.ReconcileDQ,
 	); err != nil {
 		return nil, err
 	}
 
 	// Q4: opportunity stats
-	osQuery := fmt.Sprintf(`
+	var oppStats OpportunityStats
+	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
-			SELECT ir.run_id FROM pipeline.ingestion_runs ir
-			WHERE ir.started_at BETWEEN $1 AND %s
+			SELECT run_id FROM pipeline.ingestion_runs WHERE pipeline_run_id = $1
 		)
 		SELECT
 			COUNT(*),
-			COUNT(*) FILTER (WHERE created_at >= $1),
-			COUNT(*) FILTER (WHERE created_at < $1)
+			COUNT(*) FILTER (WHERE created_at >= $2),
+			COUNT(*) FILTER (WHERE created_at < $2)
 		FROM opportunities
 		WHERE last_csv_run_id IN (SELECT run_id FROM run_ids)
-	`, endExpr)
-	var oppStats OpportunityStats
-	if err := r.pool.QueryRow(ctx, osQuery, windowArgs...).Scan(
+	`, id, startedAt).Scan(
 		&oppStats.TotalAffected, &oppStats.Inserted, &oppStats.Updated,
 	); err != nil {
 		return nil, err
 	}
 
-	// from_both: notice_ids appearing in both snap_csv and snap_api
-	fbQuery := fmt.Sprintf(`
+	// from_both: notice_ids appearing in both snap_csv and snap_api for this pipeline run
+	if err := r.pool.QueryRow(ctx, `
 		WITH run_ids AS (
-			SELECT ir.run_id FROM pipeline.ingestion_runs ir
-			WHERE ir.started_at BETWEEN $1 AND %s
+			SELECT run_id FROM pipeline.ingestion_runs WHERE pipeline_run_id = $1
 		)
 		SELECT COUNT(DISTINCT sa.notice_id)
 		FROM pipeline.snap_api sa
 		WHERE sa.run_id IN (SELECT run_id FROM run_ids)
 		  AND sa.notice_id IN (SELECT notice_id FROM pipeline.snap_csv WHERE run_id IN (SELECT run_id FROM run_ids))
-	`, endExpr)
-	if err := r.pool.QueryRow(ctx, fbQuery, windowArgs...).Scan(&oppStats.FromBoth); err != nil {
+	`, id).Scan(&oppStats.FromBoth); err != nil {
 		return nil, err
 	}
 	oppStats.FromAPI = tc.SnapAPI
