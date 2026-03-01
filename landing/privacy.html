@@ -139,7 +139,7 @@
     <main class="content">
         <div class="container">
             <h1>Privacy Policy</h1>
-            <p class="last-updated">Last updated: February 23, 2026</p>
+            <p class="last-updated">Last updated: March 2, 2026</p>
 
             <div class="draft-callout">
                 Draft — This policy is under review and may change before public launch.
@@ -155,7 +155,6 @@
             <ul>
                 <li>Email address</li>
                 <li>Name (if provided)</li>
-                <li>Company or organization name (if provided)</li>
             </ul>
             <p>Authentication is handled by WorkOS. We do not store your password — WorkOS manages authentication credentials on our behalf.</p>
 
@@ -252,7 +251,7 @@
                         <td>United States</td>
                     </tr>
                     <tr>
-                        <td>Stripe</td>
+                        <td>Stripe (not yet active)</td>
                         <td>Payment processing</td>
                         <td>Email, name, payment details</td>
                         <td>United States</td>
@@ -268,6 +267,18 @@
                         <td>Database hosting (PostgreSQL)</td>
                         <td>All service data</td>
                         <td>United States</td>
+                    </tr>
+                    <tr>
+                        <td>Sentry</td>
+                        <td>Error tracking and performance monitoring</td>
+                        <td>Error stack traces, request metadata, IP address, browser/device info</td>
+                        <td>United States</td>
+                    </tr>
+                    <tr>
+                        <td>Cloudflare</td>
+                        <td>CDN, DDoS protection, and bot management for our API</td>
+                        <td>IP address, request headers, browser metadata</td>
+                        <td>Global (nearest edge location)</td>
                     </tr>
                     <tr>
                         <td>Counter.dev</td>
@@ -317,19 +328,17 @@
             Website: <a href="https://naih.hu" target="_blank" rel="noopener">https://naih.hu</a><br>
             Email: <a href="mailto:ugyfelszolgalat@naih.hu">ugyfelszolgalat@naih.hu</a></p>
 
-            <h2>8. Cookies</h2>
-            <p>GovTrove uses only strictly necessary cookies required for the Service to function:</p>
-            <ul>
-                <li><strong>Session cookies:</strong> Maintain your authenticated session while you use the Service. These are essential for the Service to work and expire when you close your browser or after a set period.</li>
-            </ul>
+            <h2>8. Cookies and Local Storage</h2>
+            <p>GovTrove does not use cookies for authentication or tracking. Instead, we store authentication tokens in your browser's <strong>localStorage</strong> to maintain your signed-in session. This data stays on your device and is not sent to third parties.</p>
+            <p>We also store minor user preferences (such as sort order and page size) in localStorage for convenience.</p>
             <p>We do not use:</p>
             <ul>
                 <li>Analytics or tracking cookies</li>
                 <li>Advertising or retargeting cookies</li>
                 <li>Third-party cookies</li>
-                <li>Any cookies that track your behavior across other websites</li>
+                <li>Any cookies or storage mechanisms that track your behavior across other websites</li>
             </ul>
-            <p>Because we only use strictly necessary cookies, we do not require your consent to set them under GDPR. However, we disclose their use here for transparency.</p>
+            <p>Cloudflare, which proxies our API traffic, may set strictly necessary cookies (such as <code>__cf_bm</code>) for bot detection purposes. These are first-party, short-lived cookies required for security and are not used for tracking.</p>
 
             <h2>9. Data Security</h2>
             <p>We implement appropriate technical and organizational measures to protect your personal data, including:</p>
