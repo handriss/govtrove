@@ -4,7 +4,7 @@
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	test test-e2e lambda-build \
 	ecr-login deploy-frontend deploy-landing deploy-api deploy-pipeline deploy-all \
-	run-pipeline pipeline-status pipeline-dlq-status \
+	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
 	clean
@@ -53,6 +53,7 @@ help:
 	@echo ""
 	@echo "Pipeline (production):"
 	@echo "  make run-pipeline                 - Manually trigger Step Functions pipeline"
+	@echo "  make run-pipeline-force           - Clear CSV cache and trigger pipeline (full re-download)"
 	@echo "  make pipeline-status              - Show recent pipeline executions"
 	@echo "  make pipeline-dlq-status          - Check DLQ depth"
 	@echo "  make logs-pipeline SVC=<name>     - Tail logs for pipeline Lambda"
@@ -308,6 +309,22 @@ deploy-all: deploy-api deploy-pipeline deploy-frontend deploy-landing
 # ============================================================================
 
 run-pipeline:
+	@echo "Starting Step Functions pipeline execution..."
+	@ARN=$$(cd infra/terraform && terraform output -raw pipeline_state_machine_arn) && \
+	aws stepfunctions start-execution \
+		--state-machine-arn $$ARN \
+		--profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "Pipeline execution started! Check status with 'make pipeline-status'"
+
+run-pipeline-force:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	@echo "Clearing CSV cache to force re-download..."
+	@psql "$(NEON_DATABASE_URL)" -c \
+		"DELETE FROM pipeline.bulk_csv_log WHERE id = (SELECT id FROM pipeline.bulk_csv_log WHERE source = 'active' ORDER BY checked_at DESC LIMIT 1);" && \
+	echo "Cache cleared."
 	@echo "Starting Step Functions pipeline execution..."
 	@ARN=$$(cd infra/terraform && terraform output -raw pipeline_state_machine_arn) && \
 	aws stepfunctions start-execution \
