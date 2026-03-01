@@ -16,12 +16,9 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		snapshotDate2 time.Time
 		snapshotDate3 time.Time
 
-		activeRunID1   uuid.UUID
-		archivedRunID1 uuid.UUID
-		activeRunID2   uuid.UUID
-		archivedRunID2 uuid.UUID
-		activeRunID3   uuid.UUID
-		archivedRunID3 uuid.UUID
+		activeRunID1 uuid.UUID
+		activeRunID2 uuid.UUID
+		activeRunID3 uuid.UUID
 	)
 
 	BeforeAll(func() {
@@ -42,15 +39,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			Expect(activeRunID1).NotTo(Equal(uuid.Nil))
 		})
 
-		It("ingests archived CSV with 3 records", func() {
-			var err error
-			archivedRunID1, err = simulateIngest(ctx, db, archivedCSV, "ingest-archived", snapshotDate1)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(archivedRunID1).NotTo(Equal(uuid.Nil))
-		})
-
 		It("reconciles and upserts opportunities", func() {
-			err := simulateReconcile(ctx, db, activeRunID1, []uuid.UUID{archivedRunID1}, snapshotDate1)
+			err := simulateReconcile(ctx, db, activeRunID1, snapshotDate1)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -58,16 +48,12 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			activeCount := queryCount(ctx,
 				"SELECT COUNT(*) FROM pipeline.snap_csv WHERE run_id = $1", activeRunID1)
 			Expect(activeCount).To(Equal(8))
-
-			archivedCount := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.snap_csv WHERE run_id = $1", archivedRunID1)
-			Expect(archivedCount).To(Equal(3))
 		})
 
-		It("has 2 completed ingestion runs", func() {
+		It("has 1 completed ingestion run", func() {
 			count := queryCount(ctx,
-				"SELECT COUNT(*) FROM pipeline.ingestion_runs WHERE status = 'completed' AND job_type IN ('snapshot-csv', 'ingest-archived')")
-			Expect(count).To(Equal(2))
+				"SELECT COUNT(*) FROM pipeline.ingestion_runs WHERE status = 'completed' AND job_type = 'snapshot-csv'")
+			Expect(count).To(Equal(1))
 		})
 
 		It("has no disappearances on first run", func() {
@@ -89,9 +75,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("creates correct opportunities", func() {
-			// Total: 8 active + 3 archived, but HAPPY-001 and WILL-DISAPPEAR overlap → 9 unique
 			total := queryCount(ctx, "SELECT COUNT(*) FROM opportunities")
-			Expect(total).To(Equal(9))
+			Expect(total).To(Equal(8))
 		})
 
 		It("upserts HAPPY-001 with correct fields", func() {
@@ -103,7 +88,7 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			).Scan(&title, &active, &postedDate)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(title).To(Equal("Test Solicitation"))
-			// Archived CSV runs second and overwrites with active=false
+			Expect(active).To(BeTrue())
 			Expect(postedDate).NotTo(BeNil())
 		})
 
@@ -139,14 +124,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ingests archived CSV run 2", func() {
-			var err error
-			archivedRunID2, err = simulateIngest(ctx, db, archivedCSV, "ingest-archived", snapshotDate2)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("reconciles run 2", func() {
-			err := simulateReconcile(ctx, db, activeRunID2, []uuid.UUID{archivedRunID2}, snapshotDate2)
+			err := simulateReconcile(ctx, db, activeRunID2, snapshotDate2)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -158,7 +137,6 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("detects WILL-CHANGE via content hash mismatch", func() {
-			// snap_csv should show hash difference between run 1 and run 2
 			count := queryCount(ctx,
 				`SELECT COUNT(*) FROM pipeline.snap_csv c
 				 JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
@@ -174,31 +152,26 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			Expect(count).To(Equal(2))
 		})
 
-		It("resolves WILL-DISAPPEAR disappearance as archived", func() {
-			var resolution *string
-			err := db.Pool().QueryRow(ctx,
-				"SELECT resolution FROM pipeline.snap_disappearances WHERE notice_id = 'WILL-DISAPPEAR' AND run_id = $1",
-				activeRunID2,
-			).Scan(&resolution)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resolution).NotTo(BeNil())
-			Expect(*resolution).To(Equal("archived"))
-		})
-
-		It("leaves WILL-GLITCH disappearance unresolved", func() {
-			var resolution *string
-			err := db.Pool().QueryRow(ctx,
-				"SELECT resolution FROM pipeline.snap_disappearances WHERE notice_id = 'WILL-GLITCH' AND run_id = $1",
-				activeRunID2,
-			).Scan(&resolution)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resolution).To(BeNil())
+		It("leaves both disappearances unresolved", func() {
+			count := queryCount(ctx,
+				"SELECT COUNT(*) FROM pipeline.snap_disappearances WHERE run_id = $1 AND resolution IS NULL",
+				activeRunID2)
+			Expect(count).To(Equal(2))
 		})
 
 		It("marks WILL-GLITCH as inactive in opportunities", func() {
 			var active bool
 			err := db.Pool().QueryRow(ctx,
 				"SELECT active FROM opportunities WHERE notice_id = 'WILL-GLITCH' AND is_latest = true",
+			).Scan(&active)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(active).To(BeFalse())
+		})
+
+		It("marks WILL-DISAPPEAR as inactive in opportunities", func() {
+			var active bool
+			err := db.Pool().QueryRow(ctx,
+				"SELECT active FROM opportunities WHERE notice_id = 'WILL-DISAPPEAR' AND is_latest = true",
 			).Scan(&active)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(active).To(BeFalse())
@@ -229,13 +202,13 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("adds BRAND-NEW to opportunities", func() {
-			// 9 original + 1 BRAND-NEW + 1 WILL-CHANGE v2 = 11 total rows
+			// 8 original + 1 BRAND-NEW + 1 WILL-CHANGE v2 = 10 total rows
 			total := queryCount(ctx, "SELECT COUNT(*) FROM opportunities")
-			Expect(total).To(Equal(11))
+			Expect(total).To(Equal(10))
 
-			// 10 latest versions (WILL-CHANGE v1 is not latest)
+			// 9 latest versions (WILL-CHANGE v1 is not latest)
 			latestCount := queryCount(ctx, "SELECT COUNT(*) FROM opportunities WHERE is_latest = true")
-			Expect(latestCount).To(Equal(10))
+			Expect(latestCount).To(Equal(9))
 
 			var title string
 			err := db.Pool().QueryRow(ctx,
@@ -256,14 +229,8 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("ingests archived CSV run 3", func() {
-			var err error
-			archivedRunID3, err = simulateIngest(ctx, db, archivedCSV, "ingest-archived", snapshotDate3)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("reconciles run 3", func() {
-			err := simulateReconcile(ctx, db, activeRunID3, []uuid.UUID{archivedRunID3}, snapshotDate3)
+			err := simulateReconcile(ctx, db, activeRunID3, snapshotDate3)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -296,12 +263,12 @@ var _ = Describe("Pipeline E2E", Ordered, func() {
 		})
 
 		It("maintains correct total opportunity count", func() {
-			// 11 total rows (including WILL-CHANGE v1), 10 with is_latest=true
+			// 10 total rows (including WILL-CHANGE v1), 9 with is_latest=true
 			total := queryCount(ctx, "SELECT COUNT(*) FROM opportunities")
-			Expect(total).To(Equal(11))
+			Expect(total).To(Equal(10))
 
 			latestCount := queryCount(ctx, "SELECT COUNT(*) FROM opportunities WHERE is_latest = true")
-			Expect(latestCount).To(Equal(10))
+			Expect(latestCount).To(Equal(9))
 		})
 	})
 })

@@ -56,7 +56,7 @@ help:
 	@echo "  make pipeline-status              - Show recent pipeline executions"
 	@echo "  make pipeline-dlq-status          - Check DLQ depth"
 	@echo "  make logs-pipeline SVC=<name>     - Tail logs for pipeline Lambda"
-	@echo "  (Lambda functions: download-csvs, ingest-active, ingest-archived, reconcile, generate-alerts)"
+	@echo "  (Lambda functions: download-csvs, ingest-active, reconcile, generate-alerts, ingest-api)"
 	@echo ""
 	@echo "Database:"
 	@echo "  make migrate-up       - Run migrations (local DB)"
@@ -223,7 +223,7 @@ frontend-build:
 # Build
 # ============================================================================
 
-LAMBDA_FUNCTIONS := download-csvs ingest-active ingest-archived reconcile generate-alerts ingest-api
+LAMBDA_FUNCTIONS := download-csvs ingest-active reconcile generate-alerts ingest-api
 
 test:
 	cd pipeline && go test -v ./...
@@ -339,7 +339,7 @@ pipeline-dlq-status:
 # ============================================================================
 
 logs-pipeline:
-	@if [ -z "$(SVC)" ]; then echo "Usage: make logs-pipeline SVC=<name>"; echo "Functions: download-csvs, ingest-active, ingest-archived, reconcile"; exit 1; fi
+	@if [ -z "$(SVC)" ]; then echo "Usage: make logs-pipeline SVC=<name>"; echo "Functions: download-csvs, ingest-active, reconcile, generate-alerts, ingest-api"; exit 1; fi
 	aws logs tail /aws/lambda/govtrove-$(SVC) --follow --profile $(AWS_PROFILE) --region $(AWS_REGION)
 
 logs-api:

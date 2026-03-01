@@ -87,15 +87,9 @@ func TestHandle_SourceFailurePropagates(t *testing.T) {
 }
 
 func TestHandle_OutputFilesFromResults(t *testing.T) {
-	// Verify source type propagation through File output
 	f := File{Source: "active", Type: string(bulkcsv.SourceTypeActive)}
 	if f.Type != "active" {
 		t.Errorf("expected type active, got %q", f.Type)
-	}
-
-	f2 := File{Source: "archived_fy2026", Type: string(bulkcsv.SourceTypeArchived)}
-	if f2.Type != "archived" {
-		t.Errorf("expected type archived, got %q", f2.Type)
 	}
 }
 
@@ -106,8 +100,6 @@ func TestHandle_FileTypeClassification(t *testing.T) {
 		wantType   string
 	}{
 		{"active", bulkcsv.SourceTypeActive, "active"},
-		{"archived_fy2026", bulkcsv.SourceTypeArchived, "archived"},
-		{"archived_fy2025", bulkcsv.SourceTypeArchived, "archived"},
 	}
 
 	for _, c := range cases {

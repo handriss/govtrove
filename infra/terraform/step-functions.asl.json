@@ -67,11 +67,6 @@
                 "Variable": "$.file.type",
                 "StringEquals": "active",
                 "Next": "IngestActive"
-              },
-              {
-                "Variable": "$.file.type",
-                "StringEquals": "archived",
-                "Next": "IngestArchived"
               }
             ],
             "Default": "IngestActive"
@@ -82,29 +77,6 @@
             "Resource": "arn:aws:states:::lambda:invoke",
             "Parameters": {
               "FunctionName": "${ingest_active_arn}",
-              "Payload.$": "$"
-            },
-            "ResultSelector": {
-              "status.$": "$.Payload.status",
-              "run_id.$": "$.Payload.run_id",
-              "job_type.$": "$.Payload.job_type"
-            },
-            "Retry": [
-              {
-                "ErrorEquals": ["States.ALL"],
-                "MaxAttempts": 3,
-                "IntervalSeconds": 30,
-                "BackoffRate": 2.0
-              }
-            ],
-            "End": true
-          },
-
-          "IngestArchived": {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "Parameters": {
-              "FunctionName": "${ingest_archived_arn}",
               "Payload.$": "$"
             },
             "ResultSelector": {

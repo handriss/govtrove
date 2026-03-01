@@ -230,7 +230,6 @@ func TestFormatSummary_Empty(t *testing.T) {
 func TestFormatSummary_MixedOutcomes(t *testing.T) {
 	results := []SourceResult{
 		{Source: "active", Outcome: "new_file", Size: 5242880, Rows: 10000},
-		{Source: "archived", Outcome: "not_modified"},
 		{Source: "bad", Outcome: "error"},
 	}
 	summary := FormatSummary(results)
@@ -239,9 +238,6 @@ func TestFormatSummary_MixedOutcomes(t *testing.T) {
 	}
 	if !strings.Contains(summary, "10000 rows") {
 		t.Error("missing row count")
-	}
-	if !strings.Contains(summary, "archived: not_modified") {
-		t.Error("missing archived not_modified")
 	}
 	if !strings.Contains(summary, "bad: error") {
 		t.Error("missing bad error")

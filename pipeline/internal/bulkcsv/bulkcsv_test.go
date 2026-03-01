@@ -281,13 +281,11 @@ var _ = Describe("BulkCSV Download", func() {
 		It("builds a human-readable summary", func() {
 			results := []SourceResult{
 				{Source: "active", Outcome: "new_file", Size: 10 * 1024 * 1024, Rows: 50000},
-				{Source: "archived", Outcome: "not_modified"},
 			}
 			summary := FormatSummary(results)
 
 			Expect(summary).To(ContainSubstring("active: new_file"))
 			Expect(summary).To(ContainSubstring("50000 rows"))
-			Expect(summary).To(ContainSubstring("archived: not_modified"))
 		})
 	})
 })

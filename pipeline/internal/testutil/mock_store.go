@@ -29,11 +29,11 @@ type MockStore struct {
 	GetSnapCSVRawDataFn              func(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssuesFn        func(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry)
 	UpsertOpportunitiesFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
-	ResolveExpectedDisappearancesFn  func(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error)
-	MarkDisappearedInactiveFn        func(ctx context.Context, runID uuid.UUID) (int, error)
+	MarkDisappearedInactiveFn           func(ctx context.Context, runID uuid.UUID) (int, error)
+	DeactivateExpiredOpportunitiesFn func(ctx context.Context) (int, int, error)
 
-	BulkInsertSnapAPIFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error)
-	UpsertOpportunitiesFromAPIFn   func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
+	BulkInsertSnapAPIFn func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error)
+	GetSnapAPIRawDataFn func(ctx context.Context, runID uuid.UUID) ([]database.SnapAPIRawRow, error)
 
 	InsertBulkCSVLogFn        func(ctx context.Context, r *database.BulkCSVLogRecord) (int, error)
 	GetLatestBulkCSVHashFn    func(ctx context.Context, source string) (string, error)
@@ -156,18 +156,18 @@ func (m *MockStore) UpsertOpportunities(ctx context.Context, runID uuid.UUID, sn
 	return len(opps), nil
 }
 
-func (m *MockStore) ResolveExpectedDisappearances(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error) {
-	if m.ResolveExpectedDisappearancesFn != nil {
-		return m.ResolveExpectedDisappearancesFn(ctx, activeRunID, archivedRunID, snapshotDate)
-	}
-	return 0, nil
-}
-
 func (m *MockStore) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {
 	if m.MarkDisappearedInactiveFn != nil {
 		return m.MarkDisappearedInactiveFn(ctx, runID)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) DeactivateExpiredOpportunities(ctx context.Context) (int, int, error) {
+	if m.DeactivateExpiredOpportunitiesFn != nil {
+		return m.DeactivateExpiredOpportunitiesFn(ctx)
+	}
+	return 0, 0, nil
 }
 
 func (m *MockStore) BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error) {
@@ -177,11 +177,11 @@ func (m *MockStore) BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snap
 	return int64(len(rows)), nil
 }
 
-func (m *MockStore) UpsertOpportunitiesFromAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error) {
-	if m.UpsertOpportunitiesFromAPIFn != nil {
-		return m.UpsertOpportunitiesFromAPIFn(ctx, runID, snapshotDate, opps)
+func (m *MockStore) GetSnapAPIRawData(ctx context.Context, runID uuid.UUID) ([]database.SnapAPIRawRow, error) {
+	if m.GetSnapAPIRawDataFn != nil {
+		return m.GetSnapAPIRawDataFn(ctx, runID)
 	}
-	return len(opps), nil
+	return nil, nil
 }
 
 func (m *MockStore) InsertBulkCSVLog(ctx context.Context, r *database.BulkCSVLogRecord) (int, error) {

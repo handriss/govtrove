@@ -32,12 +32,12 @@ type Store interface {
 	GetSnapCSVRawData(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssues(ctx context.Context, runID uuid.UUID, entries []DataQualityEntry)
 	UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
-	ResolveExpectedDisappearances(ctx context.Context, activeRunID, archivedRunID uuid.UUID, snapshotDate time.Time) (int, error)
 	MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error)
+	DeactivateExpiredOpportunities(ctx context.Context) (int, int, error)
 
 	// API snapshot operations
 	BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []SnapAPIRow) (int64, error)
-	UpsertOpportunitiesFromAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
+	GetSnapAPIRawData(ctx context.Context, runID uuid.UUID) ([]SnapAPIRawRow, error)
 
 	// Bulk CSV log
 	InsertBulkCSVLog(ctx context.Context, r *BulkCSVLogRecord) (int, error)

@@ -17,7 +17,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/handriss/govtrove/pipeline/internal/config"
 	"github.com/handriss/govtrove/pipeline/internal/database"
-	"github.com/handriss/govtrove/pipeline/internal/reconcile"
 	"github.com/handriss/govtrove/pipeline/internal/samgov"
 )
 
@@ -228,28 +227,13 @@ func (h *Handler) runPipeline(ctx context.Context, runID uuid.UUID, snapshotDate
 			})
 		}
 
-		// Bulk insert snapshots
+		// Bulk insert snapshots (reconcile Lambda handles upsert to opportunities)
 		if len(snapRows) > 0 {
 			inserted, snapErr := h.Store.BulkInsertSnapAPI(ctx, runID, snapshotDate, snapRows)
 			if snapErr != nil {
 				return totalFetched, totalUpserted, fmt.Errorf("bulk insert snap_api for %s-%s: %w", postedFrom, postedTo, snapErr)
 			}
 			h.Logger.Info("snap_api rows inserted", "count", inserted)
-		}
-
-		// Map to Opportunity and upsert
-		mapped := make([]reconcile.Opportunity, 0, len(opps))
-		for _, opp := range opps {
-			mapped = append(mapped, reconcile.FromAPI(opp))
-		}
-
-		if len(mapped) > 0 {
-			upserted, upsertErr := h.Store.UpsertOpportunitiesFromAPI(ctx, runID, snapshotDate, mapped)
-			if upsertErr != nil {
-				return totalFetched, totalUpserted, fmt.Errorf("upsert opportunities for %s-%s: %w", postedFrom, postedTo, upsertErr)
-			}
-			totalUpserted += upserted
-			h.Logger.Info("opportunities upserted", "count", upserted)
 		}
 	}
 

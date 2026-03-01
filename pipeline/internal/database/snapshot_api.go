@@ -33,6 +33,32 @@ func (db *DB) BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDa
 	return copyCount, nil
 }
 
+type SnapAPIRawRow struct {
+	NoticeID string
+	RawData  json.RawMessage
+}
+
+func (db *DB) GetSnapAPIRawData(ctx context.Context, runID uuid.UUID) ([]SnapAPIRawRow, error) {
+	rows, err := db.pool.Query(ctx,
+		`SELECT notice_id, raw_data FROM pipeline.snap_api WHERE run_id = $1`,
+		runID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query snap_api raw_data: %w", err)
+	}
+	defer rows.Close()
+
+	var result []SnapAPIRawRow
+	for rows.Next() {
+		var r SnapAPIRawRow
+		if err := rows.Scan(&r.NoticeID, &r.RawData); err != nil {
+			return nil, fmt.Errorf("scan snap_api row: %w", err)
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 type snapAPICopySource struct {
 	rows         []SnapAPIRow
 	runID        uuid.UUID
