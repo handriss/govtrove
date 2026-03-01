@@ -11,6 +11,7 @@ locals {
 
   lambda_memory_overrides = {
     "ingest-active" = 512
+    "reconcile"     = 3008
   }
 }
 

@@ -253,11 +253,6 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		merged, mismatches := reconcile.ReconcileRecord(csvPtr, apiPtr)
 		reconciled = append(reconciled, merged)
 		for _, mm := range mismatches {
-			h.Logger.Warn("reconcile issue",
-				"notice_id", id, "issue_type", mm.IssueType,
-				"field", mm.FieldName,
-				"csv_value", mm.CSVValue, "api_value", mm.APIValue,
-			)
 			reconcileDQ = append(reconcileDQ, database.ReconcileDQEntry{
 				NoticeID:     id,
 				SnapshotDate: snapshotDate,
