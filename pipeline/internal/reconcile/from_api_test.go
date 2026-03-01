@@ -22,7 +22,7 @@ var _ = Describe("FromAPI", func() {
 					Zip:           "62701",
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.PopCity).To(Equal("Springfield"))
 			Expect(opp.PopCityCode).To(Equal("12345"))
@@ -40,7 +40,7 @@ var _ = Describe("FromAPI", func() {
 				Active:             "Yes",
 				PlaceOfPerformance: nil,
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.PopCity).To(BeEmpty())
 			Expect(opp.PopCityCode).To(BeEmpty())
@@ -60,7 +60,7 @@ var _ = Describe("FromAPI", func() {
 					Country: &samgov.NameCode{Code: "USA", Name: "United States"},
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.PopCity).To(BeEmpty())
 			Expect(opp.PopCityCode).To(BeEmpty())
@@ -78,7 +78,7 @@ var _ = Describe("FromAPI", func() {
 					City: &samgov.NameCode{Code: "", Name: "Unknown City"},
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.PopCity).To(Equal("Unknown City"))
 			Expect(opp.PopCityCode).To(BeEmpty())
@@ -92,7 +92,7 @@ var _ = Describe("FromAPI", func() {
 					Country: &samgov.NameCode{Code: "DEU", Name: "Germany"},
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.PopCity).To(BeEmpty())
 			Expect(opp.PopCityCode).To(BeEmpty())
@@ -115,7 +115,7 @@ var _ = Describe("FromAPI", func() {
 					Awardee: samgov.Awardee{Name: "ACME Corporation"},
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.AwardeeName).To(Equal("ACME Corporation"))
 			Expect(opp.Awardee).To(BeEmpty())
@@ -128,7 +128,7 @@ var _ = Describe("FromAPI", func() {
 				Active:   "Yes",
 				Award:    nil,
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.Awardee).To(BeEmpty())
 			Expect(opp.AwardeeName).To(BeEmpty())
@@ -144,7 +144,7 @@ var _ = Describe("FromAPI", func() {
 					Awardee: samgov.Awardee{Name: ""},
 				},
 			}
-			opp := reconcile.FromAPI(d)
+			opp, _ := reconcile.FromAPI(d)
 
 			Expect(opp.AwardeeName).To(BeEmpty())
 			Expect(opp.AwardNumber).To(Equal("FA8532-26-R-0042"))
@@ -162,6 +162,78 @@ var _ = Describe("FromAPI", func() {
 			Expect(issues).To(BeEmpty())
 			Expect(opp.Awardee).To(Equal("ACME CORP Springfield IL 62701 USA"))
 			Expect(opp.AwardeeName).To(BeEmpty())
+		})
+	})
+
+	Context("Data quality issues from API dates", func() {
+		It("flags sentinel ArchiveDate", func() {
+			d := samgov.OpportunityData{
+				NoticeID:    "DQ-001",
+				Active:      "Yes",
+				ArchiveDate: "1969-12-31",
+			}
+			opp, issues := reconcile.FromAPI(d)
+
+			Expect(opp.ArchiveDate).To(BeNil())
+			Expect(issues).To(HaveLen(1))
+			Expect(issues[0].FieldName).To(Equal("ArchiveDate"))
+			Expect(issues[0].IssueType).To(Equal("sentinel_date"))
+		})
+
+		It("flags unparseable ArchiveDate", func() {
+			d := samgov.OpportunityData{
+				NoticeID:    "DQ-002",
+				Active:      "Yes",
+				ArchiveDate: "not-a-date",
+			}
+			opp, issues := reconcile.FromAPI(d)
+
+			Expect(opp.ArchiveDate).To(BeNil())
+			Expect(issues).To(HaveLen(1))
+			Expect(issues[0].FieldName).To(Equal("ArchiveDate"))
+			Expect(issues[0].IssueType).To(Equal("unparseable_date"))
+		})
+
+		It("flags sentinel AwardDate", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "DQ-003",
+				Active:   "Yes",
+				Award: &samgov.Award{
+					Date: "1970-01-01",
+				},
+			}
+			opp, issues := reconcile.FromAPI(d)
+
+			Expect(opp.AwardDate).To(BeNil())
+			Expect(issues).To(HaveLen(1))
+			Expect(issues[0].FieldName).To(Equal("AwardDate"))
+			Expect(issues[0].IssueType).To(Equal("sentinel_date"))
+		})
+
+		It("returns no issues for valid dates", func() {
+			d := samgov.OpportunityData{
+				NoticeID:    "DQ-004",
+				Active:      "Yes",
+				ArchiveDate: "2026-06-01",
+				Award: &samgov.Award{
+					Date: "2026-01-20",
+				},
+			}
+			opp, issues := reconcile.FromAPI(d)
+
+			Expect(opp.ArchiveDate).NotTo(BeNil())
+			Expect(opp.AwardDate).NotTo(BeNil())
+			Expect(issues).To(BeEmpty())
+		})
+
+		It("returns no issues when Award is nil and ArchiveDate is empty", func() {
+			d := samgov.OpportunityData{
+				NoticeID: "DQ-005",
+				Active:   "Yes",
+			}
+			_, issues := reconcile.FromAPI(d)
+
+			Expect(issues).To(BeEmpty())
 		})
 	})
 

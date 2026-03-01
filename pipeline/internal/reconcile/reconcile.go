@@ -165,6 +165,15 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 	return opp, issues
 }
 
+// ReconcileRecord merges a CSV and API opportunity for the same notice_id.
+// Stub: prefers CSV when present. Real merge logic comes later.
+func ReconcileRecord(csv, api *Opportunity) Opportunity {
+	if csv != nil {
+		return *csv
+	}
+	return *api
+}
+
 func parseDateField(rawValue, fieldName string, issues *[]DataQualityIssue) *time.Time {
 	if rawValue == "" {
 		return nil

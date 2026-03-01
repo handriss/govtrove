@@ -104,6 +104,33 @@ var _ = Describe("FromCSV", func() {
 		})
 	})
 
+	Context("ReconcileRecord", func() {
+		It("returns CSV version when both are present", func() {
+			csv := &reconcile.Opportunity{NoticeID: "REC-001", Title: "CSV Title"}
+			api := &reconcile.Opportunity{NoticeID: "REC-001", Title: "API Title"}
+
+			result := reconcile.ReconcileRecord(csv, api)
+
+			Expect(result.Title).To(Equal("CSV Title"))
+		})
+
+		It("returns CSV version when only CSV is present", func() {
+			csv := &reconcile.Opportunity{NoticeID: "REC-002", Title: "CSV Only"}
+
+			result := reconcile.ReconcileRecord(csv, nil)
+
+			Expect(result.Title).To(Equal("CSV Only"))
+		})
+
+		It("returns API version when only API is present", func() {
+			api := &reconcile.Opportunity{NoticeID: "REC-003", Title: "API Only"}
+
+			result := reconcile.ReconcileRecord(nil, api)
+
+			Expect(result.Title).To(Equal("API Only"))
+		})
+	})
+
 	Context("field mapping", func() {
 		It("maps all CSV columns to the correct Opportunity fields", func() {
 			raw := map[string]string{
