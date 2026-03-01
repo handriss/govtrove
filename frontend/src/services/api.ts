@@ -471,6 +471,58 @@ export interface AdminPipelineRunsResponse {
   limit: number;
 }
 
+// --- Pipeline Run Detail ---
+
+export interface IngestionRunDetail {
+  run_id: string;
+  job_type: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  records_fetched: number | null;
+  records_inserted: number | null;
+  records_updated: number | null;
+  records_failed: number | null;
+  records_skipped: number | null;
+  duration_ms: number | null;
+  error_message: string | null;
+}
+
+export interface TableCounts {
+  snap_csv: number;
+  snap_api: number;
+  snap_data_quality: number;
+  snap_disappearances: number;
+  snap_reconcile_dq: number;
+}
+
+export interface OpportunityStats {
+  total_affected: number;
+  inserted: number;
+  updated: number;
+  from_csv_only: number;
+  from_api: number;
+  from_both: number;
+}
+
+export interface PipelineRunDetailResponse {
+  pipeline_run: AdminPipelineRun;
+  ingestion_runs: IngestionRunDetail[];
+  table_counts: TableCounts;
+  opportunity_stats: OpportunityStats;
+}
+
+export async function getAdminPipelineRunDetail(
+  token: string,
+  id: string,
+): Promise<PipelineRunDetailResponse> {
+  const response = await fetch(`${API_BASE}/admin/pipeline-runs/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 export async function getAdminPipelineRuns(
   token: string,
   page = 1,
@@ -581,4 +633,140 @@ export async function getAdminApiKeyUsage(
   );
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
+}
+
+// --- Data Quality ---
+
+export interface AdminDataQualityRow {
+  id: number;
+  notice_id: string;
+  snapshot_date: string;
+  source: string;
+  issue_type: string;
+  field_name: string | null;
+  field_value: string | null;
+  description: string | null;
+  resolved: boolean;
+  resolved_at: string | null;
+  resolution_note: string | null;
+  created_at: string;
+}
+
+export interface AdminDataQualityDetail extends AdminDataQualityRow {
+  opp_title: string | null;
+  opp_sol_num: string | null;
+  opp_type: string | null;
+  opp_active: boolean | null;
+  opp_ui_link: string | null;
+}
+
+export interface AdminReconcileDQRow {
+  id: number;
+  notice_id: string;
+  snapshot_date: string;
+  issue_type: string;
+  field_name: string;
+  csv_value: string | null;
+  api_value: string | null;
+  resolved: boolean;
+  resolved_at: string | null;
+  resolution_note: string | null;
+  created_at: string;
+}
+
+export interface AdminReconcileDQDetail extends AdminReconcileDQRow {
+  opp_title: string | null;
+  opp_sol_num: string | null;
+  opp_type: string | null;
+  opp_active: boolean | null;
+  opp_ui_link: string | null;
+}
+
+export interface AdminDQListResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminDataQualityIssues(
+  token: string,
+  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string } = {},
+): Promise<AdminDQListResponse<AdminDataQualityRow>> {
+  const sp = new URLSearchParams();
+  if (params.page) sp.set('page', String(params.page));
+  if (params.limit) sp.set('limit', String(params.limit));
+  if (params.sort) sp.set('sort', params.sort);
+  if (params.order) sp.set('order', params.order);
+  if (params.resolved) sp.set('resolved', params.resolved);
+  const response = await fetch(`${API_BASE}/admin/data-quality?${sp}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminDataQualityDetail(
+  token: string,
+  id: number,
+): Promise<AdminDataQualityDetail> {
+  const response = await fetch(`${API_BASE}/admin/data-quality/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function updateAdminDataQualityResolution(
+  token: string,
+  id: number,
+  data: { resolved: boolean; resolution_note: string },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/data-quality/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+}
+
+export async function getAdminReconcileDQIssues(
+  token: string,
+  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string } = {},
+): Promise<AdminDQListResponse<AdminReconcileDQRow>> {
+  const sp = new URLSearchParams();
+  if (params.page) sp.set('page', String(params.page));
+  if (params.limit) sp.set('limit', String(params.limit));
+  if (params.sort) sp.set('sort', params.sort);
+  if (params.order) sp.set('order', params.order);
+  if (params.resolved) sp.set('resolved', params.resolved);
+  const response = await fetch(`${API_BASE}/admin/reconcile-dq?${sp}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminReconcileDQDetail(
+  token: string,
+  id: number,
+): Promise<AdminReconcileDQDetail> {
+  const response = await fetch(`${API_BASE}/admin/reconcile-dq/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function updateAdminReconcileDQResolution(
+  token: string,
+  id: number,
+  data: { resolved: boolean; resolution_note: string },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/reconcile-dq/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
 }

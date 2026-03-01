@@ -10,6 +10,9 @@ import ProfilePage from './pages/ProfilePage';
 import SavedPage from './pages/SavedPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AdminPage from './pages/AdminPage';
+import AdminPipelineRunDetailPage from './pages/AdminPipelineRunDetailPage';
+import AdminDataQualityPage from './pages/AdminDataQualityPage';
+import AdminReconcileDQPage from './pages/AdminReconcileDQPage';
 import NotFoundPage from './pages/NotFoundPage';
 import PreviewBanner from './components/PreviewBanner';
 import Footer from './components/Footer';
@@ -66,6 +69,9 @@ function AppRoutes() {
         <Route path="/saved" element={<SavedPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
+        <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
+        <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
         <Route path="/callback" element={<AuthCallback />} />
         <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
         <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
