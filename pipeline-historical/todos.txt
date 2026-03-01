@@ -1,0 +1,3 @@
+there are states that cannot happen in theory, but probably will happen in practice
+so I need to log these somewhere and revisit them:
+- if an opportunity is returned from the api but can also be found in the historical data
