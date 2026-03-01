@@ -226,6 +226,37 @@ func (db *DB) InsertDataQualityIssues(ctx context.Context, runID uuid.UUID, entr
 	}
 }
 
+type ReconcileDQEntry struct {
+	NoticeID     string
+	SnapshotDate time.Time
+	IssueType    string
+	FieldName    string
+	CSVValue     string
+	APIValue     string
+}
+
+func (db *DB) InsertReconcileDQIssues(ctx context.Context, csvRunID, apiRunID uuid.UUID, entries []ReconcileDQEntry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	batch := &pgx.Batch{}
+	for _, e := range entries {
+		batch.Queue(`
+			INSERT INTO pipeline.snap_reconcile_dq (csv_run_id, api_run_id, notice_id, snapshot_date, issue_type, field_name, csv_value, api_value)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, csvRunID, apiRunID, e.NoticeID, e.SnapshotDate, e.IssueType, e.FieldName, nilIfEmpty(e.CSVValue), nilIfEmpty(e.APIValue))
+	}
+
+	results := db.pool.SendBatch(ctx, batch)
+	defer results.Close()
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
+			slog.Warn("failed to insert reconcile DQ issue", "error", err, "notice_id", entries[i].NoticeID)
+		}
+	}
+}
+
 func nilIfEmpty(s string) *string {
 	if s == "" {
 		return nil

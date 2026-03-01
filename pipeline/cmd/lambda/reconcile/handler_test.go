@@ -293,12 +293,12 @@ var _ = Describe("Reconcile Handler", func() {
 			Expect(err.Error()).To(ContainSubstring("snap_api"))
 		})
 
-		It("prefers CSV when same notice_id exists in both CSV and API", func() {
+		It("prefers CSV and logs reconcile mismatches when same notice_id differs", func() {
 			activeRunID := uuid.New()
 
 			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
 				return []map[string]string{
-					{"NoticeId": "BOTH-001", "Title": "CSV Version"},
+					{"NoticeId": "BOTH-001", "Title": "CSV Version", "Active": "Yes"},
 				}, nil
 			}
 
@@ -317,6 +317,11 @@ var _ = Describe("Reconcile Handler", func() {
 				return len(opps), nil
 			}
 
+			var reconcileDQ []database.ReconcileDQEntry
+			store.InsertReconcileDQIssuesFn = func(_ context.Context, _, _ uuid.UUID, entries []database.ReconcileDQEntry) {
+				reconcileDQ = entries
+			}
+
 			event := buildEvent([]IngestionResult{
 				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
 			}, &IngestionResult{
@@ -331,6 +336,10 @@ var _ = Describe("Reconcile Handler", func() {
 			Expect(output.Status).To(Equal("ok"))
 			Expect(upsertedOpps).To(HaveLen(1))
 			Expect(upsertedOpps[0].Title).To(Equal("CSV Version"))
+			Expect(reconcileDQ).To(HaveLen(1))
+			Expect(reconcileDQ[0].FieldName).To(Equal("Title"))
+			Expect(reconcileDQ[0].CSVValue).To(Equal("CSV Version"))
+			Expect(reconcileDQ[0].APIValue).To(Equal("API Version"))
 		})
 
 		It("tracks DQ issues from API data with source 'api'", func() {

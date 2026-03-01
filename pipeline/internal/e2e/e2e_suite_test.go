@@ -181,6 +181,21 @@ CREATE TABLE pipeline.snap_data_quality (
 );
 CREATE INDEX idx_snap_dq_run_id ON pipeline.snap_data_quality(run_id);
 
+-- Reconcile data quality
+CREATE TABLE pipeline.snap_reconcile_dq (
+    id              BIGSERIAL PRIMARY KEY,
+    csv_run_id      UUID REFERENCES pipeline.ingestion_runs(run_id),
+    api_run_id      UUID REFERENCES pipeline.ingestion_runs(run_id),
+    notice_id       TEXT NOT NULL,
+    snapshot_date   TIMESTAMPTZ NOT NULL,
+    issue_type      TEXT NOT NULL,
+    field_name      TEXT NOT NULL,
+    csv_value       TEXT,
+    api_value       TEXT,
+    resolved        BOOLEAN DEFAULT false,
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Opportunities
 CREATE TABLE opportunities (
     id              BIGSERIAL PRIMARY KEY,
