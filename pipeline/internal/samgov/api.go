@@ -93,7 +93,18 @@ type Award struct {
 }
 
 type Awardee struct {
-	Name string `json:"name"`
+	Name     string          `json:"name"`
+	UeiSAM   string          `json:"ueiSAM"`
+	Location *AwardeeAddress `json:"location"`
+}
+
+type AwardeeAddress struct {
+	StreetAddress  string    `json:"streetAddress"`
+	StreetAddress2 string    `json:"streetAddress2"`
+	City           *NameCode `json:"city"`
+	State          *NameCode `json:"state"`
+	Country        *NameCode `json:"country"`
+	Zip            string    `json:"zip"`
 }
 
 // APIRequestLog captures metadata about a single API call for audit logging.
