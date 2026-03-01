@@ -122,7 +122,7 @@ type PipelineStepRow struct {
 	StartedAt    string  `json:"started_at"`
 	CompletedAt  *string `json:"completed_at"`
 	DurationMs   *int    `json:"duration_ms"`
-	Stats        *string `json:"stats"`
+	Stats        json.RawMessage `json:"stats"`
 	ErrorMessage *string `json:"error_message"`
 }
 
@@ -652,7 +652,7 @@ var ErrPipelineRunNotFound = errors.New("pipeline run not found")
 func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, executionID string) (*PipelineRunDetailResponse, error) {
 	// Q1: pipeline steps for this execution
 	stepRows, err := r.pool.Query(ctx, `
-		SELECT id, step_name, status, started_at, completed_at, duration_ms, stats::text, error_message
+		SELECT id, step_name, status, started_at, completed_at, duration_ms, stats, error_message
 		FROM pipeline.pipeline_steps
 		WHERE execution_id = $1
 		ORDER BY started_at ASC
