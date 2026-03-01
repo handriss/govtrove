@@ -91,6 +91,10 @@ export default function FilterBar({
 
   const handleChipRemove = useCallback(
     (key: keyof FilterState, value?: string) => {
+      if (key === 'exactMatch') {
+        setFilter('exactMatch', false);
+        return;
+      }
       if (key === 'activeOnly') {
         setFilter('activeOnly', true);
         return;
@@ -118,6 +122,20 @@ export default function FilterBar({
             placeholder="Search contracts, solicitations, awards..."
           />
         </div>
+
+        <button
+          type="button"
+          onClick={() => setFilter('exactMatch', !filters.exactMatch)}
+          title={filters.exactMatch ? 'Exact match enabled — matches your exact words' : 'Enable exact match'}
+          className={`hidden md:flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-lg border cursor-pointer transition-colors shrink-0
+            ${filters.exactMatch
+              ? 'bg-accent/10 border-accent/40 text-accent'
+              : 'bg-dark-800 border-dark-700/50 text-dark-400 hover:border-dark-600 hover:text-dark-300'
+            }`}
+        >
+          <span className="font-mono text-[11px]">&quot;&quot;</span>
+          Exact
+        </button>
         <SearchHelpButton />
         <button
           type="button"
@@ -264,8 +282,12 @@ function SearchHelpButton() {
               <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1.5">Search tips</h3>
               <ul className="space-y-1 text-dark-400">
                 <li className="flex gap-2">
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">"" Exact</kbd>
+                  <span>matches your exact words without stemming</span>
+                </li>
+                <li className="flex gap-2">
                   <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">"exact phrase"</kbd>
-                  <span>matches words in exact order</span>
+                  <span>auto-enables exact match for literal matching</span>
                 </li>
                 <li className="flex gap-2">
                   <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">word1 OR word2</kbd>

@@ -86,9 +86,15 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	conditions = append(conditions, "is_latest = true")
 
 	if params.Query != "" {
-		conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-		args = append(args, params.Query)
-		argNum++
+		if params.ExactMatch {
+			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+			args = append(args, "%"+params.Query+"%")
+			argNum++
+		} else {
+			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
+			args = append(args, params.Query)
+			argNum++
+		}
 	}
 
 	if len(params.Types) > 0 && exclude != "type" {
@@ -179,7 +185,7 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
 	conditions, args, argNum := buildFilterConditions(params, "", 1)
 
-	orderClause := r.buildOrderClause(params.Sort, params.Order, params.Query != "")
+	orderClause := r.buildOrderClause(params)
 
 	offset := (params.Page - 1) * params.Limit
 	args = append(args, params.Limit, offset)
@@ -202,7 +208,8 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 	return query, args
 }
 
-func (r *OpportunityRepository) buildOrderClause(sort, order string, hasSearch bool) string {
+func (r *OpportunityRepository) buildOrderClause(params models.SearchParams) string {
+	order := params.Order
 	if order == "" {
 		order = "desc"
 	}
@@ -211,9 +218,12 @@ func (r *OpportunityRepository) buildOrderClause(sort, order string, hasSearch b
 		order = "DESC"
 	}
 
-	switch sort {
+	switch params.Sort {
 	case "relevance":
-		if hasSearch {
+		if params.Query != "" {
+			if params.ExactMatch {
+				return "ORDER BY CASE WHEN title ILIKE $1 THEN 0 ELSE 1 END, CASE WHEN solicitation_number ILIKE $1 THEN 0 ELSE 1 END, posted_date DESC"
+			}
 			return fmt.Sprintf("ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', $1)) %s, posted_date DESC", order)
 		}
 		return "ORDER BY posted_date DESC"

@@ -70,6 +70,7 @@ type OpportunityListItem struct {
 
 type SearchParams struct {
 	Query        string
+	ExactMatch   bool
 	Types        []string
 	SetAsides    []string
 	NAICSCodes   []string

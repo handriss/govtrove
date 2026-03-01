@@ -208,6 +208,7 @@ export default function SearchResults({
                 key={opp.id}
                 opportunity={opp}
                 keyword={keyword}
+                exactMatch={filters.exactMatch}
                 isSaved={savedIds.has(opp.id)}
                 isSelected={selectedIds.has(opp.id)}
                 anySelected={anySelected}

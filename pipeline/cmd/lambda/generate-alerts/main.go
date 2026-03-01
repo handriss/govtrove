@@ -227,6 +227,7 @@ func (h *Handler) processSearchAlerts(ctx context.Context) (int, error) {
 
 type savedFilters struct {
 	Keyword        string   `json:"keyword"`
+	ExactMatch     bool     `json:"exactMatch"`
 	NAICS          []string `json:"naics"`
 	PSC            []string `json:"psc"`
 	SetAside       []string `json:"setAside"`
@@ -326,9 +327,15 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 
 func appendFilterConditions(conditions []string, args []any, argNum int, f savedFilters) ([]string, []any, int) {
 	if f.Keyword != "" {
-		conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-		args = append(args, f.Keyword)
-		argNum++
+		if f.ExactMatch {
+			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+			args = append(args, "%"+f.Keyword+"%")
+			argNum++
+		} else {
+			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
+			args = append(args, f.Keyword)
+			argNum++
+		}
 	}
 
 	if len(f.NoticeType) > 0 {
