@@ -80,26 +80,11 @@ function getDeadlineColor(days: number | null): string {
 
 // --- Keyword highlighting ---
 
-export function highlightKeywords(text: string, keyword: string | undefined, exactMatch?: boolean): ReactNode {
+export function highlightKeywords(text: string, keyword: string | undefined): ReactNode {
   if (!keyword || !keyword.trim()) return text;
 
-  if (exactMatch) {
-    const escaped = keyword.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escaped})`, 'gi');
-    const parts = text.split(regex);
-    if (parts.length === 1) return text;
-    return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark key={i} className="bg-yellow-500/20 text-yellow-200 rounded-sm px-0.5">
-          {part}
-        </mark>
-      ) : (
-        part
-      ),
-    );
-  }
-
-  const terms = keyword.trim().split(/\s+/).filter((t) => t.length >= 2);
+  const cleaned = keyword.replace(/"/g, '');
+  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2);
   if (terms.length === 0) return text;
   const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
@@ -116,22 +101,18 @@ export function highlightKeywords(text: string, keyword: string | undefined, exa
   );
 }
 
-export function extractSnippet(description: string | undefined, keyword: string | undefined, maxLen = 200, exactMatch?: boolean): string {
+export function extractSnippet(description: string | undefined, keyword: string | undefined, maxLen = 200): string {
   if (!description) return '';
   const text = description.replace(/\s+/g, ' ').trim();
   if (!keyword || !keyword.trim()) return text.slice(0, maxLen) + (text.length > maxLen ? '...' : '');
 
   const lower = text.toLowerCase();
+  const cleaned = keyword.replace(/"/g, '');
+  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2);
   let bestIdx = -1;
-
-  if (exactMatch) {
-    bestIdx = lower.indexOf(keyword.trim().toLowerCase());
-  } else {
-    const terms = keyword.trim().split(/\s+/).filter((t) => t.length >= 2);
-    for (const term of terms) {
-      const idx = lower.indexOf(term.toLowerCase());
-      if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) bestIdx = idx;
-    }
+  for (const term of terms) {
+    const idx = lower.indexOf(term.toLowerCase());
+    if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) bestIdx = idx;
   }
 
   if (bestIdx === -1) return text.slice(0, maxLen) + (text.length > maxLen ? '...' : '');
@@ -147,7 +128,6 @@ export function extractSnippet(description: string | undefined, keyword: string 
 interface OpportunityCardProps {
   opportunity: OpportunityListItem;
   keyword?: string;
-  exactMatch?: boolean;
   isSaved: boolean;
   isSelected: boolean;
   anySelected: boolean;
@@ -158,7 +138,6 @@ interface OpportunityCardProps {
 export default memo(function OpportunityCard({
   opportunity: opp,
   keyword,
-  exactMatch,
   isSaved,
   onToggleSave,
 }: OpportunityCardProps) {
@@ -166,7 +145,7 @@ export default memo(function OpportunityCard({
   const days = getDaysUntilDeadline(opp.response_deadline);
   const deadlineColor = getDeadlineColor(days);
   const agency = formatDepartment(opp.department);
-  const snippet = extractSnippet(opp.description, keyword, 200, exactMatch);
+  const snippet = extractSnippet(opp.description, keyword);
 
   const deadlineDisplay = days !== null
     ? days < 0
@@ -214,7 +193,7 @@ export default memo(function OpportunityCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-[15px] font-medium text-dark-100 leading-snug line-clamp-2 group-hover:text-accent transition-colors">
-                {highlightKeywords(opp.title, keyword, exactMatch)}
+                {highlightKeywords(opp.title, keyword)}
               </h3>
               {badge && (
                 <span aria-label={badge.label} className={`shrink-0 text-[11px] font-medium rounded-full px-2 py-0.5 whitespace-nowrap ${badge.className}`}>
@@ -259,7 +238,7 @@ export default memo(function OpportunityCard({
         {snippet && (
           <div className="ml-[52px] mt-2">
             <p className="text-xs text-dark-500 leading-relaxed line-clamp-3">
-              {highlightKeywords(snippet, keyword, exactMatch)}
+              {highlightKeywords(snippet, keyword)}
             </p>
           </div>
         )}

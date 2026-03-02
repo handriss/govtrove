@@ -103,7 +103,6 @@ export interface FacetResult {
 
 export interface SearchParams {
   q?: string;
-  exact?: string;
   type?: string;
   set_aside?: string;
   naics?: string;

@@ -130,10 +130,6 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       result.push({ id: 'deadline', filterKey: 'deadlineFrom', label });
     }
 
-    if (filters.exactMatch) {
-      result.push({ id: 'exactMatch', filterKey: 'exactMatch', label: 'Exact match' });
-    }
-
     if (filters.activeOnly === false) {
       result.push({ id: 'activeOnly', filterKey: 'activeOnly', label: 'Including inactive' });
     }

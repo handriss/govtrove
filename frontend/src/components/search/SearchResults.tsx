@@ -208,7 +208,6 @@ export default function SearchResults({
                 key={opp.id}
                 opportunity={opp}
                 keyword={keyword}
-                exactMatch={filters.exactMatch}
                 isSaved={savedIds.has(opp.id)}
                 isSelected={selectedIds.has(opp.id)}
                 anySelected={anySelected}
@@ -335,7 +334,7 @@ function ZeroResults({
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">
               &quot;...&quot;
             </kbd>
-            <span>Use quotes for exact phrases</span>
+            <span>Match exact phrases (e.g. &ldquo;IT services&rdquo;)</span>
           </li>
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">

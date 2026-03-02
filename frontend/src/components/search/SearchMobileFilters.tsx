@@ -202,28 +202,6 @@ export default function SearchMobileFilters({
             />
           </FilterSection>
 
-          {/* Exact Match */}
-          <FilterSection label="Exact Match">
-            <button
-              type="button"
-              onClick={() => setFilter('exactMatch', !filters.exactMatch)}
-              className={`inline-flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border cursor-pointer transition-colors
-                ${filters.exactMatch
-                  ? 'bg-accent/10 border-accent/40 text-accent'
-                  : 'bg-dark-800 border-dark-700/50 text-dark-300 hover:border-dark-600'
-                }`}
-            >
-              <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors
-                ${filters.exactMatch ? 'bg-accent' : 'bg-dark-600'}`}
-              >
-                <span className={`inline-block h-3 w-3 rounded-full bg-white transition-transform
-                  ${filters.exactMatch ? 'translate-x-3.5' : 'translate-x-0.5'}`}
-                />
-              </span>
-              Exact Match
-            </button>
-          </FilterSection>
-
           {/* Active Only */}
           <FilterSection label="Active Only">
             <button
