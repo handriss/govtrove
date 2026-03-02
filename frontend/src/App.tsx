@@ -14,7 +14,6 @@ import AdminPipelineRunDetailPage from './pages/AdminPipelineRunDetailPage';
 import AdminDataQualityPage from './pages/AdminDataQualityPage';
 import AdminReconcileDQPage from './pages/AdminReconcileDQPage';
 import NotFoundPage from './pages/NotFoundPage';
-import PreviewBanner from './components/PreviewBanner';
 import Footer from './components/Footer';
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
@@ -60,7 +59,6 @@ function ErrorFallback() {
 function AppRoutes() {
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      <PreviewBanner />
       <Routes>
         <Route path="/" element={<SimpleSearchPage />} />
         <Route path="/whats-new" element={<WhatsNewPage />} />

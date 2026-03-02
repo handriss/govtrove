@@ -86,12 +86,6 @@
     --footer-text: #64748b;
     --link-color: #3b82f6;
     --link-hover: #2563eb;
-    --preview-banner-bg: #0f1a2e;
-    --preview-banner-border: rgba(59, 130, 246, 0.2);
-    --preview-banner-text: #94a3b8;
-    --preview-banner-strong: #f1f5f9;
-    --preview-banner-dismiss: #64748b;
-    --preview-banner-dismiss-hover: #e2e8f0;
 }
 
 /* ===== Light Theme ===== */
@@ -182,12 +176,6 @@
     --footer-text: #94a3b8;
     --link-color: #2563eb;
     --link-hover: #1d4ed8;
-    --preview-banner-bg: rgba(59, 130, 246, 0.06);
-    --preview-banner-border: rgba(59, 130, 246, 0.15);
-    --preview-banner-text: #475569;
-    --preview-banner-strong: #0f172a;
-    --preview-banner-dismiss: #94a3b8;
-    --preview-banner-dismiss-hover: #334155;
 }
 
 /* ===== Theme Toggle Button ===== */
