@@ -93,20 +93,20 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 
 		if !exists {
 			// New notice_id → INSERT version 1
-			args := append(params, 1, true, hash, "csv", runID, snapshotDate)
+			args := append(params, 1, true, hash, o.DataSources, runID, snapshotDate)
 			batch.Queue(insertSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else if ex.ContentHash == hash {
 			// Same hash → metadata-only update (includes active flag which is excluded from hash)
 			batch.Queue(`
 				UPDATE opportunities SET last_csv_run_id = $1, last_seen_csv = $2, active = $3,
-					data_sources = CASE WHEN data_sources LIKE '%api%' THEN 'csv+api' ELSE 'csv' END
-				WHERE notice_id = $4 AND is_latest = true
-			`, runID, snapshotDate, o.Active, o.NoticeID)
+					data_sources = $4
+				WHERE notice_id = $5 AND is_latest = true
+			`, runID, snapshotDate, o.Active, o.DataSources, o.NoticeID)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else if ex.ContentHash == "" {
 			// Pre-migration row with no hash yet — backfill hash + update content, no new version
-			args := append(params[1:], hash, runID, snapshotDate, o.NoticeID) // skip notice_id ($1 of insert)
+			args := append(params[1:], hash, o.DataSources, runID, snapshotDate, o.NoticeID) // skip notice_id ($1 of insert)
 			batch.Queue(backfillSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		} else {
@@ -118,7 +118,7 @@ func (db *DB) upsertOpportunitiesBatch(ctx context.Context, runID uuid.UUID, sna
 			`, o.NoticeID)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID+":demote")
 
-			args := append(params, newVersion, true, hash, "csv", runID, snapshotDate)
+			args := append(params, newVersion, true, hash, o.DataSources, runID, snapshotDate)
 			batch.Queue(insertSQL, args...)
 			batchNoticeIDs = append(batchNoticeIDs, o.NoticeID)
 		}
@@ -246,8 +246,8 @@ const insertSQL = `
 		$69, $70, $71
 	)`
 
-// backfillSQL: same content params (minus notice_id) + content_hash, run tracking, WHERE.
-// Params: content[2:65] as $1-$64, content_hash=$65, run_id=$66, seen=$67, notice_id=$68
+// backfillSQL: same content params (minus notice_id) + content_hash, data_sources, run tracking, WHERE.
+// Params: content[2:65] as $1-$64, content_hash=$65, data_sources=$66, run_id=$67, seen=$68, notice_id=$69
 const backfillSQL = `
 	UPDATE opportunities SET
 		solicitation_number = $1, title = $2, description = $3, type = $4, base_type = $5, organization_type = $6,
@@ -266,9 +266,9 @@ const backfillSQL = `
 		ui_link = $59, additional_info_link = $60, description_url = $61, resource_links = $62,
 		full_parent_path_name = $63, full_parent_path_code = $64,
 		content_hash = $65,
-		data_sources = CASE WHEN data_sources LIKE '%api%' THEN 'csv+api' ELSE 'csv' END,
-		last_csv_run_id = $66, last_seen_csv = $67
-	WHERE notice_id = $68 AND is_latest = true
+		data_sources = $66,
+		last_csv_run_id = $67, last_seen_csv = $68
+	WHERE notice_id = $69 AND is_latest = true
 `
 
 func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {

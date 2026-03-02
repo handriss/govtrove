@@ -92,6 +92,9 @@ type Opportunity struct {
 	DescriptionURL     string
 	AdditionalInfoLink string
 	ResourceLinks      []string
+
+	// Metadata (excluded from content hash)
+	DataSources string `json:"-"`
 }
 
 // ContentHash returns a deterministic SHA-256 hash of content fields.
@@ -192,14 +195,18 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 // and reports mismatches. Prefers CSV for the merged result.
 func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
 	if csv == nil {
-		return *api, []ReconcileMismatch{{
+		opp := *api
+		opp.DataSources = "api"
+		return opp, []ReconcileMismatch{{
 			FieldName: "source",
 			IssueType: "missing_csv",
 			APIValue:  api.NoticeID,
 		}}
 	}
 	if api == nil {
-		return *csv, []ReconcileMismatch{{
+		opp := *csv
+		opp.DataSources = "csv"
+		return opp, []ReconcileMismatch{{
 			FieldName: "source",
 			IssueType: "missing_api",
 			CSVValue:  csv.NoticeID,
@@ -301,6 +308,7 @@ func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
 	cmpStr("AACCode", csv.AACCode, api.AACCode)
 
 	merged := *csv
+	merged.DataSources = "csv+api"
 
 	// Carry forward API-only awardee fields (no merging — keep both sides)
 	merged.AwardeeName = api.AwardeeName
