@@ -124,22 +124,58 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
 }
 
 function FlowSection({ steps }: { steps: PipelineStep[] }) {
-  const stepMap = new Map(steps.map(s => [s.step_name, s]));
+  // Group steps by step_name, preserving order
+  const grouped = new Map<string, PipelineStep[]>();
+  for (const s of steps) {
+    const list = grouped.get(s.step_name) ?? [];
+    list.push(s);
+    grouped.set(s.step_name, list);
+  }
 
   return (
     <div className="space-y-0">
       {ALL_STEPS.map((stepName, i) => {
-        const step = stepMap.get(stepName);
-        const status = (step?.status as 'completed' | 'failed' | 'running') ?? 'none';
+        const attempts = grouped.get(stepName);
+        if (!attempts || attempts.length === 0) {
+          return (
+            <div key={stepName}>
+              {i > 0 && <Connector />}
+              <StepCard name={STEP_DISPLAY_NAMES[stepName] ?? stepName} status="none" duration="—" />
+            </div>
+          );
+        }
+
+        const latest = attempts.find(a => a.is_latest) ?? attempts[attempts.length - 1];
+        const retries = attempts.filter(a => a !== latest);
+
         return (
           <div key={stepName}>
             {i > 0 && <Connector />}
+            {retries.map((retry) => (
+              <div key={retry.id} className="mb-1">
+                <div className="rounded-lg border border-dark-700/30 border-l-4 border-l-red-500/30 p-2.5 bg-dark-800/20 opacity-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <XCircle size={14} className="text-red-400/60" />
+                      <span className="text-xs text-dark-400">
+                        {STEP_DISPLAY_NAMES[stepName] ?? stepName}
+                        <span className="ml-1.5 text-dark-500">attempt {retry.attempt}</span>
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-dark-500">{formatDuration(retry.duration_ms ?? null)}</span>
+                  </div>
+                  {retry.error_message && (
+                    <p className="text-[11px] text-red-400/50 mt-1 ml-5 truncate">{retry.error_message}</p>
+                  )}
+                </div>
+              </div>
+            ))}
             <StepCard
-              name={STEP_DISPLAY_NAMES[stepName] ?? stepName}
-              status={status}
-              duration={formatDuration(step?.duration_ms ?? null)}
-              metrics={formatStepStats(step?.stats ?? null)}
-              error={step?.error_message}
+              name={`${STEP_DISPLAY_NAMES[stepName] ?? stepName}${retries.length > 0 ? ` (attempt ${latest.attempt})` : ''}`}
+              status={(latest.status as 'completed' | 'failed' | 'running') ?? 'none'}
+              duration={formatDuration(latest.duration_ms ?? null)}
+              metrics={formatStepStats(latest.stats ?? null)}
+              error={latest.error_message}
             />
           </div>
         );
@@ -211,7 +247,7 @@ function DetailContent() {
     );
   }
 
-  const failedSteps = data.steps.filter(s => s.status === 'failed');
+  const failedSteps = data.steps.filter(s => s.status === 'failed' && s.is_latest);
 
   return (
     <div className="space-y-8">

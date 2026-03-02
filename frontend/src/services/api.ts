@@ -451,6 +451,8 @@ export interface PipelineStep {
   duration_ms: number | null;
   stats: Record<string, unknown> | null;
   error_message: string | null;
+  attempt: number;
+  is_latest: boolean;
 }
 
 export interface PipelineExecution {

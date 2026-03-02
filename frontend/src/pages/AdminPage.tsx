@@ -616,9 +616,10 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
   }
 
   function stepSummary(exec: PipelineExecution) {
-    const failed = exec.steps.filter(s => s.status === 'failed');
+    const failed = exec.steps.filter(s => s.status === 'failed' && s.is_latest);
     if (failed.length > 0) return failed.map(s => s.step_name).join(', ');
-    return `${exec.step_count} steps`;
+    const uniqueSteps = new Set(exec.steps.map(s => s.step_name)).size;
+    return `${uniqueSteps} steps`;
   }
 
   return (
