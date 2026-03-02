@@ -124,6 +124,8 @@ type PipelineStepRow struct {
 	DurationMs   *int    `json:"duration_ms"`
 	Stats        json.RawMessage `json:"stats"`
 	ErrorMessage *string `json:"error_message"`
+	Attempt      int     `json:"attempt"`
+	IsLatest     bool    `json:"is_latest"`
 }
 
 type PipelineExecutionRow struct {
@@ -157,22 +159,34 @@ func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit i
 
 	offset := (page - 1) * limit
 	rows, err := r.pool.Query(ctx, `
+		WITH latest_per_step AS (
+			SELECT DISTINCT ON (execution_id, step_name) execution_id, status
+			FROM pipeline.pipeline_steps
+			ORDER BY execution_id, step_name, started_at DESC
+		)
 		SELECT
 			ps.execution_id,
 			MIN(ps.started_at) AS started_at,
 			MAX(ps.completed_at) AS completed_at,
 			EXTRACT(EPOCH FROM (MAX(ps.completed_at) - MIN(ps.started_at)))::int * 1000 AS duration_ms,
-			BOOL_AND(ps.status = 'completed') AS all_completed,
-			BOOL_OR(ps.status = 'failed') AS any_failed,
-			BOOL_OR(ps.status = 'running') AS any_running,
+			(SELECT BOOL_AND(lps.status = 'completed') FROM latest_per_step lps WHERE lps.execution_id = ps.execution_id) AS all_completed,
+			(SELECT BOOL_OR(lps.status = 'failed') FROM latest_per_step lps WHERE lps.execution_id = ps.execution_id) AS any_failed,
+			(SELECT BOOL_OR(lps.status = 'running') FROM latest_per_step lps WHERE lps.execution_id = ps.execution_id) AS any_running,
 			COUNT(*) AS step_count,
 			(SELECT json_agg(json_build_object(
 				'id', ps2.id, 'step_name', ps2.step_name, 'status', ps2.status,
 				'started_at', ps2.started_at, 'completed_at', ps2.completed_at,
 				'duration_ms', ps2.duration_ms, 'stats', ps2.stats,
-				'error_message', ps2.error_message
+				'error_message', ps2.error_message,
+				'attempt', ps2.attempt, 'is_latest', ps2.is_latest
 			) ORDER BY ps2.started_at)
-			FROM pipeline.pipeline_steps ps2 WHERE ps2.execution_id = ps.execution_id
+			FROM (
+				SELECT *,
+					ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY started_at) AS attempt,
+					(ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY started_at DESC) = 1) AS is_latest
+				FROM pipeline.pipeline_steps ps3
+				WHERE ps3.execution_id = ps.execution_id
+			) ps2
 			)::text AS steps
 		FROM pipeline.pipeline_steps ps
 		GROUP BY ps.execution_id
@@ -650,9 +664,11 @@ type PipelineRunDetailResponse struct {
 var ErrPipelineRunNotFound = errors.New("pipeline run not found")
 
 func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, executionID string) (*PipelineRunDetailResponse, error) {
-	// Q1: pipeline steps for this execution
+	// Q1: pipeline steps for this execution (with attempt number and is_latest flag)
 	stepRows, err := r.pool.Query(ctx, `
-		SELECT id, step_name, status, started_at, completed_at, duration_ms, stats, error_message
+		SELECT id, step_name, status, started_at, completed_at, duration_ms, stats, error_message,
+			ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY started_at) AS attempt,
+			(ROW_NUMBER() OVER (PARTITION BY step_name ORDER BY started_at DESC) = 1) AS is_latest
 		FROM pipeline.pipeline_steps
 		WHERE execution_id = $1
 		ORDER BY started_at ASC
@@ -665,16 +681,13 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, execution
 	var steps []PipelineStepRow
 	var firstStartedAt time.Time
 	var lastCompletedAt *time.Time
-	allCompleted := true
-	anyFailed := false
-	anyRunning := false
 
 	for stepRows.Next() {
 		var s PipelineStepRow
 		var sa time.Time
 		var ca *time.Time
 		if err := stepRows.Scan(&s.ID, &s.StepName, &s.Status, &sa, &ca,
-			&s.DurationMs, &s.Stats, &s.ErrorMessage); err != nil {
+			&s.DurationMs, &s.Stats, &s.ErrorMessage, &s.Attempt, &s.IsLatest); err != nil {
 			return nil, err
 		}
 		s.StartedAt = sa.Format(time.RFC3339)
@@ -689,15 +702,6 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, execution
 		if ca != nil && (lastCompletedAt == nil || ca.After(*lastCompletedAt)) {
 			lastCompletedAt = ca
 		}
-		if s.Status != "completed" {
-			allCompleted = false
-		}
-		if s.Status == "failed" {
-			anyFailed = true
-		}
-		if s.Status == "running" {
-			anyRunning = true
-		}
 
 		steps = append(steps, s)
 	}
@@ -706,6 +710,28 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, execution
 	}
 	if len(steps) == 0 {
 		return nil, ErrPipelineRunNotFound
+	}
+
+	// Derive overall status from the latest attempt per step_name
+	latestStatus := make(map[string]string)
+	for _, s := range steps {
+		if s.IsLatest {
+			latestStatus[s.StepName] = s.Status
+		}
+	}
+	allCompleted := true
+	anyFailed := false
+	anyRunning := false
+	for _, status := range latestStatus {
+		if status == "failed" {
+			anyFailed = true
+		}
+		if status != "completed" {
+			allCompleted = false
+		}
+		if status == "running" {
+			anyRunning = true
+		}
 	}
 
 	resp := &PipelineRunDetailResponse{
