@@ -4,12 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/handriss/govtrove/api/internal/models"
 )
+
+var quotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
+
+func parseQuotedPhrases(query string) (phrases []string, remainder string) {
+	matches := quotedPhraseRe.FindAllStringSubmatch(query, -1)
+	for _, m := range matches {
+		phrases = append(phrases, m[1])
+	}
+	remainder = strings.TrimSpace(quotedPhraseRe.ReplaceAllString(query, ""))
+	return
+}
 
 type OpportunityRepository struct {
 	pool *pgxpool.Pool
@@ -77,22 +89,26 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 // buildFilterConditions builds WHERE conditions from search params.
 // exclude skips one dimension so facet counts aren't self-filtered:
 // "set_aside", "type", "department", "naics", "state"
-func buildFilterConditions(params models.SearchParams, exclude string, argStart int) ([]string, []any, int) {
+func buildFilterConditions(params models.SearchParams, exclude string, argStart int) ([]string, []any, int, int) {
 	var conditions []string
 	var args []any
 	argNum := argStart
+	ftsArgNum := 0
 
 	conditions = append(conditions, "active = true")
 	conditions = append(conditions, "is_latest = true")
 
 	if params.Query != "" {
-		if params.ExactMatch {
+		phrases, ftsQuery := parseQuotedPhrases(params.Query)
+		for _, phrase := range phrases {
 			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-			args = append(args, "%"+params.Query+"%")
+			args = append(args, "%"+phrase+"%")
 			argNum++
-		} else {
+		}
+		if ftsQuery != "" {
 			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-			args = append(args, params.Query)
+			args = append(args, ftsQuery)
+			ftsArgNum = argNum
 			argNum++
 		}
 	}
@@ -179,13 +195,13 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
-	return conditions, args, argNum
+	return conditions, args, argNum, ftsArgNum
 }
 
 func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
-	conditions, args, argNum := buildFilterConditions(params, "", 1)
+	conditions, args, argNum, ftsArgNum := buildFilterConditions(params, "", 1)
 
-	orderClause := r.buildOrderClause(params)
+	orderClause := r.buildOrderClause(params, ftsArgNum)
 
 	offset := (params.Page - 1) * params.Limit
 	args = append(args, params.Limit, offset)
@@ -208,7 +224,7 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 	return query, args
 }
 
-func (r *OpportunityRepository) buildOrderClause(params models.SearchParams) string {
+func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, ftsArgNum int) string {
 	order := params.Order
 	if order == "" {
 		order = "desc"
@@ -220,11 +236,8 @@ func (r *OpportunityRepository) buildOrderClause(params models.SearchParams) str
 
 	switch params.Sort {
 	case "relevance":
-		if params.Query != "" {
-			if params.ExactMatch {
-				return "ORDER BY CASE WHEN title ILIKE $1 THEN 0 ELSE 1 END, CASE WHEN solicitation_number ILIKE $1 THEN 0 ELSE 1 END, posted_date DESC"
-			}
-			return fmt.Sprintf("ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', $1)) %s, posted_date DESC", order)
+		if params.Query != "" && ftsArgNum > 0 {
+			return fmt.Sprintf("ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', $%d)) %s, posted_date DESC", ftsArgNum, order)
 		}
 		return "ORDER BY posted_date DESC"
 	case "deadline":
@@ -380,7 +393,7 @@ func (r *OpportunityRepository) GetFilterOptions(ctx context.Context) (*models.F
 
 func (r *OpportunityRepository) GetFacetCounts(ctx context.Context, params models.SearchParams) (*models.FacetResult, error) {
 	// Total count with all filters applied
-	conditions, args, _ := buildFilterConditions(params, "", 1)
+	conditions, args, _, _ := buildFilterConditions(params, "", 1)
 	where := strings.Join(conditions, " AND ")
 
 	var total int
@@ -482,7 +495,7 @@ func (r *OpportunityRepository) GetSolicitationHistory(ctx context.Context, oppo
 }
 
 func (r *OpportunityRepository) getFacet(ctx context.Context, params models.SearchParams, exclude, selectCol, labelCol string, limit int) ([]models.FacetValue, error) {
-	conditions, args, _ := buildFilterConditions(params, exclude, 1)
+	conditions, args, _, _ := buildFilterConditions(params, exclude, 1)
 	where := strings.Join(conditions, " AND ")
 
 	selectExpr := selectCol

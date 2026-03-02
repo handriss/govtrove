@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -325,15 +326,26 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 	return true, nil
 }
 
+var alertQuotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
+
 func appendFilterConditions(conditions []string, args []any, argNum int, f savedFilters) ([]string, []any, int) {
 	if f.Keyword != "" {
-		if f.ExactMatch {
+		kw := f.Keyword
+		// Backward compat: old saved searches with ExactMatch=true, wrap in quotes
+		if f.ExactMatch && !strings.Contains(kw, `"`) {
+			kw = `"` + kw + `"`
+		}
+
+		matches := alertQuotedPhraseRe.FindAllStringSubmatch(kw, -1)
+		for _, m := range matches {
 			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-			args = append(args, "%"+f.Keyword+"%")
+			args = append(args, "%"+m[1]+"%")
 			argNum++
-		} else {
+		}
+		ftsQuery := strings.TrimSpace(alertQuotedPhraseRe.ReplaceAllString(kw, ""))
+		if ftsQuery != "" {
 			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-			args = append(args, f.Keyword)
+			args = append(args, ftsQuery)
 			argNum++
 		}
 	}

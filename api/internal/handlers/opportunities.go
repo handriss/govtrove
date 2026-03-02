@@ -52,10 +52,13 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if result.Total == 0 && params.Query != "" {
-		if suggestion, err := h.repo.SuggestQuery(r.Context(), params.Query); err == nil && suggestion != "" {
-			result.Suggestion = suggestion
-		} else if err != nil {
-			h.logger.Warn("suggest query failed", "error", err)
+		suggestQuery := strings.TrimSpace(strings.ReplaceAll(params.Query, `"`, ""))
+		if suggestQuery != "" {
+			if suggestion, err := h.repo.SuggestQuery(r.Context(), suggestQuery); err == nil && suggestion != "" {
+				result.Suggestion = suggestion
+			} else if err != nil {
+				h.logger.Warn("suggest query failed", "error", err)
+			}
 		}
 	}
 
@@ -352,7 +355,6 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 
 	params := models.SearchParams{
 		Query:      truncate(q.Get("q"), 500),
-		ExactMatch: q.Get("exact") == "true",
 		Sort:       q.Get("sort"),
 		Order:      q.Get("order"),
 		Page:       1,
