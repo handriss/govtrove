@@ -5,20 +5,26 @@ import { X, SlidersHorizontal } from 'lucide-react';
 interface MoreFiltersPanelProps {
   postedFrom: string;
   postedTo: string;
-  onChange: (values: { postedFrom: string; postedTo: string }) => void;
+  solicitationNumber: string;
+  popCity: string;
+  onChange: (values: { postedFrom: string; postedTo: string; solicitationNumber: string; popCity: string }) => void;
 }
 
-export default function MoreFiltersPanel({ postedFrom, postedTo, onChange }: MoreFiltersPanelProps) {
+export default function MoreFiltersPanel({ postedFrom, postedTo, solicitationNumber, popCity, onChange }: MoreFiltersPanelProps) {
   const [open, setOpen] = useState(false);
   const [localFrom, setLocalFrom] = useState(postedFrom);
   const [localTo, setLocalTo] = useState(postedTo);
+  const [localSolNum, setLocalSolNum] = useState(solicitationNumber);
+  const [localPopCity, setLocalPopCity] = useState(popCity);
 
   useEffect(() => {
     if (open) {
       setLocalFrom(postedFrom);
       setLocalTo(postedTo);
+      setLocalSolNum(solicitationNumber);
+      setLocalPopCity(popCity);
     }
-  }, [open, postedFrom, postedTo]);
+  }, [open, postedFrom, postedTo, solicitationNumber, popCity]);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -28,18 +34,20 @@ export default function MoreFiltersPanel({ postedFrom, postedTo, onChange }: Mor
   }, [open]);
 
   const handleApply = useCallback(() => {
-    onChange({ postedFrom: localFrom, postedTo: localTo });
+    onChange({ postedFrom: localFrom, postedTo: localTo, solicitationNumber: localSolNum, popCity: localPopCity });
     setOpen(false);
-  }, [localFrom, localTo, onChange]);
+  }, [localFrom, localTo, localSolNum, localPopCity, onChange]);
 
   const handleReset = useCallback(() => {
     setLocalFrom('');
     setLocalTo('');
-    onChange({ postedFrom: '', postedTo: '' });
+    setLocalSolNum('');
+    setLocalPopCity('');
+    onChange({ postedFrom: '', postedTo: '', solicitationNumber: '', popCity: '' });
     setOpen(false);
   }, [onChange]);
 
-  const activeCount = (postedFrom || postedTo) ? 1 : 0;
+  const activeCount = [postedFrom || postedTo, solicitationNumber, popCity].filter(Boolean).length;
 
   return (
     <>
@@ -113,31 +121,29 @@ export default function MoreFiltersPanel({ postedFrom, postedTo, onChange }: Mor
                   </div>
                 </div>
 
-                {/* Stub: Solicitation Number */}
-                <div className="space-y-2 opacity-50">
-                  <label className="text-xs font-medium text-dark-500">
-                    Solicitation Number <span className="text-dark-600">(coming soon)</span>
-                  </label>
+                {/* Solicitation Number */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-dark-300">Solicitation Number</label>
                   <input
                     type="text"
-                    disabled
+                    value={localSolNum}
+                    onChange={(e) => setLocalSolNum(e.target.value)}
                     placeholder="e.g. W911NF-24-R-0001"
-                    className="w-full text-xs bg-dark-800/50 border border-dark-700/30 rounded-lg px-3 py-2 text-dark-500
-                      placeholder:text-dark-600 cursor-not-allowed"
+                    className="w-full text-xs bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-2 text-dark-200
+                      placeholder:text-dark-500 focus:outline-none focus:border-accent/50"
                   />
                 </div>
 
-                {/* Stub: Place of Performance */}
-                <div className="space-y-2 opacity-50">
-                  <label className="text-xs font-medium text-dark-500">
-                    Place of Performance <span className="text-dark-600">(coming soon)</span>
-                  </label>
+                {/* Place of Performance */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-dark-300">Place of Performance</label>
                   <input
                     type="text"
-                    disabled
+                    value={localPopCity}
+                    onChange={(e) => setLocalPopCity(e.target.value)}
                     placeholder="City or zip code"
-                    className="w-full text-xs bg-dark-800/50 border border-dark-700/30 rounded-lg px-3 py-2 text-dark-500
-                      placeholder:text-dark-600 cursor-not-allowed"
+                    className="w-full text-xs bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-2 text-dark-200
+                      placeholder:text-dark-500 focus:outline-none focus:border-accent/50"
                   />
                 </div>
 

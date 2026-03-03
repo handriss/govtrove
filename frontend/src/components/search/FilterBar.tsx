@@ -83,8 +83,13 @@ export default function FilterBar({
   );
 
   const handleMoreFiltersChange = useCallback(
-    (values: { postedFrom: string; postedTo: string }) => {
-      setFilters({ postedFrom: values.postedFrom, postedTo: values.postedTo });
+    (values: { postedFrom: string; postedTo: string; solicitationNumber: string; popCity: string }) => {
+      setFilters({
+        postedFrom: values.postedFrom,
+        postedTo: values.postedTo,
+        solicitationNumber: values.solicitationNumber,
+        popCity: values.popCity,
+      });
     },
     [setFilters],
   );
@@ -196,6 +201,8 @@ export default function FilterBar({
         <MoreFiltersPanel
           postedFrom={filters.postedFrom}
           postedTo={filters.postedTo}
+          solicitationNumber={filters.solicitationNumber}
+          popCity={filters.popCity}
           onChange={handleMoreFiltersChange}
         />
 

@@ -195,6 +195,18 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
+	if params.SolicitationNumber != "" {
+		conditions = append(conditions, fmt.Sprintf("solicitation_number ILIKE $%d", argNum))
+		args = append(args, "%"+params.SolicitationNumber+"%")
+		argNum++
+	}
+
+	if params.PopCity != "" {
+		conditions = append(conditions, fmt.Sprintf("(pop_city ILIKE $%d OR pop_zip LIKE $%d)", argNum, argNum))
+		args = append(args, params.PopCity+"%")
+		argNum++
+	}
+
 	return conditions, args, argNum, ftsArgNum
 }
 

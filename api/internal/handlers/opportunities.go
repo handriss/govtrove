@@ -390,6 +390,9 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 		params.States = capSlice(strings.Split(stateStr, ","), 50)
 	}
 
+	params.SolicitationNumber = truncate(q.Get("sol_num"), 100)
+	params.PopCity = truncate(q.Get("pop_city"), 100)
+
 	if postedFrom := q.Get("posted_from"); postedFrom != "" {
 		if t, err := time.Parse("2006-01-02", postedFrom); err == nil {
 			params.PostedFrom = &t
@@ -454,6 +457,12 @@ func (h *OpportunityHandler) buildFilters(params models.SearchParams) map[string
 	}
 	if len(params.AgencyPaths) > 0 {
 		f["agency"] = params.AgencyPaths
+	}
+	if params.SolicitationNumber != "" {
+		f["sol_num"] = params.SolicitationNumber
+	}
+	if params.PopCity != "" {
+		f["pop_city"] = params.PopCity
 	}
 	if params.PostedFrom != nil {
 		f["posted_from"] = params.PostedFrom.Format("2006-01-02")
