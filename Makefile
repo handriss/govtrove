@@ -7,6 +7,7 @@
 	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
+	n8n-up n8n-down n8n-logs n8n-pull n8n-push n8n-watch \
 	clean
 
 # ============================================================================
@@ -36,6 +37,14 @@ help:
 	@echo "  make dev-up           - Start local PostgreSQL + Adminer (foreground)"
 	@echo "  make dev-up-d         - Start local PostgreSQL + Adminer (detached)"
 	@echo "  make dev-down         - Stop local database services"
+	@echo ""
+	@echo "n8n Automations:"
+	@echo "  make n8n-up           - Start n8n (localhost:5678)"
+	@echo "  make n8n-down         - Stop n8n"
+	@echo "  make n8n-logs         - Tail n8n logs"
+	@echo "  make n8n-pull         - Pull workflows from n8n to n8n/workflows/"
+	@echo "  make n8n-push         - Push workflows from n8n/workflows/ into n8n"
+	@echo "  make n8n-watch        - Auto-pull workflows every 30s"
 	@echo ""
 	@echo "API Service:"
 	@echo "  make api-run          - Run API server locally (localhost:3000)"
@@ -115,11 +124,77 @@ dev: dev-up-d migrate-up api-run-d frontend-dev-d
 	@echo "  - Adminer:    http://localhost:8080"
 	@echo "  - API:        http://localhost:3000"
 	@echo "  - Frontend:   http://localhost:5173"
+	@echo "  - n8n:        http://localhost:5678"
 	@echo ""
 	@echo "Run 'make dev-stop' to stop all services"
 
 dev-stop: frontend-stop api-stop dev-down
 	@echo "All local dev services stopped"
+
+# ============================================================================
+# n8n Automations
+# ============================================================================
+
+N8N_COMPOSE := docker compose -f infra/docker-compose.yml
+
+n8n-up:
+	$(N8N_COMPOSE) up -d n8n
+
+n8n-down:
+	$(N8N_COMPOSE) stop n8n
+
+n8n-logs:
+	$(N8N_COMPOSE) logs -f n8n
+
+n8n-pull:
+	@echo "Pulling n8n workflows..."
+	@$(N8N_COMPOSE) exec -T n8n \
+		sh -c 'rm -rf /home/node/.n8n/exports && mkdir -p /home/node/.n8n/exports && n8n export:workflow --all --output=/home/node/.n8n/exports/ --separate'
+	@mkdir -p /tmp/n8n-pull
+	@rm -f /tmp/n8n-pull/*.json
+	@$(N8N_COMPOSE) cp n8n:/home/node/.n8n/exports/. /tmp/n8n-pull/
+	@changed=0; \
+	for f in /tmp/n8n-pull/*.json; do \
+		[ -f "$$f" ] || continue; \
+		name=$$(basename "$$f"); \
+		if [ ! -f "n8n/workflows/$$name" ] || ! diff -q "$$f" "n8n/workflows/$$name" >/dev/null 2>&1; then \
+			cp "$$f" "n8n/workflows/$$name"; \
+			changed=$$((changed + 1)); \
+		fi; \
+	done; \
+	for f in n8n/workflows/*.json; do \
+		[ -f "$$f" ] || continue; \
+		name=$$(basename "$$f"); \
+		if [ ! -f "/tmp/n8n-pull/$$name" ]; then \
+			rm "$$f"; \
+			changed=$$((changed + 1)); \
+		fi; \
+	done; \
+	rm -rf /tmp/n8n-pull; \
+	if [ $$changed -gt 0 ]; then \
+		echo "Updated $$changed workflow file(s)"; \
+	else \
+		echo "No changes"; \
+	fi
+
+n8n-push:
+	@echo "Pushing workflows to n8n..."
+	@if ls n8n/workflows/*.json 1>/dev/null 2>&1; then \
+		$(N8N_COMPOSE) cp n8n/workflows/. n8n:/home/node/.n8n/imports/ && \
+		$(N8N_COMPOSE) exec -T n8n \
+			sh -c 'for f in /home/node/.n8n/imports/*.json; do n8n import:workflow --input="$$f"; done && rm -rf /home/node/.n8n/imports' && \
+		echo "Pushed workflows to n8n"; \
+	else \
+		echo "No workflow files found in n8n/workflows/"; \
+	fi
+
+n8n-watch:
+	@echo "Watching n8n for workflow changes (every 30s)..."
+	@echo "Press Ctrl+C to stop"
+	@while true; do \
+		$(MAKE) -s n8n-pull 2>/dev/null || echo "n8n not running — retrying..."; \
+		sleep 30; \
+	done
 
 # ============================================================================
 # Migrations
@@ -257,9 +332,11 @@ deploy-frontend: frontend-build
 	@API_URL=$$(cd infra/terraform && terraform output -raw api_url) && \
 	WORKOS_CLIENT_ID=$$(cd infra/terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
 	SENTRY_DSN=$$(cd infra/terraform && terraform output -raw sentry_frontend_dsn 2>/dev/null || echo "") && \
+	TAWK_ID=$$(cd infra/terraform && terraform output -raw tawk_property_id 2>/dev/null || echo "") && \
 	echo "VITE_API_URL=$$API_URL/api" > .env.production && \
 	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> .env.production; fi && \
 	if [ -n "$$SENTRY_DSN" ]; then echo "VITE_SENTRY_DSN=$$SENTRY_DSN" >> .env.production; fi && \
+	if [ -n "$$TAWK_ID" ]; then echo "VITE_TAWK_PROPERTY_ID=$$TAWK_ID" >> .env.production; fi && \
 	cd frontend && npm run build && \
 	BUCKET=$$(cd ../infra/terraform && terraform output -raw frontend_bucket_name) && \
 	DIST_ID=$$(cd ../infra/terraform && terraform output -raw cloudfront_distribution_id) && \
