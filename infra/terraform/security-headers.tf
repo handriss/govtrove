@@ -21,7 +21,7 @@ resource "aws_cloudfront_response_headers_policy" "frontend" {
     }
 
     content_security_policy {
-      content_security_policy = "default-src 'self'; script-src 'self' https://cdn.counter.dev 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.govtrove.com https://*.workos.com https://*.sentry.io; img-src 'self' data:; frame-src https://*.workos.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      content_security_policy = "default-src 'self'; script-src 'self' https://cdn.counter.dev 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.govtrove.com https://*.workos.com https://*.sentry.io https://t.counter.dev; img-src 'self' data:; frame-src https://*.workos.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       override               = true
     }
   }
@@ -49,7 +49,7 @@ resource "aws_cloudfront_response_headers_policy" "landing" {
     }
 
     content_security_policy {
-      content_security_policy = "default-src 'self'; script-src 'self' https://unpkg.com https://cdn.counter.dev 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.govtrove.com; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.govtrove.com"
+      content_security_policy = "default-src 'self'; script-src 'self' https://unpkg.com https://cdn.counter.dev 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.govtrove.com https://t.counter.dev; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.govtrove.com"
       override               = true
     }
   }

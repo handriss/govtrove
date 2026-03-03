@@ -9,7 +9,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   signIn: ReturnType<typeof useAuth>['signIn'];
   signUp: ReturnType<typeof useAuth>['signUp'];
-  signOut: ReturnType<typeof useAuth>['signOut'];
+  signOut: () => void;
   getAccessToken: ReturnType<typeof useAuth>['getAccessToken'];
 }
 
@@ -61,11 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [auth.user?.id]);
 
+  const signOut = useCallback(() => {
+    auth.signOut({ returnTo: window.location.origin });
+  }, [auth.signOut]);
+
   const handleAuthError = useCallback(() => {
     setGovtroveUser(null);
     syncedForUser.current = null;
-    auth.signOut();
-  }, [auth.signOut]);
+    signOut();
+  }, [signOut]);
 
   useEffect(() => {
     window.addEventListener(AUTH_ERROR_EVENT, handleAuthError);
@@ -81,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!auth.user,
         signIn: auth.signIn,
         signUp: auth.signUp,
-        signOut: auth.signOut,
+        signOut,
         getAccessToken: auth.getAccessToken,
       }}
     >
