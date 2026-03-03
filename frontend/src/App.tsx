@@ -16,6 +16,7 @@ import AdminReconcileDQPage from './pages/AdminReconcileDQPage';
 import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import useUTMCapture from './hooks/useUTMCapture';
+import useTawk from './hooks/useTawk';
 import Footer from './components/Footer';
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
@@ -60,6 +61,7 @@ function ErrorFallback() {
 
 function AppRoutes() {
   useUTMCapture();
+  useTawk();
 
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
