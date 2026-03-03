@@ -119,8 +119,57 @@
             color: var(--footer-text);
             text-align: center;
         }
+
+        .summary-box {
+            background: var(--table-header-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.75rem;
+            padding: 2rem 2rem 1.5rem;
+            margin-bottom: 3rem;
+        }
+        .summary-box h2 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+            font-size: 1.25rem;
+        }
+        .summary-box > p {
+            font-size: 0.9375rem;
+        }
+        .summary-box h3 {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+        .summary-box ul {
+            font-size: 0.9375rem;
+            margin-bottom: 0.5rem;
+        }
+        .summary-box li {
+            margin-bottom: 0.25rem;
+        }
+        .summary-box .summary-note {
+            font-size: 0.8125rem;
+            color: var(--footer-text);
+            font-style: italic;
+            margin-top: 1.25rem;
+            margin-bottom: 0;
+        }
+        .legal-divider {
+            border: none;
+            border-top: 1px solid var(--border-subtle);
+            margin: 0 0 2.5rem;
+        }
+        .legal-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--footer-text);
+            margin-bottom: 2rem;
+        }
     </style>
-    <script>if(!localStorage.getItem('govtrove_notrack'))document.write('<script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"><\/script>')</script>
+    <script>if(!localStorage.getItem('govtrove_notrack')){var s=document.createElement('script');s.src='https://cdn.counter.dev/script.js';s.dataset.id='65dc1175-5654-4e33-b21c-a0886ea068d3';s.dataset.utcoffset='1';document.head.appendChild(s)}</script>
 </head>
 <body>
     <nav class="nav">
@@ -144,6 +193,39 @@
             <div class="draft-callout">
                 Draft — This policy is under review and may change before public launch.
             </div>
+
+            <div class="summary-box">
+                <h2>The Short Version</h2>
+                <p>GovTrove is a search tool for government contracts. We are here to provide a service, and that is all we do. Here is what that means for your data:</p>
+
+                <h3>What we collect and why</h3>
+                <ul>
+                    <li><strong>Your email and name</strong> — to create your account and send you alerts</li>
+                    <li><strong>Your searches and saved opportunities</strong> — to make the product work for you</li>
+                    <li><strong>Basic technical data</strong> (IP, browser, device) — to keep the service running and secure</li>
+                    <li><strong>Payment info</strong> — handled entirely by Stripe. We never see your card number.</li>
+                    <li><strong>Passwords</strong> — handled entirely by WorkOS. We never see or store them.</li>
+                </ul>
+
+                <h3>What we don't do</h3>
+                <ul>
+                    <li>No third-party cookies. None.</li>
+                    <li>No tracking you across other websites.</li>
+                    <li>No advertising pixels or retargeting.</li>
+                    <li>No selling, renting, or sharing your data with anyone for their own purposes. Never have, never will.</li>
+                    <li>No profiling. No behavioral advertising. No data broker nonsense.</li>
+                </ul>
+
+                <h3>Your control</h3>
+                <ul>
+                    <li>Delete your account and we delete your data as soon as possible (typically within 24 hours, at most 30 days).</li>
+                    <li>You can access, correct, export, or delete your data anytime — email <a href="mailto:privacy@govtrove.com">privacy@govtrove.com</a>.</li>
+                </ul>
+                <p class="summary-note">This summary is for convenience. The full legal policy is below.</p>
+            </div>
+
+            <hr class="legal-divider">
+            <p class="legal-label">Full Legal Policy</p>
 
             <p class="intro">This Privacy Policy describes how Andr&aacute;s Hinkel, operating as a Hungarian egyéni v&aacute;llalkoz&oacute; (sole proprietor) ("we," "us," "our"), collects, uses, and protects your personal data when you use GovTrove ("Service").</p>
             <p class="intro">We are the data controller for the purposes of the EU General Data Protection Regulation (GDPR). We are committed to protecting your privacy and handling your data transparently.</p>
@@ -303,7 +385,7 @@
             <p>We retain your personal data for as long as you maintain an active account with us.</p>
             <p>If you delete your account:</p>
             <ul>
-                <li>Your account data, saved searches, and usage data are deleted from our systems within 30 days.</li>
+                <li>Your account data, saved searches, and usage data are deleted from our systems as soon as practicable, typically within 24 hours and no later than 30 days.</li>
                 <li>Stripe retains financial transaction records as required by law (tax and accounting obligations). This is a legal obligation we cannot override, but we inform you of it here for transparency.</li>
                 <li>Backup copies may persist for up to 90 days before being automatically purged.</li>
             </ul>
