@@ -18,6 +18,8 @@ export interface FilterState {
   postedTo: string;
   deadlineFrom: string;
   deadlineTo: string;
+  solicitationNumber: string;
+  popCity: string;
   activeOnly: boolean;
   sort: string;
   sortDir: 'asc' | 'desc';
@@ -37,6 +39,8 @@ const DEFAULTS: FilterState = {
   postedTo: '',
   deadlineFrom: '',
   deadlineTo: '',
+  solicitationNumber: '',
+  popCity: '',
   activeOnly: true,
   sort: 'posted_date',
   sortDir: 'desc',
@@ -113,6 +117,8 @@ const URL_MAP: [keyof FilterState, string][] = [
   ['postedTo', 'posted_to'],
   ['deadlineFrom', 'deadline_from'],
   ['deadlineTo', 'deadline_to'],
+  ['solicitationNumber', 'sol_num'],
+  ['popCity', 'pop_city'],
   ['activeOnly', 'active'],
   ['sort', 'sort'],
   ['sortDir', 'order'],
@@ -309,6 +315,8 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.state) count++;
     if (JSON.stringify(filters.noticeType.slice().sort()) !== JSON.stringify(DEFAULTS.noticeType.slice().sort())) count++;
     if (filters.deadlinePreset) count++;
+    if (filters.solicitationNumber) count++;
+    if (filters.popCity) count++;
     if (filters.postedFrom || filters.postedTo) count++;
     if (filters.deadlineFrom || filters.deadlineTo) count++;
     return count;
@@ -337,6 +345,8 @@ export function useFilterState(): UseFilterStateReturn {
       p.deadline_from = today();
     }
 
+    if (filters.solicitationNumber) p.sol_num = filters.solicitationNumber;
+    if (filters.popCity) p.pop_city = filters.popCity;
     if (filters.sort) p.sort = filters.sort;
     if (filters.sortDir) p.order = filters.sortDir;
     if (filters.page > 1) p.page = filters.page;

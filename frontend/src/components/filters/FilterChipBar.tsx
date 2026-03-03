@@ -110,6 +110,22 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       });
     }
 
+    if (filters.solicitationNumber) {
+      result.push({
+        id: 'solicitationNumber',
+        filterKey: 'solicitationNumber',
+        label: `Sol: ${filters.solicitationNumber}`,
+      });
+    }
+
+    if (filters.popCity) {
+      result.push({
+        id: 'popCity',
+        filterKey: 'popCity',
+        label: `Location: ${filters.popCity}`,
+      });
+    }
+
     if (filters.postedFrom || filters.postedTo) {
       const from = filters.postedFrom ? formatDateShort(filters.postedFrom) : '';
       const to = filters.postedTo ? formatDateShort(filters.postedTo) : '';

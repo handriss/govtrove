@@ -82,8 +82,10 @@ type SearchParams struct {
 	PostedFrom   *time.Time
 	PostedTo     *time.Time
 	DeadlineFrom *time.Time
-	DeadlineTo   *time.Time
-	Sort         string
+	DeadlineTo           *time.Time
+	SolicitationNumber   string
+	PopCity              string
+	Sort                 string
 	Order        string
 	Page         int
 	Limit        int

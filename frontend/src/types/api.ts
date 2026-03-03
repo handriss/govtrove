@@ -116,6 +116,8 @@ export interface SearchParams {
   posted_to?: string;
   deadline_from?: string;
   deadline_to?: string;
+  sol_num?: string;
+  pop_city?: string;
   sort?: string;
   order?: string;
   page?: number;
