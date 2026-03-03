@@ -107,10 +107,10 @@ func (r *SavedOpportunityRepository) Add(ctx context.Context, userID, opportunit
 	query := `
 		INSERT INTO saved_opportunities (user_id, opportunity_id, notice_id, solicitation_number)
 		SELECT $1, $2, o.notice_id, o.solicitation_number
-		FROM opportunities o WHERE o.id = $2
+		FROM opportunities o WHERE o.id = $3
 		ON CONFLICT (user_id, opportunity_id) DO NOTHING
 	`
-	_, err := r.pool.Exec(ctx, query, userID, opportunityID)
+	_, err := r.pool.Exec(ctx, query, userID, opportunityID, opportunityID)
 	if err != nil {
 		return fmt.Errorf("adding saved opportunity: %w", err)
 	}
