@@ -27,8 +27,8 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 		INSERT INTO search_events (
 			event_type, user_id, query, filters, sort_by, page,
 			total_results, opportunity_id,
-			user_agent, referer
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			user_agent, referer, utm_campaign
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	_, err = r.pool.Exec(ctx, query,
@@ -42,6 +42,7 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 		event.OpportunityID,
 		event.UserAgent,
 		event.Referer,
+		event.UtmCampaign,
 	)
 	if err != nil {
 		return fmt.Errorf("inserting event: %w", err)

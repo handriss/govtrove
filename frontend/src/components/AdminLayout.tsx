@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, ArrowLeft, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getAdminUsers, type AdminUser } from '../services/api';
 
@@ -39,6 +39,7 @@ const mainNavItems: NavItem[] = [
 const dqNavItems: NavItem[] = [
   { label: 'Ingestion DQ', icon: AlertCircle, path: '/admin/data-quality' },
   { label: 'Reconcile DQ', icon: AlertCircle, path: '/admin/reconcile-dq' },
+  { label: 'Campaigns', icon: Megaphone, path: '/admin/campaigns' },
 ];
 
 function isActive(item: NavItem, pathname: string, searchParams: URLSearchParams): boolean {
