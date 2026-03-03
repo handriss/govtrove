@@ -98,8 +98,51 @@
             color: var(--footer-text);
             text-align: center;
         }
+
+        .summary-box {
+            background: var(--table-header-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 0.75rem;
+            padding: 2rem 2rem 1.5rem;
+            margin-bottom: 3rem;
+        }
+        .summary-box h2 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+            font-size: 1.25rem;
+        }
+        .summary-box > p {
+            font-size: 0.9375rem;
+        }
+        .summary-box ul {
+            font-size: 0.9375rem;
+            margin-bottom: 0.5rem;
+        }
+        .summary-box li {
+            margin-bottom: 0.25rem;
+        }
+        .summary-box .summary-note {
+            font-size: 0.8125rem;
+            color: var(--footer-text);
+            font-style: italic;
+            margin-top: 1.25rem;
+            margin-bottom: 0;
+        }
+        .legal-divider {
+            border: none;
+            border-top: 1px solid var(--border-subtle);
+            margin: 0 0 2.5rem;
+        }
+        .legal-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--footer-text);
+            margin-bottom: 2rem;
+        }
     </style>
-    <script>if(!localStorage.getItem('govtrove_notrack'))document.write('<script src="https://cdn.counter.dev/script.js" data-id="65dc1175-5654-4e33-b21c-a0886ea068d3" data-utcoffset="1"><\/script>')</script>
+    <script>if(!localStorage.getItem('govtrove_notrack')){var s=document.createElement('script');s.src='https://cdn.counter.dev/script.js';s.dataset.id='65dc1175-5654-4e33-b21c-a0886ea068d3';s.dataset.utcoffset='1';document.head.appendChild(s)}</script>
 </head>
 <body>
     <nav class="nav">
@@ -123,6 +166,22 @@
             <div class="draft-callout">
                 Draft — These terms are under review and may change before public launch.
             </div>
+
+            <div class="summary-box">
+                <h2>The Short Version</h2>
+                <p>GovTrove is a search tool for federal contract opportunities. We pull public data from SAM.gov and make it easier to find what you're looking for. We are not the government, and we don't submit bids for you.</p>
+                <ul>
+                    <li>Our data comes from SAM.gov. Always verify details there before making business decisions.</li>
+                    <li>Your saved searches and notes are yours. The contract data itself is public government information.</li>
+                    <li>Don't scrape, bot, or resell. Use the service like a normal person.</li>
+                    <li>We provide the service "as is" — we work hard to keep things accurate and running, but we can't guarantee perfection.</li>
+                    <li>If something goes wrong, email us first. Formal disputes go through arbitration in Budapest (Hungarian law applies).</li>
+                </ul>
+                <p class="summary-note">This summary is for convenience. The full legal terms are below.</p>
+            </div>
+
+            <hr class="legal-divider">
+            <p class="legal-label">Full Legal Terms</p>
 
             <p class="intro">These Terms of Service ("Terms") govern your use of GovTrove ("Service"), operated by Andr&aacute;s Hinkel as a Hungarian egyéni v&aacute;llalkoz&oacute; (sole proprietor), registered in Hungary ("we," "us," "our").</p>
             <p class="intro">By creating an account or using GovTrove, you agree to these Terms. If you do not agree, do not use the Service.</p>
