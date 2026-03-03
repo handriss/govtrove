@@ -631,3 +631,78 @@ func TestAppendFilterConditions_ArgNumContinuation(t *testing.T) {
 		t.Errorf("expected argNum 4, got %d", argNum)
 	}
 }
+
+// --- splitOR ---
+
+func TestSplitOR_SingleTerm(t *testing.T) {
+	got := splitOR("sterilizer")
+	if len(got) != 1 || got[0] != "sterilizer" {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestSplitOR_TwoTerms(t *testing.T) {
+	got := splitOR("sterilizer OR autoclave")
+	if len(got) != 2 || got[0] != "sterilizer" || got[1] != "autoclave" {
+		t.Errorf("got %v", got)
+	}
+}
+
+func TestSplitOR_QuotedPhrasePreserved(t *testing.T) {
+	got := splitOR(`"this OR that" OR sterilizer`)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 segments, got %v", got)
+	}
+	if got[0] != `"this OR that"` {
+		t.Errorf("segment 0: got %q", got[0])
+	}
+}
+
+func TestSplitOR_LowercaseNotSplit(t *testing.T) {
+	got := splitOR("sterilizer or autoclave")
+	if len(got) != 1 {
+		t.Errorf("lowercase 'or' should not split, got %v", got)
+	}
+}
+
+// --- appendFilterConditions with OR keywords ---
+
+func TestAppendFilterConditions_ORKeyword(t *testing.T) {
+	conditions := []string{}
+	args := []any{}
+	f := savedFilters{Keyword: "sterilizer OR autoclave"}
+
+	got, gotArgs, argNum := appendFilterConditions(conditions, args, 1, f)
+	if len(got) != 1 {
+		t.Errorf("expected 1 compound OR condition, got %d: %v", len(got), got)
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "sterilizer" || gotArgs[1] != "autoclave" {
+		t.Errorf("expected 2 FTS args, got: %v", gotArgs)
+	}
+	if argNum != 3 {
+		t.Errorf("expected argNum 3, got %d", argNum)
+	}
+}
+
+func TestAppendFilterConditions_ORKeywordWithPhrase(t *testing.T) {
+	conditions := []string{}
+	args := []any{}
+	f := savedFilters{Keyword: `sterilizer OR "exact phrase"`}
+
+	got, gotArgs, argNum := appendFilterConditions(conditions, args, 1, f)
+	if len(got) != 1 {
+		t.Errorf("expected 1 compound OR condition, got %d: %v", len(got), got)
+	}
+	if len(gotArgs) != 2 {
+		t.Errorf("expected 2 args, got %d: %v", len(gotArgs), gotArgs)
+	}
+	if gotArgs[0] != "sterilizer" {
+		t.Errorf("gotArgs[0]: %v", gotArgs[0])
+	}
+	if gotArgs[1] != "%exact phrase%" {
+		t.Errorf("gotArgs[1]: %v", gotArgs[1])
+	}
+	if argNum != 3 {
+		t.Errorf("expected argNum 3, got %d", argNum)
+	}
+}
