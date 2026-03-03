@@ -328,25 +328,79 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 
 var alertQuotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
 
+func splitOR(query string) []string {
+	var segments []string
+	var current strings.Builder
+	inQuote := false
+
+	for i := 0; i < len(query); i++ {
+		if query[i] == '"' {
+			inQuote = !inQuote
+			current.WriteByte(query[i])
+		} else if !inQuote && i+4 <= len(query) && query[i:i+4] == " OR " {
+			if seg := strings.TrimSpace(current.String()); seg != "" {
+				segments = append(segments, seg)
+			}
+			current.Reset()
+			i += 3
+		} else {
+			current.WriteByte(query[i])
+		}
+	}
+
+	if seg := strings.TrimSpace(current.String()); seg != "" {
+		segments = append(segments, seg)
+	}
+	return segments
+}
+
 func appendFilterConditions(conditions []string, args []any, argNum int, f savedFilters) ([]string, []any, int) {
 	if f.Keyword != "" {
 		kw := f.Keyword
-		// Backward compat: old saved searches with ExactMatch=true, wrap in quotes
 		if f.ExactMatch && !strings.Contains(kw, `"`) {
 			kw = `"` + kw + `"`
 		}
 
-		matches := alertQuotedPhraseRe.FindAllStringSubmatch(kw, -1)
-		for _, m := range matches {
-			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-			args = append(args, "%"+m[1]+"%")
-			argNum++
-		}
-		ftsQuery := strings.TrimSpace(alertQuotedPhraseRe.ReplaceAllString(kw, ""))
-		if ftsQuery != "" {
-			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-			args = append(args, ftsQuery)
-			argNum++
+		segments := splitOR(kw)
+		if len(segments) <= 1 {
+			matches := alertQuotedPhraseRe.FindAllStringSubmatch(kw, -1)
+			for _, m := range matches {
+				conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+				args = append(args, "%"+m[1]+"%")
+				argNum++
+			}
+			ftsQuery := strings.TrimSpace(alertQuotedPhraseRe.ReplaceAllString(kw, ""))
+			if ftsQuery != "" {
+				conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
+				args = append(args, ftsQuery)
+				argNum++
+			}
+		} else {
+			var orParts []string
+			var ftsExprs []string
+
+			for _, seg := range segments {
+				matches := alertQuotedPhraseRe.FindAllStringSubmatch(seg, -1)
+				for _, m := range matches {
+					orParts = append(orParts, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+					args = append(args, "%"+m[1]+"%")
+					argNum++
+				}
+				ftsQuery := strings.TrimSpace(alertQuotedPhraseRe.ReplaceAllString(seg, ""))
+				if ftsQuery != "" {
+					ftsExprs = append(ftsExprs, fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum))
+					args = append(args, ftsQuery)
+					argNum++
+				}
+			}
+
+			if len(ftsExprs) > 0 {
+				orParts = append(orParts, fmt.Sprintf("search_vector @@ (%s)", strings.Join(ftsExprs, " || ")))
+			}
+
+			if len(orParts) > 0 {
+				conditions = append(conditions, "("+strings.Join(orParts, " OR ")+")")
+			}
 		}
 	}
 

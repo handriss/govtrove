@@ -23,6 +23,33 @@ func parseQuotedPhrases(query string) (phrases []string, remainder string) {
 	return
 }
 
+// splitOR splits a query on " OR " (case-sensitive) while respecting quoted phrases.
+func splitOR(query string) []string {
+	var segments []string
+	var current strings.Builder
+	inQuote := false
+
+	for i := 0; i < len(query); i++ {
+		if query[i] == '"' {
+			inQuote = !inQuote
+			current.WriteByte(query[i])
+		} else if !inQuote && i+4 <= len(query) && query[i:i+4] == " OR " {
+			if seg := strings.TrimSpace(current.String()); seg != "" {
+				segments = append(segments, seg)
+			}
+			current.Reset()
+			i += 3
+		} else {
+			current.WriteByte(query[i])
+		}
+	}
+
+	if seg := strings.TrimSpace(current.String()); seg != "" {
+		segments = append(segments, seg)
+	}
+	return segments
+}
+
 type OpportunityRepository struct {
 	pool *pgxpool.Pool
 }
@@ -89,27 +116,57 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 // buildFilterConditions builds WHERE conditions from search params.
 // exclude skips one dimension so facet counts aren't self-filtered:
 // "set_aside", "type", "department", "naics", "state"
-func buildFilterConditions(params models.SearchParams, exclude string, argStart int) ([]string, []any, int, int) {
+func buildFilterConditions(params models.SearchParams, exclude string, argStart int) ([]string, []any, int, string) {
 	var conditions []string
 	var args []any
 	argNum := argStart
-	ftsArgNum := 0
+	var ftsExpr string
 
 	conditions = append(conditions, "active = true")
 	conditions = append(conditions, "is_latest = true")
 
 	if params.Query != "" {
-		phrases, ftsQuery := parseQuotedPhrases(params.Query)
-		for _, phrase := range phrases {
-			conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-			args = append(args, "%"+phrase+"%")
-			argNum++
-		}
-		if ftsQuery != "" {
-			conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-			args = append(args, ftsQuery)
-			ftsArgNum = argNum
-			argNum++
+		segments := splitOR(params.Query)
+		if len(segments) <= 1 {
+			phrases, ftsQuery := parseQuotedPhrases(params.Query)
+			for _, phrase := range phrases {
+				conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+				args = append(args, "%"+phrase+"%")
+				argNum++
+			}
+			if ftsQuery != "" {
+				conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
+				args = append(args, ftsQuery)
+				ftsExpr = fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum)
+				argNum++
+			}
+		} else {
+			var orParts []string
+			var ftsExprs []string
+
+			for _, seg := range segments {
+				phrases, ftsQuery := parseQuotedPhrases(seg)
+				for _, phrase := range phrases {
+					orParts = append(orParts, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
+					args = append(args, "%"+phrase+"%")
+					argNum++
+				}
+				if ftsQuery != "" {
+					ftsExprs = append(ftsExprs, fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum))
+					args = append(args, ftsQuery)
+					argNum++
+				}
+			}
+
+			if len(ftsExprs) > 0 {
+				combined := strings.Join(ftsExprs, " || ")
+				orParts = append(orParts, fmt.Sprintf("search_vector @@ (%s)", combined))
+				ftsExpr = combined
+			}
+
+			if len(orParts) > 0 {
+				conditions = append(conditions, "("+strings.Join(orParts, " OR ")+")")
+			}
 		}
 	}
 
@@ -207,13 +264,13 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
-	return conditions, args, argNum, ftsArgNum
+	return conditions, args, argNum, ftsExpr
 }
 
 func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
-	conditions, args, argNum, ftsArgNum := buildFilterConditions(params, "", 1)
+	conditions, args, argNum, ftsExpr := buildFilterConditions(params, "", 1)
 
-	orderClause := r.buildOrderClause(params, ftsArgNum)
+	orderClause := r.buildOrderClause(params, ftsExpr)
 
 	offset := (params.Page - 1) * params.Limit
 	args = append(args, params.Limit, offset)
@@ -236,7 +293,7 @@ func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (st
 	return query, args
 }
 
-func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, ftsArgNum int) string {
+func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, ftsExpr string) string {
 	order := params.Order
 	if order == "" {
 		order = "desc"
@@ -248,8 +305,8 @@ func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, fts
 
 	switch params.Sort {
 	case "relevance":
-		if params.Query != "" && ftsArgNum > 0 {
-			return fmt.Sprintf("ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', $%d)) %s, posted_date DESC", ftsArgNum, order)
+		if params.Query != "" && ftsExpr != "" {
+			return fmt.Sprintf("ORDER BY ts_rank(search_vector, %s) %s, posted_date DESC", ftsExpr, order)
 		}
 		return "ORDER BY posted_date DESC"
 	case "deadline":
@@ -297,7 +354,7 @@ func (r *OpportunityRepository) SuggestQuery(ctx context.Context, query string) 
 		matched AS (
 			SELECT qw.ordinality,
 				CASE WHEN (SELECT similarity(qw.qw, tw) FROM title_words ORDER BY similarity(qw.qw, tw) DESC LIMIT 1) > 0.3
-					THEN (SELECT tw FROM title_words ORDER BY similarity(qw.qw, tw) DESC LIMIT 1)
+					THEN (SELECT lower(tw) FROM title_words ORDER BY similarity(qw.qw, tw) DESC LIMIT 1)
 					ELSE qw.qw
 				END AS replacement
 			FROM query_words qw

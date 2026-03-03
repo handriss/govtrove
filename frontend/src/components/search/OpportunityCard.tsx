@@ -84,7 +84,7 @@ export function highlightKeywords(text: string, keyword: string | undefined): Re
   if (!keyword || !keyword.trim()) return text;
 
   const cleaned = keyword.replace(/"/g, '');
-  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2);
+  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2 && t !== 'OR');
   if (terms.length === 0) return text;
   const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
@@ -108,7 +108,7 @@ export function extractSnippet(description: string | undefined, keyword: string 
 
   const lower = text.toLowerCase();
   const cleaned = keyword.replace(/"/g, '');
-  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2);
+  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2 && t !== 'OR');
   let bestIdx = -1;
   for (const term of terms) {
     const idx = lower.indexOf(term.toLowerCase());
