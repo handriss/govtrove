@@ -40,7 +40,7 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
       result.push({
         id: 'keyword',
         filterKey: 'keyword',
-        label: `"${filters.keyword}"`,
+        label: filters.keyword.startsWith('"') ? filters.keyword : `"${filters.keyword}"`,
       });
     }
 

@@ -68,6 +68,7 @@ export default function SearchResults({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const anySelected = selectedIds.size > 0;
+  const displayKeyword = keyword?.replace(/^"+|"+$/g, '') || keyword;
 
   // Clear selection when results change
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function SearchResults({
     if (loading) return;
     const count = total.toLocaleString();
     document.title = keyword
-      ? `${count} results for "${keyword}" — GovTrove`
+      ? `${count} results for "${displayKeyword}" — GovTrove`
       : `${count} results — GovTrove`;
     return () => { document.title = 'GovTrove'; };
   }, [total, keyword, loading]);
@@ -144,7 +145,7 @@ export default function SearchResults({
               <span className="ml-1">results</span>
               {keyword && (
                 <span className="ml-1">
-                  for &lsquo;<span className="text-dark-200">{keyword}</span>&rsquo;
+                  for &lsquo;<span className="text-dark-200">{displayKeyword}</span>&rsquo;
                 </span>
               )}
             </>
@@ -297,7 +298,7 @@ function ZeroResults({
       </h3>
       {keyword && (
         <p className="text-dark-400 text-sm mb-2">
-          No results for &ldquo;<span className="text-dark-300">{keyword}</span>&rdquo;
+          No results for &ldquo;<span className="text-dark-300">{keyword?.replace(/^"+|"+$/g, '')}</span>&rdquo;
         </p>
       )}
       {querySuggestion && onQuerySuggestionClick && (
