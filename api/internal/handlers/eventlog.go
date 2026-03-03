@@ -37,6 +37,14 @@ func (l *EventLogger) Log(r *http.Request, userID *int, event *models.SearchEven
 		event.Referer = &ref
 	}
 
+	utmCampaign := r.Header.Get("X-UTM-Campaign")
+	if utmCampaign != "" {
+		if len(utmCampaign) > 255 {
+			utmCampaign = utmCampaign[:255]
+		}
+		event.UtmCampaign = &utmCampaign
+	}
+
 	if botfilter.IsBot(ua) {
 		return
 	}

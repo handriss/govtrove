@@ -17,4 +17,5 @@ type SearchEvent struct {
 	CreatedAt     time.Time              `json:"created_at"`
 	UserAgent     *string                `json:"user_agent,omitempty"`
 	Referer       *string                `json:"referer,omitempty"`
+	UtmCampaign   *string                `json:"utm_campaign,omitempty"`
 }

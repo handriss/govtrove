@@ -4,6 +4,11 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export const AUTH_ERROR_EVENT = 'govtrove:auth-error';
 
+function utmHeaders(): Record<string, string> {
+  const campaign = sessionStorage.getItem('govtrove_utm_campaign');
+  return campaign ? { 'X-UTM-Campaign': campaign } : {};
+}
+
 function checkAuth(response: Response): void {
   if (response.status === 401) {
     window.dispatchEvent(new CustomEvent(AUTH_ERROR_EVENT));
@@ -43,7 +48,9 @@ export async function searchOpportunities(params: SearchParams = {}): Promise<Se
   if (params.page) searchParams.set('page', String(params.page));
   if (params.limit) searchParams.set('limit', String(params.limit));
 
-  const response = await fetch(`${API_BASE}/opportunities?${searchParams}`);
+  const response = await fetch(`${API_BASE}/opportunities?${searchParams}`, {
+    headers: { ...utmHeaders() },
+  });
   if (!response.ok) {
     throw new Error(`Search failed: ${response.statusText}`);
   }
@@ -51,7 +58,9 @@ export async function searchOpportunities(params: SearchParams = {}): Promise<Se
 }
 
 export async function getOpportunity(id: number): Promise<Opportunity> {
-  const response = await fetch(`${API_BASE}/opportunities/${id}`);
+  const response = await fetch(`${API_BASE}/opportunities/${id}`, {
+    headers: { ...utmHeaders() },
+  });
   if (!response.ok) {
     if (response.status === 404) {
       throw new Error('Opportunity not found');
@@ -205,7 +214,7 @@ export async function getSavedOpportunitiesWithDetails(
 export async function saveOpportunity(token: string, id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/saved/opportunities`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...utmHeaders() },
     body: JSON.stringify({ opportunity_id: id }),
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to save opportunity: ${response.statusText}`); }
@@ -214,7 +223,7 @@ export async function saveOpportunity(token: string, id: number): Promise<void> 
 export async function unsaveOpportunity(token: string, id: number): Promise<void> {
   const response = await fetch(`${API_BASE}/saved/opportunities`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...utmHeaders() },
     body: JSON.stringify({ opportunity_id: id }),
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to unsave opportunity: ${response.statusText}`); }
@@ -750,4 +759,57 @@ export async function updateAdminReconcileDQResolution(
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error(`${response.status}`);
+}
+
+// --- UTM Analytics ---
+
+export interface UTMCampaignSummary {
+  campaign: string;
+  landing_visits: number;
+  app_visits: number;
+  total_visits: number;
+  first_visit: string;
+  last_visit: string;
+}
+
+export interface UTMSourceSummary {
+  source: string;
+  medium: string;
+  count: number;
+}
+
+export interface UTMDailyCounts {
+  date: string;
+  count: number;
+}
+
+export interface UTMQueryCount {
+  query: string;
+  count: number;
+}
+
+export interface UTMCampaignSearchActivity {
+  campaign: string;
+  total_searches: number;
+  total_views: number;
+  top_queries: UTMQueryCount[] | null;
+}
+
+export interface UTMAnalytics {
+  total_visits: number;
+  campaigns: UTMCampaignSummary[] | null;
+  sources: UTMSourceSummary[] | null;
+  daily_visits: UTMDailyCounts[] | null;
+  search_activity: UTMCampaignSearchActivity[] | null;
+}
+
+export async function getAdminUTMAnalytics(
+  token: string,
+  period = '30d',
+): Promise<UTMAnalytics> {
+  const response = await fetch(`${API_BASE}/admin/utm-analytics?period=${period}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
 }

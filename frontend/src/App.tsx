@@ -13,7 +13,9 @@ import AdminPage from './pages/AdminPage';
 import AdminPipelineRunDetailPage from './pages/AdminPipelineRunDetailPage';
 import AdminDataQualityPage from './pages/AdminDataQualityPage';
 import AdminReconcileDQPage from './pages/AdminReconcileDQPage';
+import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import useUTMCapture from './hooks/useUTMCapture';
 import Footer from './components/Footer';
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
@@ -57,6 +59,8 @@ function ErrorFallback() {
 }
 
 function AppRoutes() {
+  useUTMCapture();
+
   return (
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <Routes>
@@ -70,6 +74,7 @@ function AppRoutes() {
         <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
         <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
         <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
+        <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
         <Route path="/callback" element={<AuthCallback />} />
         <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
         <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />

@@ -150,6 +150,7 @@ func main() {
 	savedSearchRepo := repository.NewSavedSearchRepository(pool)
 	userUpdateRepo := repository.NewUserUpdateRepository(pool)
 	pipelineRepo := repository.NewPipelineRepository(pool)
+	utmRepo := repository.NewUTMRepository(pool)
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
@@ -163,6 +164,7 @@ func main() {
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)
+	utmHandler := handlers.NewUTMHandler(utmRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -190,7 +192,7 @@ func main() {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization", "X-UTM-Campaign"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -234,6 +236,11 @@ func main() {
 			r.Get("/opportunities/{id}", oppHandler.GetByID)
 		})
 
+		r.Route("/utm", func(r chi.Router) {
+			r.Use(httprate.LimitByIP(10, time.Minute))
+			r.Post("/", utmHandler.TrackVisit)
+		})
+
 		r.Get("/agencies", agencyHandler.Search)
 		r.Get("/opportunities/facets", oppHandler.GetFacets)
 		r.Get("/opportunities/{id}/history", oppHandler.GetSolicitationHistory)
@@ -268,6 +275,7 @@ func main() {
 					r.Get("/reconcile-dq", adminHandler.ListReconcileDQIssues)
 					r.Get("/reconcile-dq/{id}", adminHandler.GetReconcileDQDetail)
 					r.Put("/reconcile-dq/{id}", adminHandler.UpdateReconcileDQResolution)
+					r.Get("/utm-analytics", utmHandler.GetAnalytics)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
