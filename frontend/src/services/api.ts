@@ -867,6 +867,26 @@ export async function adminResendEmail(
   if (!response.ok) throw new Error(`${response.status}`);
 }
 
+export interface AdminSendNewEmailInput {
+  template_name: string;
+  to_email: string;
+  subject: string;
+  template_data: Record<string, unknown>;
+}
+
+export async function adminSendNewEmail(
+  token: string,
+  input: AdminSendNewEmailInput,
+): Promise<{ id: string }> {
+  const response = await fetch(`${API_BASE}/admin/send-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 // --- UTM Analytics ---
 
 export interface UTMCampaignSummary {

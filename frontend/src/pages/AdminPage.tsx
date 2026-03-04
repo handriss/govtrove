@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
+import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, RotateCw, Plus } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
+  adminSendNewEmail, type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
@@ -1011,6 +1012,44 @@ function EmailPrefsTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
+interface TemplateField {
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'json';
+  options?: string[];
+}
+
+const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
+  'welcome.html': [
+    { name: 'Greeting', label: 'Greeting', type: 'text' },
+  ],
+  'opportunity_update.html': [
+    { name: 'ChangeType', label: 'ChangeType', type: 'select', options: ['amendment', 'field_changes'] },
+    { name: 'OpportunityTitle', label: 'OpportunityTitle', type: 'text' },
+    { name: 'SolicitationNumber', label: 'SolicitationNumber', type: 'text' },
+    { name: 'OpportunityURL', label: 'OpportunityURL', type: 'text' },
+    { name: 'Changes', label: 'Changes', type: 'json' },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+  ],
+  'search_results.html': [
+    { name: 'MatchCount', label: 'MatchCount', type: 'number' },
+    { name: 'SearchName', label: 'SearchName', type: 'text' },
+    { name: 'SearchURL', label: 'SearchURL', type: 'text' },
+    { name: 'Opportunities', label: 'Opportunities', type: 'json' },
+    { name: 'HasMore', label: 'HasMore', type: 'select', options: ['true', 'false'] },
+    { name: 'RemainingCount', label: 'RemainingCount', type: 'number' },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+  ],
+  'digest.html': [
+    { name: 'Greeting', label: 'Greeting', type: 'text' },
+    { name: 'SearchAlerts', label: 'SearchAlerts', type: 'json' },
+    { name: 'OpportunityAlerts', label: 'OpportunityAlerts', type: 'json' },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+  ],
+};
+
+const TEMPLATE_NAMES = Object.keys(TEMPLATE_FIELDS);
+
 function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   const [emails, setEmails] = useState<AdminSentEmail[]>([]);
   const [total, setTotal] = useState(0);
@@ -1020,6 +1059,15 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   const [resendEmail, setResendEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const limit = 50;
+
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeTemplate, setComposeTemplate] = useState(TEMPLATE_NAMES[0]);
+  const [composeToEmail, setComposeToEmail] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeFields, setComposeFields] = useState<Record<string, string>>({});
+  const [composeSending, setComposeSending] = useState(false);
+  const [composeStatus, setComposeStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [composeError, setComposeError] = useState('');
 
   const fetchPage = useCallback(async (p: number) => {
     setLoading(true);
@@ -1038,6 +1086,63 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   }, [getToken]);
 
   useEffect(() => { fetchPage(1); }, [fetchPage]);
+
+  function handleTemplateChange(name: string) {
+    setComposeTemplate(name);
+    setComposeFields({});
+    setComposeStatus('idle');
+    setComposeError('');
+  }
+
+  async function handleComposeSend() {
+    setComposeError('');
+    const fields = TEMPLATE_FIELDS[composeTemplate] || [];
+    const templateData: Record<string, unknown> = {};
+    for (const f of fields) {
+      const raw = composeFields[f.name] || '';
+      if (f.type === 'json') {
+        if (raw.trim()) {
+          try { templateData[f.name] = JSON.parse(raw); } catch {
+            setComposeError(`Invalid JSON in ${f.label}`);
+            return;
+          }
+        }
+      } else if (f.type === 'number') {
+        templateData[f.name] = raw ? parseInt(raw, 10) : 0;
+      } else if (f.type === 'select' && (raw === 'true' || raw === 'false')) {
+        templateData[f.name] = raw === 'true';
+      } else {
+        templateData[f.name] = raw;
+      }
+    }
+
+    setComposeSending(true);
+    try {
+      const token = await getToken();
+      const input: AdminSendNewEmailInput = {
+        template_name: composeTemplate,
+        to_email: composeToEmail,
+        subject: composeSubject,
+        template_data: templateData,
+      };
+      await adminSendNewEmail(token, input);
+      setComposeStatus('success');
+      fetchPage(1);
+      setTimeout(() => {
+        setShowCompose(false);
+        setComposeToEmail('');
+        setComposeSubject('');
+        setComposeFields({});
+        setComposeTemplate(TEMPLATE_NAMES[0]);
+        setComposeStatus('idle');
+      }, 1500);
+    } catch {
+      setComposeStatus('error');
+      setComposeError('Failed to send email');
+    } finally {
+      setComposeSending(false);
+    }
+  }
 
   const totalPages = Math.ceil(total / limit);
 
@@ -1068,12 +1173,24 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
     }
   }
 
+  const composeFieldDefs = TEMPLATE_FIELDS[composeTemplate] || [];
+  const inputClass = 'w-full px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 placeholder:text-dark-600';
+
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-dark-200">
-          Sent Emails <span className="text-dark-500 text-sm font-normal">({total.toLocaleString()})</span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-medium text-dark-200">
+            Sent Emails <span className="text-dark-500 text-sm font-normal">({total.toLocaleString()})</span>
+          </h2>
+          <button
+            onClick={() => setShowCompose(!showCompose)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 border border-accent/20 transition-colors"
+          >
+            <Plus size={14} />
+            Send New Email
+          </button>
+        </div>
         {totalPages > 1 && (
           <div className="flex items-center gap-2 text-sm">
             <button
@@ -1094,6 +1211,96 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
           </div>
         )}
       </div>
+
+      {showCompose && (
+        <div className="bg-dark-800/30 border border-dark-700/50 rounded-xl p-4 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-dark-400 mb-1">Template</label>
+              <select
+                value={composeTemplate}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                className={inputClass}
+              >
+                {TEMPLATE_NAMES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-dark-400 mb-1">Recipient</label>
+              <input
+                type="email"
+                value={composeToEmail}
+                onChange={(e) => setComposeToEmail(e.target.value)}
+                placeholder="to@example.com"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-dark-400 mb-1">Subject</label>
+              <input
+                type="text"
+                value={composeSubject}
+                onChange={(e) => setComposeSubject(e.target.value)}
+                placeholder="Email subject"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          {composeFieldDefs.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {composeFieldDefs.map((f) => (
+                <div key={f.name} className={f.type === 'json' ? 'col-span-2' : ''}>
+                  <label className="block text-xs text-dark-400 mb-1">{f.label}</label>
+                  {f.type === 'select' ? (
+                    <select
+                      value={composeFields[f.name] || ''}
+                      onChange={(e) => setComposeFields(prev => ({ ...prev, [f.name]: e.target.value }))}
+                      className={inputClass}
+                    >
+                      <option value="">Select...</option>
+                      {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : f.type === 'json' ? (
+                    <textarea
+                      rows={3}
+                      value={composeFields[f.name] || ''}
+                      onChange={(e) => setComposeFields(prev => ({ ...prev, [f.name]: e.target.value }))}
+                      placeholder="JSON value"
+                      className={inputClass + ' font-mono text-xs'}
+                    />
+                  ) : (
+                    <input
+                      type={f.type === 'number' ? 'number' : 'text'}
+                      value={composeFields[f.name] || ''}
+                      onChange={(e) => setComposeFields(prev => ({ ...prev, [f.name]: e.target.value }))}
+                      className={inputClass}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleComposeSend}
+              disabled={composeSending || !composeToEmail || !composeSubject}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-dark-950 hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {composeSending ? 'Sending...' : 'Send'}
+            </button>
+            <button
+              onClick={() => { setShowCompose(false); setComposeStatus('idle'); setComposeError(''); }}
+              className="px-4 py-2 text-sm text-dark-400 hover:text-dark-200 transition-colors"
+            >
+              Cancel
+            </button>
+            {composeStatus === 'success' && <span className="text-emerald-400 text-sm">Sent</span>}
+            {composeError && <span className="text-red-400 text-sm">{composeError}</span>}
+          </div>
+        </div>
+      )}
 
       {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
 

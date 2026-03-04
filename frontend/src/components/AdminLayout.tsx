@@ -26,22 +26,49 @@ interface NavItem {
   tab?: string;
 }
 
-const mainNavItems: NavItem[] = [
-  { label: 'Users', icon: Users, path: '/admin' },
-  { label: 'Notifications', icon: Bell, path: '/admin', tab: 'notifications' },
-  { label: 'API Keys', icon: Key, path: '/admin', tab: 'api-keys' },
-  { label: 'SAM.gov Requests', icon: Globe, path: '/admin', tab: 'samgov-requests' },
-  { label: 'Usage Chart', icon: BarChart3, path: '/admin', tab: 'usage' },
-  { label: 'Pipeline', icon: Activity, path: '/admin', tab: 'pipeline' },
-  { label: 'Searches', icon: Search, path: '/admin', tab: 'searches' },
-  { label: 'Email Prefs', icon: Mail, path: '/admin', tab: 'email-prefs' },
-  { label: 'Sent Emails', icon: Send, path: '/admin', tab: 'sent-emails' },
-];
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
 
-const dqNavItems: NavItem[] = [
-  { label: 'Ingestion DQ', icon: AlertCircle, path: '/admin/data-quality' },
-  { label: 'Reconcile DQ', icon: AlertCircle, path: '/admin/reconcile-dq' },
-  { label: 'Campaigns', icon: Megaphone, path: '/admin/campaigns' },
+const navGroups: NavGroup[] = [
+  {
+    label: 'Users & Analytics',
+    items: [
+      { label: 'Users', icon: Users, path: '/admin' },
+      { label: 'Notifications', icon: Bell, path: '/admin', tab: 'notifications' },
+      { label: 'Searches', icon: Search, path: '/admin', tab: 'searches' },
+      { label: 'Usage Chart', icon: BarChart3, path: '/admin', tab: 'usage' },
+    ],
+  },
+  {
+    label: 'Email',
+    items: [
+      { label: 'Email Prefs', icon: Mail, path: '/admin', tab: 'email-prefs' },
+      { label: 'Sent Emails', icon: Send, path: '/admin', tab: 'sent-emails' },
+    ],
+  },
+  {
+    label: 'Pipeline & Data',
+    items: [
+      { label: 'Pipeline', icon: Activity, path: '/admin', tab: 'pipeline' },
+      { label: 'API Keys', icon: Key, path: '/admin', tab: 'api-keys' },
+      { label: 'SAM.gov Requests', icon: Globe, path: '/admin', tab: 'samgov-requests' },
+    ],
+  },
+  {
+    label: 'Data Quality',
+    items: [
+      { label: 'Ingestion DQ', icon: AlertCircle, path: '/admin/data-quality' },
+      { label: 'Reconcile DQ', icon: AlertCircle, path: '/admin/reconcile-dq' },
+    ],
+  },
+  {
+    label: 'Other',
+    items: [
+      { label: 'Campaigns', icon: Megaphone, path: '/admin/campaigns' },
+    ],
+  },
 ];
 
 function isActive(item: NavItem, pathname: string, searchParams: URLSearchParams): boolean {
@@ -138,9 +165,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-          {mainNavItems.map(navLink)}
-          {dqNavItems.map(navLink)}
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          {navGroups.map((group, gi) => (
+            <div key={group.label}>
+              {gi > 0 && <hr className="border-dark-700/50 my-2 mx-1" />}
+              {!collapsed && (
+                <span className="block px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-dark-600">
+                  {group.label}
+                </span>
+              )}
+              <div className="space-y-1">
+                {group.items.map(navLink)}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Footer */}
