@@ -79,9 +79,11 @@ type Input struct {
 }
 
 type Output struct {
-	Status            string `json:"status"`
-	SearchAlerts      int    `json:"search_alerts"`
-	OpportunityAlerts int    `json:"opportunity_alerts"`
+	Status                    string `json:"status"`
+	SearchAlerts              int    `json:"search_alerts"`
+	OpportunityAlerts         int    `json:"opportunity_alerts"`
+	SearchNotifications       int    `json:"search_notifications"`
+	OpportunityNotifications  int    `json:"opportunity_notifications"`
 }
 
 type Handler struct {
@@ -137,12 +139,23 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		return nil, fmt.Errorf("opportunity alerts: %w", err)
 	}
 
+	searchNotifs, err := h.writeSearchNotifications(ctx)
+	if err != nil {
+		h.Logger.Error("search notifications failed (non-fatal)", "error", err)
+	}
+	oppNotifs, err := h.writeOpportunityNotifications(ctx)
+	if err != nil {
+		h.Logger.Error("opportunity notifications failed (non-fatal)", "error", err)
+	}
+
 	durationMs := int(time.Since(start).Milliseconds())
 
 	if stepID != uuid.Nil {
 		stepStats := map[string]any{
-			"search_alerts":      searchAlerts,
-			"opportunity_alerts": oppAlerts,
+			"search_alerts":             searchAlerts,
+			"opportunity_alerts":        oppAlerts,
+			"search_notifications":      searchNotifs,
+			"opportunity_notifications": oppNotifs,
 		}
 		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
 			h.Logger.Warn("failed to complete pipeline step", "error", err)
@@ -152,13 +165,17 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	h.Logger.Info("alerts complete",
 		"search_alerts", searchAlerts,
 		"opportunity_alerts", oppAlerts,
+		"search_notifications", searchNotifs,
+		"opportunity_notifications", oppNotifs,
 		"duration_ms", durationMs,
 	)
 
 	return &Output{
-		Status:            "ok",
-		SearchAlerts:      searchAlerts,
-		OpportunityAlerts: oppAlerts,
+		Status:                    "ok",
+		SearchAlerts:              searchAlerts,
+		OpportunityAlerts:         oppAlerts,
+		SearchNotifications:       searchNotifs,
+		OpportunityNotifications:  oppNotifs,
 	}, nil
 }
 
