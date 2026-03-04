@@ -9,6 +9,7 @@ import OpportunityDetail from './pages/OpportunityDetail';
 import ProfilePage from './pages/ProfilePage';
 import SavedPage from './pages/SavedPage';
 import NotificationsPage from './pages/NotificationsPage';
+import NotificationsV2Page from './pages/NotificationsV2Page';
 import AdminPage from './pages/AdminPage';
 import AdminPipelineRunDetailPage from './pages/AdminPipelineRunDetailPage';
 import AdminDataQualityPage from './pages/AdminDataQualityPage';
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/saved" element={<SavedPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/notifications-v2" element={<NotificationsV2Page />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
         <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
