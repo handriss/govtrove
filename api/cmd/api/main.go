@@ -290,6 +290,7 @@ func main() {
 					r.Put("/email-preferences/{userId}", adminHandler.UpdateEmailPreference)
 					r.Get("/sent-emails", adminHandler.ListSentEmails)
 					r.Post("/sent-emails/{id}/resend", adminHandler.ResendEmail)
+					r.Post("/send-email", adminHandler.SendNewEmail)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)

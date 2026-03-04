@@ -458,6 +458,59 @@ func (h *AdminHandler) ListSentEmails(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+var allowedTemplates = map[string]bool{
+	"welcome.html":            true,
+	"opportunity_update.html": true,
+	"search_results.html":     true,
+	"digest.html":             true,
+}
+
+func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		TemplateName string         `json:"template_name"`
+		ToEmail      string         `json:"to_email"`
+		Subject      string         `json:"subject"`
+		TemplateData map[string]any `json:"template_data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if body.TemplateName == "" || body.ToEmail == "" || body.Subject == "" {
+		http.Error(w, "template_name, to_email, and subject are required", http.StatusBadRequest)
+		return
+	}
+
+	if !allowedTemplates[body.TemplateName] {
+		http.Error(w, "template_name not allowed", http.StatusBadRequest)
+		return
+	}
+
+	if h.emailSvc == nil {
+		http.Error(w, "email service not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	sentID, err := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+		UserID:       0,
+		ToEmail:      body.ToEmail,
+		EmailType:    "admin_test",
+		TemplateName: body.TemplateName,
+		TemplateData: body.TemplateData,
+		Subject:      body.Subject,
+	})
+	if err != nil {
+		h.logger.Error("send new email failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"id": sentID})
+}
+
 func (h *AdminHandler) ResendEmail(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
