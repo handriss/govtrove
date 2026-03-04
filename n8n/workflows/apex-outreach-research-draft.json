@@ -1,0 +1,215 @@
+{
+  "id": "1",
+  "name": "APEX Outreach - Research & Draft",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      id: 'va-richmond',\n      office_name: 'Virginia APEX Accelerator',\n      contact_name: 'Jane Smith',\n      contact_title: 'Program Director',\n      email: 'jane.smith@example.com',\n      state: 'VA',\n      city: 'Richmond',\n      focus_areas: ['defense', 'IT'],\n      client_count: 350\n    }\n  },\n  {\n    json: {\n      id: 'tx-san-antonio',\n      office_name: 'Texas APEX Accelerator',\n      contact_name: 'Carlos Garcia',\n      contact_title: 'Senior Counselor',\n      email: 'carlos.garcia@example.com',\n      state: 'TX',\n      city: 'San Antonio',\n      focus_areas: ['defense', 'logistics'],\n      client_count: 500\n    }\n  },\n  {\n    json: {\n      id: 'md-baltimore',\n      office_name: 'Maryland APEX Accelerator',\n      contact_name: 'Patricia Johnson',\n      contact_title: 'Director of Client Services',\n      email: 'patricia.johnson@example.com',\n      state: 'MD',\n      city: 'Baltimore',\n      focus_areas: ['cybersecurity', 'defense'],\n      client_count: 420\n    }\n  }\n];"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Load APEX Contacts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.govtrove.com/api/opportunities?pop_state={{ $json.state }}&limit=1",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Get State Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.govtrove.com/api/opportunities/facets?pop_state={{ $('Loop Over Items').item.json.state }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Get State Facets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Loop Over Items').item.json;\nconst oppsResponse = $('Get State Opportunities').item.json;\nconst facetsResponse = $('Get State Facets').item.json;\n\nconst total = oppsResponse.total || 0;\n\n// Parse facets\nconst setAsides = (facetsResponse.set_asides || [])\n  .sort((a, b) => b.count - a.count)\n  .slice(0, 5)\n  .map(f => `${f.label}: ${f.count}`)\n  .join(', ');\n\nconst types = (facetsResponse.types || [])\n  .sort((a, b) => b.count - a.count)\n  .slice(0, 5)\n  .map(f => `${f.label}: ${f.count}`)\n  .join(', ');\n\nconst utmLink = `https://govtrove.com?utm_source=apex_outreach&utm_medium=email&utm_campaign=${contact.id}`;\n\nreturn [{\n  json: {\n    contact,\n    enrichment: {\n      total_opportunities: total,\n      set_asides: setAsides,\n      types: types\n    },\n    utm_link: utmLink\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Build Research Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-20250514',\n  max_tokens: 1024,\n  messages: [{\n    role: 'user',\n    content: `You are Andrew, founder of GovTrove — a free tool that helps small businesses find federal contract opportunities.\n\nWrite a short outreach email (under 200 words) to an APEX Accelerator contact.\n\nRECIPIENT CONTEXT:\n- Office: ${$json.contact.office_name}\n- Contact: ${$json.contact.contact_name}, ${$json.contact.contact_title}\n- Location: ${$json.contact.city}, ${$json.contact.state}\n- Focus areas: ${$json.contact.focus_areas.join(', ')}\n- Approximate client count: ${$json.contact.client_count}\n\nGOVTROVE DATA FOR ${$json.contact.state}:\n- Total active opportunities: ${$json.enrichment.total_opportunities}\n- Set-aside breakdown: ${$json.enrichment.set_asides}\n- Opportunity types: ${$json.enrichment.types}\n\nABOUT GOVTROVE:\n- Free search tool for SAM.gov contract opportunities\n- Filters by state, set-aside, NAICS, agency, keyword\n- Daily email alerts for new matches\n- One-pager PDF: https://govtrove.com/govtrove-one-pager.pdf\n- Tracking link for this contact: ${$json.utm_link}\n\nINSTRUCTIONS:\n- Be genuine and conversational, not salesy\n- Lead with a specific data point about their state\n- Mention the one-pager PDF as an attachment reference\n- Include the tracking link naturally\n- Close with a low-pressure ask (e.g., \"happy to jump on a quick call\" or \"would love your feedback\")\n- Sign as \"Andrew\"\n\nFORMAT YOUR RESPONSE EXACTLY AS:\nSUBJECT: [subject line here]\nBODY:\n[email body here]`\n  }]\n}) }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "name": "Generate Email Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $('Build Research Context').item.json.contact;\nconst enrichment = $('Build Research Context').item.json.enrichment;\nconst utmLink = $('Build Research Context').item.json.utm_link;\nconst response = $json;\n\nlet text = '';\ntry {\n  text = response.content[0].text;\n} catch (e) {\n  return [{ json: { error: 'Failed to parse Claude response', raw: response } }];\n}\n\n// Parse SUBJECT: and BODY: from response\nconst subjectMatch = text.match(/SUBJECT:\\s*(.+?)\\n/);\nconst bodyMatch = text.match(/BODY:\\s*\\n([\\s\\S]+)$/);\n\nconst subject = subjectMatch ? subjectMatch[1].trim() : 'No subject parsed';\nconst body = bodyMatch ? bodyMatch[1].trim() : text;\n\nreturn [{\n  json: {\n    contact_id: contact.id,\n    office_name: contact.office_name,\n    contact_name: contact.contact_name,\n    contact_email: contact.email,\n    state: contact.state,\n    subject,\n    body,\n    utm_link: utmLink,\n    enrichment,\n    status: 'pending_review',\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0008-4000-8000-000000000008",
+      "name": "Parse Email Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst drafts = $input.all().map(item => item.json);\n\nconst output = {\n  generated_at: new Date().toISOString(),\n  total_drafts: drafts.length,\n  drafts\n};\n\nconst filePath = '/home/node/output/apex-drafts.json';\nfs.writeFileSync(filePath, JSON.stringify(output, null, 2));\n\nreturn [{\n  json: {\n    message: `Saved ${drafts.length} drafts to ${filePath}`,\n    total_drafts: drafts.length,\n    file_path: filePath\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0009-4000-8000-000000000009",
+      "name": "Save Drafts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 0]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load APEX Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load APEX Contacts": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Save Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get State Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get State Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Get State Facets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get State Facets": {
+      "main": [
+        [
+          {
+            "node": "Build Research Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Research Context": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Draft": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Draft": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

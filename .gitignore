@@ -64,6 +64,9 @@ reference/
 *.zip
 api/ogpreview
 
+# n8n output
+n8n/output/*.json
+
 # Pipeline Lambda binaries
 pipeline/download-csvs
 pipeline/ingest-active

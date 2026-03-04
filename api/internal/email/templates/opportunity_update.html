@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opportunity Update</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f9fafb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;">
+<tr>
+<td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;">
+
+<!-- Header -->
+<tr>
+<td style="padding:24px 32px 16px 32px;border-bottom:1px solid #e5e7eb;">
+<span style="font-size:22px;font-weight:700;color:#111827;letter-spacing:-0.5px;">GovTrove</span>
+</td>
+</tr>
+
+<!-- Content -->
+<tr>
+<td style="padding:24px 32px;">
+<p style="margin:0 0 4px 0;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">
+{{if eq .ChangeType "amendment"}}New Amendment{{else}}Opportunity Updated{{end}}
+</p>
+
+<p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#111827;line-height:1.3;">
+{{.OpportunityTitle}}
+</p>
+
+{{if .SolicitationNumber}}
+<p style="margin:0 0 16px 0;font-size:13px;color:#6b7280;">
+Sol #: {{.SolicitationNumber}}
+</p>
+{{end}}
+
+{{if eq .ChangeType "amendment"}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px 0;background-color:#eff6ff;border-radius:6px;border:1px solid #bfdbfe;">
+<tr>
+<td style="padding:12px 16px;">
+<p style="margin:0;font-size:14px;color:#1e40af;">
+A new amendment has been posted for this solicitation. Review the latest version for updated requirements, deadlines, or attachments.
+</p>
+</td>
+</tr>
+</table>
+{{end}}
+
+{{if .Changes}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px 0;border:1px solid #e5e7eb;border-radius:6px;">
+<tr>
+<td style="padding:12px 16px;background-color:#f9fafb;border-bottom:1px solid #e5e7eb;">
+<p style="margin:0;font-size:13px;font-weight:600;color:#374151;">What changed</p>
+</td>
+</tr>
+{{range .Changes}}
+<tr>
+<td style="padding:10px 16px;border-bottom:1px solid #f3f4f6;">
+<p style="margin:0 0 2px 0;font-size:13px;font-weight:600;color:#374151;">{{.Field}}</p>
+{{if .Old}}<p style="margin:0;font-size:13px;color:#9ca3af;text-decoration:line-through;">{{.Old}}</p>{{end}}
+{{if .New}}<p style="margin:0;font-size:13px;color:#059669;">{{.New}}</p>{{end}}
+{{if not .Old}}{{if not .New}}<p style="margin:0;font-size:13px;color:#6b7280;font-style:italic;">Content changed</p>{{end}}{{end}}
+</td>
+</tr>
+{{end}}
+</table>
+{{end}}
+
+<!-- CTA Button -->
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px 0;">
+<tr>
+<td style="border-radius:6px;background-color:#2563eb;">
+<a href="{{.OpportunityURL}}" target="_blank" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">View Opportunity</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<!-- Footer -->
+<tr>
+<td style="padding:16px 32px 24px 32px;border-top:1px solid #e5e7eb;">
+<p style="margin:0 0 4px 0;font-size:12px;color:#9ca3af;">
+You're receiving this because you saved this opportunity on GovTrove.
+</p>
+<p style="margin:0 0 4px 0;font-size:12px;">
+<a href="{{.UnsubscribeURL}}" target="_blank" style="color:#6b7280;text-decoration:underline;">Unsubscribe from all emails</a>
+</p>
+<p style="margin:0;font-size:12px;">
+<a href="https://govtrove.com" target="_blank" style="color:#6b7280;text-decoration:none;">govtrove.com</a>
+</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

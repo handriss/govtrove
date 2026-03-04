@@ -13,6 +13,7 @@ import {
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
 } from '../services/api';
 import type { UserUpdate } from '../types/api';
+import { useAppAuth } from '../contexts/AuthContext';
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -1072,9 +1073,11 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   const [resendStatus, setResendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const limit = 50;
 
+  const { user } = useAppAuth();
+
   const [showCompose, setShowCompose] = useState(false);
   const [composeTemplate, setComposeTemplate] = useState(TEMPLATE_NAMES[0]);
-  const [composeToEmail, setComposeToEmail] = useState('');
+  const [composeToEmail, setComposeToEmail] = useState(user?.email || '');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeFields, setComposeFields] = useState<Record<string, string>>(() => getTemplateDefaults(TEMPLATE_NAMES[0]));
   const [composeSending, setComposeSending] = useState(false);
@@ -1142,7 +1145,7 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
       fetchPage(1);
       setTimeout(() => {
         setShowCompose(false);
-        setComposeToEmail('');
+        setComposeToEmail(user?.email || '');
         setComposeSubject('');
         setComposeTemplate(TEMPLATE_NAMES[0]);
         setComposeFields(getTemplateDefaults(TEMPLATE_NAMES[0]));
