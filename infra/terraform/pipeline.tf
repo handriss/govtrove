@@ -41,11 +41,15 @@ resource "aws_lambda_function" "pipeline" {
 
   environment {
     variables = {
-      DATABASE_URL_SECRET_ARN = aws_secretsmanager_secret.database_url.arn
-      S3_BUCKET               = aws_s3_bucket.data.id
-      AWS_REGION_NAME         = var.aws_region
-      SENTRY_DSN              = var.sentry_pipeline_dsn
-      SAM_API_KEY_SECRET_ARN  = aws_secretsmanager_secret.sam_api_key.arn
+      DATABASE_URL_SECRET_ARN  = aws_secretsmanager_secret.database_url.arn
+      S3_BUCKET                = aws_s3_bucket.data.id
+      AWS_REGION_NAME          = var.aws_region
+      SENTRY_DSN               = var.sentry_pipeline_dsn
+      SAM_API_KEY_SECRET_ARN   = aws_secretsmanager_secret.sam_api_key.arn
+      RESEND_API_KEY_SECRET_ARN = aws_secretsmanager_secret.resend_api_key.arn
+      UNSUBSCRIBE_SECRET_ARN   = aws_secretsmanager_secret.resend_webhook_secret.arn
+      EMAIL_FROM               = "GovTrove <notifications@govtrove.com>"
+      APP_BASE_URL             = "https://app.govtrove.com"
     }
   }
 
@@ -103,7 +107,9 @@ resource "aws_iam_role_policy" "lambda_pipeline_base" {
         Action   = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.database_url.arn,
-          aws_secretsmanager_secret.sam_api_key.arn
+          aws_secretsmanager_secret.sam_api_key.arn,
+          aws_secretsmanager_secret.resend_api_key.arn,
+          aws_secretsmanager_secret.resend_webhook_secret.arn
         ]
       }
     ]

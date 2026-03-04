@@ -56,6 +56,8 @@ resource "aws_iam_role_policy" "apprunner_secrets" {
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.workos_client_id.arn,
           aws_secretsmanager_secret.workos_api_key.arn,
+          aws_secretsmanager_secret.resend_api_key.arn,
+          aws_secretsmanager_secret.resend_webhook_secret.arn,
         ]
       }
     ]
@@ -137,9 +139,11 @@ resource "aws_apprunner_service" "api" {
         port = tostring(var.api_port)
 
         runtime_environment_secrets = {
-          DATABASE_URL     = aws_secretsmanager_secret.database_url.arn
-          WORKOS_CLIENT_ID = aws_secretsmanager_secret.workos_client_id.arn
-          WORKOS_API_KEY   = aws_secretsmanager_secret.workos_api_key.arn
+          DATABASE_URL           = aws_secretsmanager_secret.database_url.arn
+          WORKOS_CLIENT_ID       = aws_secretsmanager_secret.workos_client_id.arn
+          WORKOS_API_KEY         = aws_secretsmanager_secret.workos_api_key.arn
+          RESEND_API_KEY         = aws_secretsmanager_secret.resend_api_key.arn
+          RESEND_WEBHOOK_SECRET  = aws_secretsmanager_secret.resend_webhook_secret.arn
         }
 
         runtime_environment_variables = {
@@ -150,7 +154,8 @@ resource "aws_apprunner_service" "api" {
           AWS_REGION      = var.aws_region
           ADMIN_EMAILS    = var.admin_emails
           SENTRY_DSN      = var.sentry_dsn
-          SES_FROM_EMAIL  = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
+          RESEND_FROM_EMAIL = "GovTrove <notifications@govtrove.com>"
+          SES_FROM_EMAIL    = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
           SES_CONFIG_SET  = aws_sesv2_configuration_set.main.configuration_set_name
         }
       }

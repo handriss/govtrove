@@ -134,6 +134,19 @@ variable "sentry_frontend_dsn" {
   default     = ""
 }
 
+# Email (Resend)
+variable "resend_api_key" {
+  description = "Resend API key for transactional emails"
+  type        = string
+  sensitive   = true
+}
+
+variable "resend_webhook_secret" {
+  description = "Resend webhook secret (also used for unsubscribe HMAC)"
+  type        = string
+  sensitive   = true
+}
+
 # Domain (optional, for future custom domain support)
 variable "domain_name" {
   description = "Custom domain name for the application (optional)"
