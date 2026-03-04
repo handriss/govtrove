@@ -13,13 +13,14 @@ import (
 )
 
 type AuthHandler struct {
-	repo     *repository.UserRepository
-	emailSvc *email.Service
-	logger   *slog.Logger
+	repo           *repository.UserRepository
+	emailPrefsRepo *repository.EmailPreferencesRepository
+	emailSvc       *email.Service
+	logger         *slog.Logger
 }
 
-func NewAuthHandler(repo *repository.UserRepository, emailSvc *email.Service, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{repo: repo, emailSvc: emailSvc, logger: logger}
+func NewAuthHandler(repo *repository.UserRepository, emailPrefsRepo *repository.EmailPreferencesRepository, emailSvc *email.Service, logger *slog.Logger) *AuthHandler {
+	return &AuthHandler{repo: repo, emailPrefsRepo: emailPrefsRepo, emailSvc: emailSvc, logger: logger}
 }
 
 type syncRequest struct {
@@ -68,9 +69,14 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if result.IsNew && h.emailSvc != nil {
-		if err := h.emailSvc.SendWelcome(r.Context(), req.Email, req.FirstName); err != nil {
-			h.logger.Error("failed to send welcome email", "error", err, "user_id", result.User.ID)
+	if result.IsNew {
+		if err := h.emailPrefsRepo.CreateDefaults(r.Context(), result.User.ID); err != nil {
+			h.logger.Error("failed to create email preferences", "error", err, "user_id", result.User.ID)
+		}
+		if h.emailSvc != nil {
+			if err := h.emailSvc.SendWelcome(r.Context(), req.Email, req.FirstName); err != nil {
+				h.logger.Error("failed to send welcome email", "error", err, "user_id", result.User.ID)
+			}
 		}
 	}
 

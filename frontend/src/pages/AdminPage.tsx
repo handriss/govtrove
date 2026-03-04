@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, RotateCw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
+  getAdminEmailPreferences, getAdminSentEmails, adminResendEmail,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
-  type SearchAnalytics,
+  type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
 } from '../services/api';
 import type { UserUpdate } from '../types/api';
 
@@ -917,7 +918,231 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches';
+function EmailPrefsTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [prefs, setPrefs] = useState<AdminEmailPreference[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken();
+        setPrefs(await getAdminEmailPreferences(token));
+      } catch { /* empty */ }
+      finally { setLoading(false); }
+    })();
+  }, [getToken]);
+
+  if (loading) return <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>;
+
+  return (
+    <section>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">
+        Email Preferences <span className="text-dark-500 text-sm font-normal">({prefs.length})</span>
+      </h2>
+      <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+              <th className="px-4 py-3 font-medium">Email</th>
+              <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium w-28">Search</th>
+              <th className="px-4 py-3 font-medium w-28">Opportunity</th>
+              <th className="px-4 py-3 font-medium w-32">Unsubscribed</th>
+              <th className="px-4 py-3 font-medium w-24">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {prefs.map((p) => (
+              <tr key={p.user_id} className="border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30">
+                <td className="px-4 py-3 text-dark-200">{p.email}</td>
+                <td className="px-4 py-3 text-dark-300">
+                  {p.first_name || p.last_name
+                    ? `${p.first_name} ${p.last_name}`.trim()
+                    : <span className="text-dark-600">&mdash;</span>}
+                </td>
+                <td className="px-4 py-3">
+                  {p.search_alerts
+                    ? <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">On</span>
+                    : <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-dark-800/60 border border-dark-700/30 text-dark-500">Off</span>
+                  }
+                </td>
+                <td className="px-4 py-3">
+                  {p.opportunity_alerts
+                    ? <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">On</span>
+                    : <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-dark-800/60 border border-dark-700/30 text-dark-500">Off</span>
+                  }
+                </td>
+                <td className="px-4 py-3 text-dark-400 text-xs">
+                  {p.unsubscribed_at ? formatDate(p.unsubscribed_at) : <span className="text-dark-600">&mdash;</span>}
+                </td>
+                <td className="px-4 py-3 text-dark-400 text-xs">{p.unsubscribe_reason ?? <span className="text-dark-600">&mdash;</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [emails, setEmails] = useState<AdminSentEmail[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendStatus, setResendStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const limit = 50;
+
+  const fetchPage = useCallback(async (p: number) => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await getAdminSentEmails(token, p);
+      setEmails(res.emails || []);
+      setTotal(res.total);
+      setPage(p);
+    } catch {
+      setEmails([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { fetchPage(1); }, [fetchPage]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  function statusBadge(status: string) {
+    switch (status) {
+      case 'delivered':
+        return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">delivered</span>;
+      case 'bounced':
+        return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 border border-red-500/30 text-red-400">bounced</span>;
+      case 'complained':
+        return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-500/15 border border-amber-500/30 text-amber-400">complained</span>;
+      default:
+        return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-dark-800/60 border border-dark-700/30 text-dark-300">{status}</span>;
+    }
+  }
+
+  async function handleResend(id: string) {
+    if (!resendEmail) return;
+    setResendStatus(prev => ({ ...prev, [id]: 'loading' }));
+    try {
+      const token = await getToken();
+      await adminResendEmail(token, id, resendEmail);
+      setResendStatus(prev => ({ ...prev, [id]: 'success' }));
+      setResendingId(null);
+      setResendEmail('');
+    } catch {
+      setResendStatus(prev => ({ ...prev, [id]: 'error' }));
+    }
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-medium text-dark-200">
+          Sent Emails <span className="text-dark-500 text-sm font-normal">({total.toLocaleString()})</span>
+        </h2>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => fetchPage(page - 1)}
+              disabled={page <= 1 || loading}
+              className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-dark-400">{page} / {totalPages}</span>
+            <button
+              onClick={() => fetchPage(page + 1)}
+              disabled={page >= totalPages || loading}
+              className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
+
+      {!loading && emails.length === 0 && (
+        <p className="text-dark-500 text-sm py-8 text-center">No emails sent yet.</p>
+      )}
+
+      {!loading && emails.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="px-4 py-3 font-medium w-44">Date</th>
+                <th className="px-4 py-3 font-medium">To</th>
+                <th className="px-4 py-3 font-medium w-28">Type</th>
+                <th className="px-4 py-3 font-medium">Subject</th>
+                <th className="px-4 py-3 font-medium w-24">Status</th>
+                <th className="px-4 py-3 font-medium w-24">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emails.map((e) => (
+                <tr key={e.id} className="border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30">
+                  <td className="px-4 py-3 text-dark-400 text-xs">{formatDateTime(e.created_at)}</td>
+                  <td className="px-4 py-3 text-dark-200 text-xs">{e.to_email}</td>
+                  <td className="px-4 py-3 text-dark-300 text-xs">{e.email_type}</td>
+                  <td className="px-4 py-3 text-dark-200 text-xs max-w-xs truncate">{e.subject}</td>
+                  <td className="px-4 py-3">{statusBadge(e.status)}</td>
+                  <td className="px-4 py-3">
+                    {resendingId === e.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="email"
+                          value={resendEmail}
+                          onChange={(ev) => setResendEmail(ev.target.value)}
+                          placeholder="email"
+                          className="w-32 px-2 py-1 text-xs bg-dark-800/50 border border-dark-700/50 rounded text-dark-100 focus:outline-none focus:border-accent/50"
+                        />
+                        <button
+                          onClick={() => handleResend(e.id)}
+                          disabled={resendStatus[e.id] === 'loading'}
+                          className="p-1 text-accent hover:text-accent/80 disabled:opacity-50 transition-colors"
+                          title="Send"
+                        >
+                          <RotateCw size={14} className={resendStatus[e.id] === 'loading' ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                          onClick={() => { setResendingId(null); setResendEmail(''); }}
+                          className="text-xs text-dark-500 hover:text-dark-300"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ) : resendStatus[e.id] === 'success' ? (
+                      <span className="text-emerald-400 text-xs">Sent</span>
+                    ) : (
+                      <button
+                        onClick={() => setResendingId(e.id)}
+                        className="text-xs text-dark-400 hover:text-accent transition-colors"
+                      >
+                        Resend
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -942,6 +1167,8 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'usage' && <UsageChartTab getToken={getToken} />}
       {activeTab === 'pipeline' && <PipelineRunsTab getToken={getToken} />}
       {activeTab === 'searches' && <SearchAnalyticsTab getToken={getToken} />}
+      {activeTab === 'email-prefs' && <EmailPrefsTab getToken={getToken} />}
+      {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
     </div>
   );
 }

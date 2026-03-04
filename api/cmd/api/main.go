@@ -12,7 +12,6 @@ import (
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	sesv2 "github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/getsentry/sentry-go"
 	"github.com/MicahParks/keyfunc/v3"
@@ -97,23 +96,24 @@ func main() {
 	logger.Info("connected to database")
 
 	var snsClient *sns.Client
-	var emailSvc *email.Service
-	needsAWS := cfg.SNSTopicARN != "" || cfg.SESFromEmail != ""
-	if needsAWS {
+	if cfg.SNSTopicARN != "" {
 		awsCfg, awsErr := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
 		if awsErr != nil {
-			logger.Warn("failed to load AWS config, SNS/SES disabled", "error", awsErr)
+			logger.Warn("failed to load AWS config, SNS disabled", "error", awsErr)
 		} else {
-			if cfg.SNSTopicARN != "" {
-				snsClient = sns.NewFromConfig(awsCfg)
-				logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
-			}
-			if cfg.SESFromEmail != "" {
-				sesClient := sesv2.NewFromConfig(awsCfg)
-				emailSvc = email.NewService(sesClient, cfg.SESFromEmail, cfg.SESConfigSet, logger)
-				logger.Info("SES email service configured", "from", cfg.SESFromEmail, "config_set", cfg.SESConfigSet)
-			}
+			snsClient = sns.NewFromConfig(awsCfg)
+			logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
 		}
+	}
+
+	var emailSvc *email.Service
+	if cfg.ResendAPIKey != "" {
+		fromEmail := cfg.ResendFromEmail
+		if fromEmail == "" {
+			fromEmail = "notifications@govtrove.com"
+		}
+		emailSvc = email.NewService(cfg.ResendAPIKey, fromEmail, cfg.ResendWebhookSecret, pool, logger)
+		logger.Info("Resend email service configured", "from", fromEmail)
 	}
 
 	// JWKS for WorkOS JWT validation
@@ -151,6 +151,8 @@ func main() {
 	userUpdateRepo := repository.NewUserUpdateRepository(pool)
 	pipelineRepo := repository.NewPipelineRepository(pool)
 	utmRepo := repository.NewUTMRepository(pool)
+	emailPrefsRepo := repository.NewEmailPreferencesRepository(pool)
+	sentEmailsRepo := repository.NewSentEmailsRepository(pool)
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
@@ -158,13 +160,16 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, userUpdateRepo, pipelineRepo, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, userUpdateRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, emailSvc, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
-	authHandler := handlers.NewAuthHandler(userRepo, emailSvc, logger)
+	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)
 	utmHandler := handlers.NewUTMHandler(utmRepo, logger)
+	webhookHandler := handlers.NewWebhookHandler(sentEmailsRepo, emailPrefsRepo, emailSvc, logger)
+	unsubscribeHandler := handlers.NewUnsubscribeHandler(emailPrefsRepo, emailSvc, logger)
+	preferencesHandler := handlers.NewPreferencesHandler(emailPrefsRepo, userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -228,6 +233,9 @@ func main() {
 		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Use(authmw.MaxBodySize(1 << 20))
 
+		r.Post("/webhooks/resend", webhookHandler.HandleResend)
+		r.Get("/unsubscribe", unsubscribeHandler.HandleUnsubscribe)
+
 		r.Group(func(r chi.Router) {
 			if jwks != nil {
 				r.Use(authmw.OptionalAuth(jwks))
@@ -257,6 +265,8 @@ func main() {
 				r.Get("/me", userHandler.GetMe)
 				r.Post("/auth/sync", authHandler.Sync)
 				r.Post("/account/requests", accountRequestHandler.Create)
+				r.Get("/preferences", preferencesHandler.Get)
+				r.Put("/preferences", preferencesHandler.Update)
 
 				r.Route("/admin", func(r chi.Router) {
 					r.Use(authmw.RequireAdmin(adminLookup))
@@ -276,6 +286,9 @@ func main() {
 					r.Get("/reconcile-dq/{id}", adminHandler.GetReconcileDQDetail)
 					r.Put("/reconcile-dq/{id}", adminHandler.UpdateReconcileDQResolution)
 					r.Get("/utm-analytics", utmHandler.GetAnalytics)
+					r.Get("/email-preferences", adminHandler.ListEmailPreferences)
+					r.Get("/sent-emails", adminHandler.ListSentEmails)
+					r.Post("/sent-emails/{id}/resend", adminHandler.ResendEmail)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
