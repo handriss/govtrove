@@ -801,6 +801,19 @@ export interface AdminEmailPreference {
   unsubscribe_reason: string | null;
 }
 
+export async function updateAdminEmailPreference(
+  token: string,
+  userId: number,
+  prefs: { search_alerts: boolean; opportunity_alerts: boolean },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/email-preferences/${userId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(prefs),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+}
+
 export async function getAdminEmailPreferences(token: string): Promise<AdminEmailPreference[]> {
   const response = await fetch(`${API_BASE}/admin/email-preferences`, {
     headers: { Authorization: `Bearer ${token}` },
