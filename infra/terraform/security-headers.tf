@@ -8,6 +8,7 @@ resource "aws_cloudfront_response_headers_policy" "frontend" {
     strict_transport_security {
       access_control_max_age_sec = 31536000
       include_subdomains         = true
+      preload                    = true
       override                   = true
     }
 
@@ -25,6 +26,14 @@ resource "aws_cloudfront_response_headers_policy" "frontend" {
       override               = true
     }
   }
+
+  custom_headers_config {
+    items {
+      header   = "Cross-Origin-Opener-Policy"
+      value    = "same-origin"
+      override = true
+    }
+  }
 }
 
 resource "aws_cloudfront_response_headers_policy" "landing" {
@@ -36,6 +45,7 @@ resource "aws_cloudfront_response_headers_policy" "landing" {
     strict_transport_security {
       access_control_max_age_sec = 31536000
       include_subdomains         = true
+      preload                    = true
       override                   = true
     }
 
@@ -51,6 +61,14 @@ resource "aws_cloudfront_response_headers_policy" "landing" {
     content_security_policy {
       content_security_policy = "default-src 'self'; script-src 'self' https://unpkg.com https://cdn.counter.dev https://*.tawk.to 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tawk.to; font-src 'self' https://fonts.gstatic.com https://*.tawk.to; connect-src 'self' https://api.govtrove.com https://t.counter.dev https://unpkg.com https://*.tawk.to wss://*.tawk.to; img-src 'self' data: https://*.tawk.to; frame-src https://*.tawk.to; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://api.govtrove.com"
       override               = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "Cross-Origin-Opener-Policy"
+      value    = "same-origin"
+      override = true
     }
   }
 }
