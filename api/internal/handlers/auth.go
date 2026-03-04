@@ -73,11 +73,6 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		if err := h.emailPrefsRepo.CreateDefaults(r.Context(), result.User.ID); err != nil {
 			h.logger.Error("failed to create email preferences", "error", err, "user_id", result.User.ID)
 		}
-		if h.emailSvc != nil {
-			if err := h.emailSvc.SendWelcome(r.Context(), req.Email, req.FirstName); err != nil {
-				h.logger.Error("failed to send welcome email", "error", err, "user_id", result.User.ID)
-			}
-		}
 	}
 
 	h.logger.Info("user synced", "workos_id", workosID, "user_id", result.User.ID, "is_new", result.IsNew)

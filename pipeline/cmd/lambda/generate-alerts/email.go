@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -247,16 +248,16 @@ func (e *EmailSender) buildSearchURL(filters map[string]any) string {
 		switch val := v.(type) {
 		case string:
 			if val != "" {
-				params = append(params, k+"="+val)
+				params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(val))
 			}
 		case bool:
 			if val {
-				params = append(params, k+"=true")
+				params = append(params, url.QueryEscape(k)+"=true")
 			}
 		case []any:
 			for _, item := range val {
 				if s, ok := item.(string); ok && s != "" {
-					params = append(params, k+"="+s)
+					params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(s))
 				}
 			}
 		}

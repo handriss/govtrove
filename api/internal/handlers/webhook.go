@@ -99,6 +99,16 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+	case "email.opened":
+		if err := h.sentEmailsRepo.SetOpenedByResendID(ctx, resendID); err != nil {
+			h.logger.Error("failed to set email opened", "resend_id", resendID, "error", err)
+		}
+
+	case "email.clicked":
+		if err := h.sentEmailsRepo.SetClickedByResendID(ctx, resendID); err != nil {
+			h.logger.Error("failed to set email clicked", "resend_id", resendID, "error", err)
+		}
+
 	default:
 		h.logger.Debug("unhandled webhook event type", "type", event.Type)
 	}

@@ -1,0 +1,2 @@
+ALTER TABLE sent_emails ADD COLUMN opened_at TIMESTAMPTZ;
+ALTER TABLE sent_emails ADD COLUMN clicked_at TIMESTAMPTZ;
