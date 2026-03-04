@@ -27,7 +27,7 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 			SELECT 1 FROM sent_emails se
 			WHERE se.user_id = n.user_id
 			AND se.email_type = 'digest'
-			AND se.created_at > NOW() - INTERVAL '1 hour'
+			AND se.created_at > NOW() - INTERVAL '23 hours'
 		)
 		ORDER BY n.user_id, n.update_type, n.created_at
 	`)

@@ -27,6 +27,8 @@ type SentEmail struct {
 	Subject         string     `json:"subject"`
 	ResendMessageID *string    `json:"resend_message_id"`
 	Status          string     `json:"status"`
+	OpenedAt        *time.Time `json:"opened_at"`
+	ClickedAt       *time.Time `json:"clicked_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
@@ -40,10 +42,10 @@ type SentEmailWithUser struct {
 func (r *SentEmailsRepository) GetByID(ctx context.Context, id string) (*SentEmail, error) {
 	var se SentEmail
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, user_id, to_email, email_type, template_name, template_data, subject, resend_message_id, status, created_at, updated_at
+		`SELECT id, user_id, to_email, email_type, template_name, template_data, subject, resend_message_id, status, opened_at, clicked_at, created_at, updated_at
 		 FROM sent_emails WHERE id = $1`, id,
 	).Scan(&se.ID, &se.UserID, &se.ToEmail, &se.EmailType, &se.TemplateName, &se.TemplateData,
-		&se.Subject, &se.ResendMessageID, &se.Status, &se.CreatedAt, &se.UpdatedAt)
+		&se.Subject, &se.ResendMessageID, &se.Status, &se.OpenedAt, &se.ClickedAt, &se.CreatedAt, &se.UpdatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -78,6 +80,28 @@ func (r *SentEmailsRepository) GetUserIDByResendID(ctx context.Context, resendMe
 	return userID, nil
 }
 
+func (r *SentEmailsRepository) SetOpenedByResendID(ctx context.Context, resendMessageID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE sent_emails SET opened_at = COALESCE(opened_at, now()), updated_at = now() WHERE resend_message_id = $1`,
+		resendMessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("setting opened_at: %w", err)
+	}
+	return nil
+}
+
+func (r *SentEmailsRepository) SetClickedByResendID(ctx context.Context, resendMessageID string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE sent_emails SET clicked_at = COALESCE(clicked_at, now()), updated_at = now() WHERE resend_message_id = $1`,
+		resendMessageID,
+	)
+	if err != nil {
+		return fmt.Errorf("setting clicked_at: %w", err)
+	}
+	return nil
+}
+
 func (r *SentEmailsRepository) List(ctx context.Context, page, limit int) ([]SentEmailWithUser, int, error) {
 	var total int
 	err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM sent_emails`).Scan(&total)
@@ -88,7 +112,7 @@ func (r *SentEmailsRepository) List(ctx context.Context, page, limit int) ([]Sen
 	offset := (page - 1) * limit
 	rows, err := r.pool.Query(ctx,
 		`SELECT se.id, se.user_id, se.to_email, se.email_type, se.template_name, se.template_data,
-			se.subject, se.resend_message_id, se.status, se.created_at, se.updated_at,
+			se.subject, se.resend_message_id, se.status, se.opened_at, se.clicked_at, se.created_at, se.updated_at,
 			u.email, COALESCE(u.first_name || ' ' || u.last_name, u.email)
 		 FROM sent_emails se
 		 JOIN users u ON u.id = se.user_id
@@ -104,7 +128,7 @@ func (r *SentEmailsRepository) List(ctx context.Context, page, limit int) ([]Sen
 	for rows.Next() {
 		var se SentEmailWithUser
 		if err := rows.Scan(&se.ID, &se.UserID, &se.ToEmail, &se.EmailType, &se.TemplateName, &se.TemplateData,
-			&se.Subject, &se.ResendMessageID, &se.Status, &se.CreatedAt, &se.UpdatedAt,
+			&se.Subject, &se.ResendMessageID, &se.Status, &se.OpenedAt, &se.ClickedAt, &se.CreatedAt, &se.UpdatedAt,
 			&se.UserEmail, &se.UserName); err != nil {
 			return nil, 0, fmt.Errorf("scanning sent email: %w", err)
 		}

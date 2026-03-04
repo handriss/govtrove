@@ -1333,6 +1333,8 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
                 <th className="px-4 py-3 font-medium w-28">Type</th>
                 <th className="px-4 py-3 font-medium">Subject</th>
                 <th className="px-4 py-3 font-medium w-24">Status</th>
+                <th className="px-4 py-3 font-medium w-36">Opened</th>
+                <th className="px-4 py-3 font-medium w-36">Clicked</th>
                 <th className="px-4 py-3 font-medium w-24">Action</th>
               </tr>
             </thead>
@@ -1344,6 +1346,8 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
                   <td className="px-4 py-3 text-dark-300 text-xs">{e.email_type}</td>
                   <td className="px-4 py-3 text-dark-200 text-xs max-w-xs truncate">{e.subject}</td>
                   <td className="px-4 py-3">{statusBadge(e.status)}</td>
+                  <td className="px-4 py-3 text-dark-400 text-xs">{e.opened_at ? formatDateTime(e.opened_at) : '—'}</td>
+                  <td className="px-4 py-3 text-dark-400 text-xs">{e.clicked_at ? formatDateTime(e.clicked_at) : '—'}</td>
                   <td className="px-4 py-3">
                     {resendingId === e.id ? (
                       <div className="flex items-center gap-1">

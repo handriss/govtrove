@@ -880,6 +880,8 @@ export interface AdminSentEmail {
   subject: string;
   resend_message_id: string | null;
   status: string;
+  opened_at: string | null;
+  clicked_at: string | null;
   created_at: string;
   user_email: string;
   user_name: string;
