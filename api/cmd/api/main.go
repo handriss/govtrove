@@ -153,6 +153,7 @@ func main() {
 	utmRepo := repository.NewUTMRepository(pool)
 	emailPrefsRepo := repository.NewEmailPreferencesRepository(pool)
 	sentEmailsRepo := repository.NewSentEmailsRepository(pool)
+	notificationRepo := repository.NewNotificationRepository(pool)
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
@@ -166,6 +167,7 @@ func main() {
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	userUpdateHandler := handlers.NewUserUpdateHandler(userUpdateRepo, userRepo, logger)
+	notificationHandler := handlers.NewNotificationHandler(notificationRepo, userRepo, logger)
 	utmHandler := handlers.NewUTMHandler(utmRepo, logger)
 	webhookHandler := handlers.NewWebhookHandler(sentEmailsRepo, emailPrefsRepo, emailSvc, logger)
 	unsubscribeHandler := handlers.NewUnsubscribeHandler(emailPrefsRepo, emailSvc, logger)
@@ -312,6 +314,12 @@ func main() {
 				r.Put("/updates/{id}/read", userUpdateHandler.MarkRead)
 				r.Put("/updates/read-all", userUpdateHandler.MarkAllRead)
 				r.Delete("/updates/{id}", userUpdateHandler.Delete)
+
+				r.Get("/notifications", notificationHandler.List)
+				r.Get("/notifications/count", notificationHandler.Count)
+				r.Put("/notifications/{id}/read", notificationHandler.MarkRead)
+				r.Put("/notifications/read-all", notificationHandler.MarkAllRead)
+				r.Delete("/notifications/{id}", notificationHandler.Delete)
 			})
 		}
 	})

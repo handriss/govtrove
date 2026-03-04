@@ -211,6 +211,30 @@ export interface SavedOpportunitiesResponse {
   limit: number;
 }
 
+export interface Notification {
+  id: string;
+  user_id: number;
+  update_type: string;
+  source_id?: number;
+  group_key?: string;
+  details: Record<string, unknown>;
+  is_read: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface NotificationCount {
+  unread: number;
+  total: number;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface UserUpdate {
   id: string;
   user_id: number;

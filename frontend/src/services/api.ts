@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, UserUpdatesResponse, UserUpdateCount, AgencyResult, AgencySearchResponse } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, UserUpdatesResponse, UserUpdateCount, NotificationsResponse, NotificationCount, AgencyResult, AgencySearchResponse } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -360,6 +360,55 @@ export async function deleteUpdate(token: string, id: string): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete update: ${response.statusText}`); }
+}
+
+// --- Notifications (v2) ---
+
+export async function getNotifications(
+  token: string,
+  params: { unread_only?: boolean; page?: number; limit?: number } = {},
+): Promise<NotificationsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.unread_only) searchParams.set('unread_only', 'true');
+  if (params.page) searchParams.set('page', String(params.page));
+  if (params.limit) searchParams.set('limit', String(params.limit));
+  const response = await fetch(`${API_BASE}/notifications?${searchParams}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch notifications: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function getNotificationsCount(token: string): Promise<NotificationCount> {
+  const response = await fetch(`${API_BASE}/notifications/count`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch notifications count: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function markNotificationRead(token: string, id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/notifications/${id}/read`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark notification read: ${response.statusText}`); }
+}
+
+export async function markAllNotificationsRead(token: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/notifications/read-all`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark all notifications read: ${response.statusText}`); }
+}
+
+export async function deleteNotification(token: string, id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/notifications/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete notification: ${response.statusText}`); }
 }
 
 // Admin

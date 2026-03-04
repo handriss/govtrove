@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Search, FileText, ChevronDown, ChevronRight, Bell, Zap } from 'lucide-react';
-import type { OpportunityListItem } from '../types/api';
+import { ArrowLeft, Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2 } from 'lucide-react';
+import type { OpportunityListItem, Notification } from '../types/api';
+import { useNotifications } from '../hooks/useNotifications';
 import AuthButton from '../components/AuthButton';
 
 // --- Local utils (duplicated from OpportunityCard to avoid coupling) ---
@@ -99,7 +100,7 @@ function formatTimeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
-// --- Mock data types ---
+// --- Notification types ---
 
 interface FieldDiff {
   field: string;
@@ -133,229 +134,44 @@ interface OpportunityUpdateNotification {
 
 type NotificationItem = SearchMatchNotification | OpportunityUpdateNotification;
 
-// --- Relative dates for mock data ---
+// --- Map API notification to local types ---
 
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3600000).toISOString();
+function mapNotification(n: Notification): NotificationItem | null {
+  const d = n.details;
+  if (n.update_type === 'search_matches') {
+    const matches = (d.matches as OpportunityListItem[] | undefined) || [];
+    return {
+      id: n.id,
+      type: 'search_matches',
+      searchName: (d.search_name as string) || 'Search',
+      searchUrl: (d.search_url as string) || '/',
+      matches,
+      totalMatches: (d.total_matches as number) || matches.length,
+      isRead: n.is_read,
+      createdAt: n.created_at,
+    };
+  }
+  if (n.update_type === 'opportunity_update') {
+    const changes = ((d.changes as FieldDiff[]) || []).map((c) => ({
+      field: c.field,
+      old: c.old,
+      new: c.new,
+    }));
+    return {
+      id: n.id,
+      type: 'opportunity_update',
+      opportunityId: n.source_id || 0,
+      title: (d.title as string) || '',
+      solicitationNumber: (d.solicitation_number as string) || '',
+      department: (d.department as string) || '',
+      changeType: (d.change_type as 'amendment' | 'field_change') || 'field_change',
+      changes,
+      isRead: n.is_read,
+      createdAt: n.created_at,
+    };
+  }
+  return null;
 }
-
-// --- Mock data ---
-
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  // Today — search with 3 matches
-  {
-    id: 'n1',
-    type: 'search_matches',
-    searchName: 'Logistics',
-    searchUrl: '/?q=Logistics',
-    totalMatches: 3,
-    isRead: false,
-    createdAt: hoursAgo(2),
-    matches: [
-      {
-        id: 4501, notice_id: 'opp-4501', title: 'Logistics Support Services — Fort Liberty',
-        solicitation_number: 'W912345-26-R-0001', department: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
-        naics_code: '541614', set_aside_code: 'SB', set_aside_description: 'Small Business',
-        posted_date: hoursAgo(36), response_deadline: '2026-04-15', active: true,
-      },
-      {
-        id: 4502, notice_id: 'opp-4502', title: 'IT Infrastructure Modernization and Network Support',
-        solicitation_number: 'FA8750-26-R-0002', department: 'DEPT OF DEFENSE.DEPT OF THE AIR FORCE',
-        naics_code: '541512', posted_date: hoursAgo(6), response_deadline: '2026-05-01', active: true,
-      },
-      {
-        id: 4503, notice_id: 'opp-4503', title: 'Supply Chain Management — DLA Distribution',
-        solicitation_number: 'SP4500-26-R-0015', department: 'DEPT OF DEFENSE.DEFENSE LOGISTICS AGENCY',
-        naics_code: '493110', set_aside_code: 'SDVOSBC', set_aside_description: 'SDVOSB',
-        posted_date: hoursAgo(48), response_deadline: '2026-03-11', active: true,
-      },
-    ],
-  },
-  // Today — search with 8 matches
-  {
-    id: 'n2',
-    type: 'search_matches',
-    searchName: 'IT Services',
-    searchUrl: '/?q=IT%20Services',
-    totalMatches: 8,
-    isRead: false,
-    createdAt: hoursAgo(4),
-    matches: [
-      {
-        id: 4510, notice_id: 'opp-4510', title: 'Enterprise Cloud Migration Services',
-        solicitation_number: 'HC1028-26-R-0010', department: 'DEPT OF DEFENSE.DEFENSE INFORMATION SYSTEMS AGENCY',
-        naics_code: '541519', set_aside_code: '8A', set_aside_description: '8(a)',
-        posted_date: hoursAgo(12), response_deadline: '2026-04-20', active: true,
-      },
-      {
-        id: 4511, notice_id: 'opp-4511', title: 'Cybersecurity Operations and Monitoring',
-        solicitation_number: 'N00189-26-R-0044', department: 'DEPT OF DEFENSE.DEPT OF THE NAVY',
-        naics_code: '541512', posted_date: hoursAgo(24), response_deadline: '2026-03-09', active: true,
-      },
-      {
-        id: 4512, notice_id: 'opp-4512', title: 'Help Desk and End User Support',
-        solicitation_number: 'GS-35F-0119Y', department: 'GENERAL SERVICES ADMINISTRATION',
-        naics_code: '541513', set_aside_code: 'SB', set_aside_description: 'Small Business',
-        posted_date: hoursAgo(30), response_deadline: '2026-05-15', active: true,
-      },
-    ],
-  },
-  // Today — 2 more searches to test "show more" cutoff
-  {
-    id: 'n2b',
-    type: 'search_matches',
-    searchName: 'Medical supplies',
-    searchUrl: '/?q=Medical%20supplies',
-    totalMatches: 2,
-    isRead: false,
-    createdAt: hoursAgo(5),
-    matches: [
-      {
-        id: 4530, notice_id: 'opp-4530', title: 'Medical Surgical Instruments and Supplies',
-        solicitation_number: 'VA248-26-R-0012', department: 'VETERANS AFFAIRS, DEPARTMENT OF',
-        naics_code: '339112', set_aside_code: 'SDVOSBC', set_aside_description: 'SDVOSB',
-        posted_date: hoursAgo(18), response_deadline: '2026-04-10', active: true,
-      },
-      {
-        id: 4531, notice_id: 'opp-4531', title: 'Pharmaceutical Distribution Services',
-        solicitation_number: 'VA258-26-R-0045', department: 'VETERANS AFFAIRS, DEPARTMENT OF',
-        naics_code: '424210', posted_date: hoursAgo(20), response_deadline: '2026-05-20', active: true,
-      },
-    ],
-  },
-  {
-    id: 'n2c',
-    type: 'search_matches',
-    searchName: 'Janitorial',
-    searchUrl: '/?q=Janitorial',
-    totalMatches: 1,
-    isRead: false,
-    createdAt: hoursAgo(6),
-    matches: [
-      {
-        id: 4540, notice_id: 'opp-4540', title: 'Custodial and Janitorial Services — Pentagon',
-        solicitation_number: 'HQ0034-26-R-0003', department: 'DEPT OF DEFENSE.WASHINGTON HEADQUARTERS SERVICES',
-        naics_code: '561720', set_aside_code: '8A', set_aside_description: '8(a)',
-        posted_date: hoursAgo(10), response_deadline: '2026-04-25', active: true,
-      },
-    ],
-  },
-  // Today — opportunity updates (4 total to test "show more")
-  {
-    id: 'n3',
-    type: 'opportunity_update',
-    opportunityId: 4400,
-    title: 'Base Operations Support — Fort Eisenhower',
-    solicitationNumber: 'W50S8J-26-R-0005',
-    department: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
-    changeType: 'amendment',
-    changes: [],
-    isRead: false,
-    createdAt: hoursAgo(3),
-  },
-  {
-    id: 'n3b',
-    type: 'opportunity_update',
-    opportunityId: 4401,
-    title: 'Facility Maintenance — Joint Base Andrews',
-    solicitationNumber: 'FA7014-26-R-0021',
-    department: 'DEPT OF DEFENSE.DEPT OF THE AIR FORCE',
-    changeType: 'field_change',
-    changes: [
-      { field: 'Response Date', old: 'Mar 15, 2026', new: 'Apr 15, 2026' },
-    ],
-    isRead: false,
-    createdAt: hoursAgo(4),
-  },
-  {
-    id: 'n3c',
-    type: 'opportunity_update',
-    opportunityId: 4402,
-    title: 'HVAC System Replacement — Camp Pendleton',
-    solicitationNumber: 'N62473-26-R-0088',
-    department: 'DEPT OF DEFENSE.DEPT OF THE NAVY',
-    changeType: 'amendment',
-    changes: [],
-    isRead: false,
-    createdAt: hoursAgo(5),
-  },
-  {
-    id: 'n3d',
-    type: 'opportunity_update',
-    opportunityId: 4403,
-    title: 'Grounds Maintenance — Fort Cavazos',
-    solicitationNumber: 'W911SF-26-R-0044',
-    department: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
-    changeType: 'field_change',
-    changes: [
-      { field: 'Set-Aside', old: 'Unrestricted', new: 'Small Business' },
-      { field: 'Response Date', old: 'Mar 10, 2026', new: 'Mar 25, 2026' },
-    ],
-    isRead: false,
-    createdAt: hoursAgo(6),
-  },
-  // Yesterday — only opportunity updates (no searches — tests empty search section)
-  {
-    id: 'n5',
-    type: 'opportunity_update',
-    opportunityId: 4350,
-    title: 'Environmental Remediation Services — JBSA',
-    solicitationNumber: 'FA8903-26-R-0012',
-    department: 'DEPT OF DEFENSE.DEPT OF THE AIR FORCE',
-    changeType: 'field_change',
-    changes: [
-      { field: 'Response Date', old: 'Mar 1, 2026', new: 'Apr 1, 2026' },
-      { field: 'Description', new: 'Content changed' },
-    ],
-    isRead: false,
-    createdAt: hoursAgo(28),
-  },
-  {
-    id: 'n5b',
-    type: 'opportunity_update',
-    opportunityId: 4351,
-    title: 'Water Treatment Plant Upgrades — NAS Pensacola',
-    solicitationNumber: 'N69450-26-R-0091',
-    department: 'DEPT OF DEFENSE.DEPT OF THE NAVY',
-    changeType: 'amendment',
-    changes: [],
-    isRead: true,
-    createdAt: hoursAgo(30),
-  },
-  // 6 days ago — only search matches (4-day quiet gap after yesterday)
-  {
-    id: 'n7',
-    type: 'search_matches',
-    searchName: 'Construction',
-    searchUrl: '/?q=Construction',
-    totalMatches: 1,
-    isRead: true,
-    createdAt: hoursAgo(144),
-    matches: [
-      {
-        id: 4520, notice_id: 'opp-4520', title: 'Roof Replacement — Building 500, NAS Jacksonville',
-        solicitation_number: 'N69450-26-R-0033', department: 'DEPT OF DEFENSE.DEPT OF THE NAVY',
-        naics_code: '238160', set_aside_code: 'SB', set_aside_description: 'Small Business',
-        posted_date: hoursAgo(146), response_deadline: '2026-04-30', active: true,
-      },
-    ],
-  },
-  // 8 days ago — read notification (another 1-day gap after 6 days ago)
-  {
-    id: 'n6',
-    type: 'opportunity_update',
-    opportunityId: 4300,
-    title: 'Vehicle Maintenance Services — Fort Moore',
-    solicitationNumber: 'W911SE-26-R-0008',
-    department: 'DEPT OF DEFENSE.DEPT OF THE ARMY',
-    changeType: 'field_change',
-    changes: [
-      { field: 'Set-Aside', old: 'Unrestricted', new: 'Small Business' },
-    ],
-    isRead: true,
-    createdAt: hoursAgo(192),
-  },
-];
 
 // --- Mini opportunity card ---
 
@@ -419,7 +235,11 @@ function MiniOpportunityCard({ opp }: { opp: OpportunityListItem }) {
 
 // --- Search match group card ---
 
-function SearchMatchCard({ notification }: { notification: SearchMatchNotification }) {
+function SearchMatchCard({ notification, onMarkRead, onDelete }: {
+  notification: SearchMatchNotification;
+  onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   const [expanded, setExpanded] = useState(true);
   const displayedMatches = notification.matches.slice(0, 3);
   const remaining = notification.totalMatches - 3;
@@ -449,7 +269,25 @@ function SearchMatchCard({ notification }: { notification: SearchMatchNotificati
                 — {notification.totalMatches} new match{notification.totalMatches !== 1 ? 'es' : ''}
               </span>
             </button>
-            <span className="text-[11px] text-dark-600 shrink-0">{formatTimeAgo(notification.createdAt)}</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] text-dark-600">{formatTimeAgo(notification.createdAt)}</span>
+              {!notification.isRead && (
+                <button
+                  onClick={() => onMarkRead(notification.id)}
+                  className="p-1 text-dark-600 hover:text-dark-300 transition-colors"
+                  title="Mark as read"
+                >
+                  <CheckCheck size={13} />
+                </button>
+              )}
+              <button
+                onClick={() => onDelete(notification.id)}
+                className="p-1 text-dark-600 hover:text-red-400 transition-colors"
+                title="Dismiss"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
           <div className="mt-1">
             <Link
@@ -485,7 +323,11 @@ function SearchMatchCard({ notification }: { notification: SearchMatchNotificati
 
 // --- Opportunity update card ---
 
-function OpportunityUpdateCard({ notification }: { notification: OpportunityUpdateNotification }) {
+function OpportunityUpdateCard({ notification, onMarkRead, onDelete }: {
+  notification: OpportunityUpdateNotification;
+  onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   const agency = formatDepartment(notification.department);
 
   return (
@@ -506,7 +348,25 @@ function OpportunityUpdateCard({ notification }: { notification: OpportunityUpda
               <h4 className="text-sm font-medium text-dark-200 leading-snug line-clamp-1">
                 {notification.title}
               </h4>
-              <span className="text-[11px] text-dark-600 shrink-0">{formatTimeAgo(notification.createdAt)}</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[11px] text-dark-600">{formatTimeAgo(notification.createdAt)}</span>
+                {!notification.isRead && (
+                  <button
+                    onClick={() => onMarkRead(notification.id)}
+                    className="p-1 text-dark-600 hover:text-dark-300 transition-colors"
+                    title="Mark as read"
+                  >
+                    <CheckCheck size={13} />
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(notification.id)}
+                  className="p-1 text-dark-600 hover:text-red-400 transition-colors"
+                  title="Dismiss"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
             <p className="text-xs text-dark-500 mt-0.5">
               Sol#: {notification.solicitationNumber} &middot; {agency}
@@ -697,12 +557,15 @@ function CollapsibleSection<T extends NotificationItem>({
 
 // --- Page ---
 
-const SHOW_EMPTY = false;
-
 export default function NotificationsV2Page() {
-  const notifications = SHOW_EMPTY ? [] : MOCK_NOTIFICATIONS;
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-  const timeline = buildTimeline(notifications);
+  const { notifications: rawNotifications, loading, hasMore, markRead, markAllRead, remove, loadMore } = useNotifications();
+
+  const items: NotificationItem[] = rawNotifications
+    .map(mapNotification)
+    .filter((n): n is NotificationItem => n !== null);
+
+  const unreadCount = items.filter((n) => !n.isRead).length;
+  const timeline = buildTimeline(items);
 
   return (
     <div className="min-h-screen relative">
@@ -723,9 +586,23 @@ export default function NotificationsV2Page() {
               {unreadCount} unread
             </span>
           )}
+          <div className="flex-1" />
+          {unreadCount > 0 && (
+            <button
+              onClick={() => { markAllRead(); }}
+              className="text-xs text-dark-500 hover:text-dark-300 transition-colors flex items-center gap-1"
+            >
+              <CheckCheck size={14} />
+              Mark all read
+            </button>
+          )}
         </div>
 
-        {notifications.length === 0 ? (
+        {loading && items.length === 0 ? (
+          <div className="flex justify-center py-16">
+            <Loader2 size={24} className="text-dark-500 animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="space-y-8">
@@ -756,7 +633,7 @@ export default function NotificationsV2Page() {
                       label="New search matches"
                       iconColor="text-accent/60"
                       labelColor="text-accent/60"
-                      renderItem={(n) => <SearchMatchCard key={n.id} notification={n} />}
+                      renderItem={(n) => <SearchMatchCard key={n.id} notification={n} onMarkRead={markRead} onDelete={remove} />}
                     />
                   )}
 
@@ -767,12 +644,26 @@ export default function NotificationsV2Page() {
                       label="Opportunity changes"
                       iconColor="text-blue-400/60"
                       labelColor="text-blue-400/60"
-                      renderItem={(n) => <OpportunityUpdateCard key={n.id} notification={n} />}
+                      renderItem={(n) => <OpportunityUpdateCard key={n.id} notification={n} onMarkRead={markRead} onDelete={remove} />}
                     />
                   )}
                 </div>
               );
             })}
+
+            {hasMore && (
+              <div className="flex justify-center">
+                <button
+                  onClick={loadMore}
+                  disabled={loading}
+                  className="text-sm text-dark-400 hover:text-dark-200 transition-colors
+                    border border-dark-800/40 rounded-lg px-4 py-2 hover:border-dark-700/50
+                    disabled:opacity-50"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Load more'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
