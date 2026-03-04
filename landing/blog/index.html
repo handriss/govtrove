@@ -83,11 +83,11 @@
         /* ===== Blog Grid ===== */
         .blog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 2rem; padding-bottom: 6rem; }
 
-        .blog-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 0.5rem; padding: 2rem; transition: border-color var(--transition-fast); display: flex; flex-direction: column; }
+        .blog-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 0.5rem; padding: 2rem; transition: border-color var(--transition-fast); display: flex; flex-direction: column; position: relative; cursor: pointer; }
         .blog-card:hover { border-color: var(--border-default); }
+        .blog-card-overlay { position: absolute; inset: 0; z-index: 1; }
 
         .blog-card-meta { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-        .blog-card-category { font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.625rem; border-radius: 9999px; }
         .category-set-asides { background: var(--category-set-asides-bg); color: var(--category-set-asides-text); border: 1px solid var(--category-set-asides-border); }
         .category-sam-gov { background: var(--category-sam-gov-bg); color: var(--category-sam-gov-text); border: 1px solid var(--category-sam-gov-border); }
         .category-naics { background: var(--category-naics-bg); color: var(--category-naics-text); border: 1px solid var(--category-naics-border); }
@@ -226,63 +226,69 @@
             <div class="container">
                 <div class="blog-grid">
                     <article class="blog-card">
+                        <a href="/blog/boolean-search-quoted-phrases.html" class="blog-card-overlay" aria-label="Boolean Search &amp; Quoted Phrases: Find More Federal Contracts with Smarter Queries"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-sam-gov">SAM.gov Tips</span>
                             <span class="blog-card-date">March 4, 2026</span>
                         </div>
-                        <h2><a href="/blog/boolean-search-quoted-phrases.html">Boolean Search &amp; Quoted Phrases: Find More Federal Contracts with Smarter Queries</a></h2>
+                        <h2>Boolean Search &amp; Quoted Phrases: Find More Federal Contracts with Smarter Queries</h2>
                         <p class="blog-card-excerpt">Learn how to use the OR operator and quoted phrases to find government contracts you're missing. Real examples with result counts from live SAM.gov data.</p>
-                        <a href="/blog/boolean-search-quoted-phrases.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
+                        <a href="/blog/sam-gov-data-services-csv-api-explained.html" class="blog-card-overlay" aria-label="SAM.gov Has Three Ways to Access Contract Data"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-sam-gov">SAM.gov Tips</span>
                             <span class="blog-card-date">February 25, 2026</span>
                         </div>
-                        <h2><a href="/blog/sam-gov-data-services-csv-api-explained.html">SAM.gov Has Three Ways to Access Contract Data &mdash; Here's What Each One Actually Does</a></h2>
+                        <h2>SAM.gov Has Three Ways to Access Contract Data &mdash; Here's What Each One Actually Does</h2>
                         <p class="blog-card-excerpt">SAM.gov publishes contract opportunity data through daily CSV exports, weekly archives, and a public REST API. Each has different strengths and tradeoffs &mdash; here's what each one provides and how GovTrove combines them.</p>
-                        <a href="/blog/sam-gov-data-services-csv-api-explained.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
+                        <a href="/blog/sam-gov-foreign-entity-registration.html" class="blog-card-overlay" aria-label="How I Registered My Hungarian Business on SAM.gov"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-guide">Guide</span>
                             <span class="blog-card-date">February 25, 2026</span>
                         </div>
-                        <h2><a href="/blog/sam-gov-foreign-entity-registration.html">How I Registered My Hungarian Business on SAM.gov: A Complete Guide for Foreign Entities</a></h2>
+                        <h2>How I Registered My Hungarian Business on SAM.gov: A Complete Guide for Foreign Entities</h2>
                         <p class="blog-card-excerpt">Everything I learned getting a non-U.S. sole proprietorship registered in the U.S. federal contracting system &mdash; NCAGE codes, entity registration, reps &amp; certs, and every gotcha along the way.</p>
-                        <a href="/blog/sam-gov-foreign-entity-registration.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
+                        <a href="/blog/understanding-set-asides.html" class="blog-card-overlay" aria-label="Understanding Set-Aside Contracts"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-set-asides">Set-Asides</span>
                             <span class="blog-card-date">February 10, 2026</span>
                         </div>
-                        <h2><a href="/blog/understanding-set-asides.html">Understanding Set-Aside Contracts: A Guide for Small Businesses</a></h2>
+                        <h2>Understanding Set-Aside Contracts: A Guide for Small Businesses</h2>
                         <p class="blog-card-excerpt">A breakdown of SBA, 8(a), SDVOSB, WOSB, and HUBZone set-asides &mdash; what they mean, who qualifies, and how to find opportunities reserved for your business.</p>
-                        <a href="/blog/understanding-set-asides.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
+                        <a href="/blog/sam-gov-search-tips.html" class="blog-card-overlay" aria-label="5 SAM.gov Search Tips You're Probably Missing"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-sam-gov">SAM.gov Tips</span>
                             <span class="blog-card-date">February 7, 2026</span>
                         </div>
-                        <h2><a href="/blog/sam-gov-search-tips.html">5 SAM.gov Search Tips You're Probably Missing</a></h2>
+                        <h2>5 SAM.gov Search Tips You're Probably Missing</h2>
                         <p class="blog-card-excerpt">Common mistakes when searching SAM.gov and how to get better results using filters, keywords, and NAICS codes. Stop missing opportunities hiding in plain sight.</p>
-                        <a href="/blog/sam-gov-search-tips.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
+                        <a href="/blog/naics-codes-explained.html" class="blog-card-overlay" aria-label="NAICS Codes Explained"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-naics">NAICS</span>
                             <span class="blog-card-date">February 3, 2026</span>
                         </div>
-                        <h2><a href="/blog/naics-codes-explained.html">NAICS Codes Explained: Finding the Right Codes for Your Business</a></h2>
+                        <h2>NAICS Codes Explained: Finding the Right Codes for Your Business</h2>
                         <p class="blog-card-excerpt">What NAICS codes are, why they matter for government contracting, and how to identify the ones relevant to your business so you never miss a matching opportunity.</p>
-                        <a href="/blog/naics-codes-explained.html" class="blog-card-link">Read more &rarr;</a>
+                        <span class="blog-card-link">Read more &rarr;</span>
                     </article>
                 </div>
             </div>
