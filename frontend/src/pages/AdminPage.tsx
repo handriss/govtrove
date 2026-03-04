@@ -1038,15 +1038,15 @@ const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
     { name: 'MatchCount', label: 'MatchCount', type: 'number', default: '3' },
     { name: 'SearchName', label: 'SearchName', type: 'text', default: 'My Saved Search' },
     { name: 'SearchURL', label: 'SearchURL', type: 'text', default: 'https://app.govtrove.com/?q=logistics' },
-    { name: 'Opportunities', label: 'Opportunities', type: 'json', default: JSON.stringify([{ Title: "Logistics Support Services", SolicitationNumber: "W912345-26-R-0001", Agency: "Department of the Army", URL: "https://app.govtrove.com/opportunities/1" }, { Title: "IT Infrastructure Modernization", SolicitationNumber: "FA8750-26-R-0002", Agency: "Department of the Air Force", URL: "https://app.govtrove.com/opportunities/2" }], null, 2) },
+    { name: 'Opportunities', label: 'Opportunities', type: 'json', default: JSON.stringify([{ Title: "Logistics Support Services", URL: "https://app.govtrove.com/opportunities/1", Department: "Department of the Army", Deadline: "Apr 15, 2026" }, { Title: "IT Infrastructure Modernization", URL: "https://app.govtrove.com/opportunities/2", Department: "Department of the Air Force", Deadline: "May 1, 2026" }], null, 2) },
     { name: 'HasMore', label: 'HasMore', type: 'select', options: ['true', 'false'], default: 'false' },
     { name: 'RemainingCount', label: 'RemainingCount', type: 'number', default: '0' },
     { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text', default: UNSUB_DEFAULT },
   ],
   'digest.html': [
     { name: 'Greeting', label: 'Greeting', type: 'text', default: 'Hi there,' },
-    { name: 'SearchAlerts', label: 'SearchAlerts', type: 'json', default: JSON.stringify([{ SearchName: "Logistics", MatchCount: 2, SearchURL: "https://app.govtrove.com/?q=logistics", Opportunities: [{ Title: "Logistics Support", SolicitationNumber: "W912345-26-R-0001", Agency: "Dept of Army", URL: "https://app.govtrove.com/opportunities/1" }] }], null, 2) },
-    { name: 'OpportunityAlerts', label: 'OpportunityAlerts', type: 'json', default: JSON.stringify([{ OpportunityTitle: "Sample Opportunity", SolicitationNumber: "FA8750-26-R-0002", ChangeType: "amendment", OpportunityURL: "https://app.govtrove.com/opportunities/2", Changes: [{ Field: "Response Date", Old: "2026-03-01", New: "2026-04-01" }] }], null, 2) },
+    { name: 'SearchAlerts', label: 'SearchAlerts', type: 'json', default: JSON.stringify([{ SearchName: "Logistics", MatchCount: 2, SearchURL: "https://app.govtrove.com/?q=logistics", TopOpportunities: [{ Title: "Logistics Support", URL: "https://app.govtrove.com/opportunities/1" }], HasMore: true, RemainingCount: 1 }], null, 2) },
+    { name: 'OpportunityAlerts', label: 'OpportunityAlerts', type: 'json', default: JSON.stringify([{ OpportunityTitle: "Sample Opportunity", SolicitationNumber: "FA8750-26-R-0002", Summary: "Response deadline extended to April 2026.", OpportunityURL: "https://app.govtrove.com/opportunities/2" }], null, 2) },
     { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text', default: UNSUB_DEFAULT },
   ],
 };
