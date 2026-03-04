@@ -761,6 +761,99 @@ export async function updateAdminReconcileDQResolution(
   if (!response.ok) throw new Error(`${response.status}`);
 }
 
+// --- Email Preferences ---
+
+export interface EmailPreferences {
+  search_alerts: boolean;
+  opportunity_alerts: boolean;
+}
+
+export async function getEmailPreferences(token: string): Promise<EmailPreferences> {
+  const response = await fetch(`${API_BASE}/preferences`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch preferences: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function updateEmailPreferences(
+  token: string,
+  prefs: EmailPreferences,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/preferences`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(prefs),
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to update preferences: ${response.statusText}`); }
+}
+
+// --- Admin Email ---
+
+export interface AdminEmailPreference {
+  user_id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  search_alerts: boolean;
+  opportunity_alerts: boolean;
+  unsubscribed_at: string | null;
+  unsubscribe_reason: string | null;
+}
+
+export async function getAdminEmailPreferences(token: string): Promise<AdminEmailPreference[]> {
+  const response = await fetch(`${API_BASE}/admin/email-preferences`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export interface AdminSentEmail {
+  id: string;
+  user_id: number;
+  to_email: string;
+  email_type: string;
+  template_name: string;
+  subject: string;
+  resend_message_id: string | null;
+  status: string;
+  created_at: string;
+  user_email: string;
+  user_name: string;
+}
+
+export interface AdminSentEmailsResponse {
+  emails: AdminSentEmail[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminSentEmails(
+  token: string,
+  page = 1,
+): Promise<AdminSentEmailsResponse> {
+  const response = await fetch(`${API_BASE}/admin/sent-emails?page=${page}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminResendEmail(
+  token: string,
+  id: string,
+  toEmail: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/sent-emails/${id}/resend`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ to_email: toEmail }),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+}
+
 // --- UTM Analytics ---
 
 export interface UTMCampaignSummary {

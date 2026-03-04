@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -9,9 +9,10 @@ import {
   User,
   Check,
   Loader2,
+  Mail,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
-import { createAccountRequest } from '../services/api';
+import { createAccountRequest, getEmailPreferences, updateEmailPreferences } from '../services/api';
 
 function formatMemberSince(dateStr: string) {
   const d = new Date(dateStr);
@@ -24,6 +25,37 @@ export default function ProfilePage() {
   const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [searchAlerts, setSearchAlerts] = useState(true);
+  const [opportunityAlerts, setOpportunityAlerts] = useState(true);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+
+  const loadPrefs = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const prefs = await getEmailPreferences(token);
+      setSearchAlerts(prefs.search_alerts);
+      setOpportunityAlerts(prefs.opportunity_alerts);
+    } catch { /* defaults remain */ }
+    finally { setPrefsLoading(false); }
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (isAuthenticated) loadPrefs();
+  }, [isAuthenticated, loadPrefs]);
+
+  async function togglePref(field: 'search_alerts' | 'opportunity_alerts', value: boolean) {
+    const newSearch = field === 'search_alerts' ? value : searchAlerts;
+    const newOpp = field === 'opportunity_alerts' ? value : opportunityAlerts;
+    if (field === 'search_alerts') setSearchAlerts(value);
+    else setOpportunityAlerts(value);
+    try {
+      const token = await getAccessToken();
+      await updateEmailPreferences(token, { search_alerts: newSearch, opportunity_alerts: newOpp });
+    } catch {
+      if (field === 'search_alerts') setSearchAlerts(!value);
+      else setOpportunityAlerts(!value);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -96,6 +128,53 @@ export default function ProfilePage() {
             </div>
             <p className="text-dark-100 font-medium capitalize">{plan}</p>
           </div>
+        </div>
+
+        {/* Email Notifications */}
+        <div className="border-t border-dark-800/50 pt-8 mb-8">
+          <h2 className="text-sm font-medium text-dark-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Mail size={14} strokeWidth={1.5} />
+            Email Notifications
+          </h2>
+          <p className="text-xs text-dark-500 mb-4">Manage which emails you receive from GovTrove.</p>
+          {prefsLoading ? (
+            <div className="text-dark-500 text-sm py-4 text-center">Loading...</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-dark-200">Saved Search Alerts</h3>
+                  <p className="text-xs text-dark-500 mt-0.5">Get notified when new opportunities match your saved searches.</p>
+                </div>
+                <button
+                  onClick={() => togglePref('search_alerts', !searchAlerts)}
+                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                    searchAlerts ? 'bg-accent' : 'bg-dark-700'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                    searchAlerts ? 'translate-x-5' : ''
+                  }`} />
+                </button>
+              </div>
+              <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-dark-200">Opportunity Change Alerts</h3>
+                  <p className="text-xs text-dark-500 mt-0.5">Get notified when a saved opportunity is amended or changed.</p>
+                </div>
+                <button
+                  onClick={() => togglePref('opportunity_alerts', !opportunityAlerts)}
+                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                    opportunityAlerts ? 'bg-accent' : 'bg-dark-700'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                    opportunityAlerts ? 'translate-x-5' : ''
+                  }`} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Account Actions */}

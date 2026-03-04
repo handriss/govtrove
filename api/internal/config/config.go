@@ -15,8 +15,11 @@ type Config struct {
 	WorkOSAPIKey   string `envconfig:"WORKOS_API_KEY"`
 	AdminEmails    string `envconfig:"ADMIN_EMAILS"`
 	SentryDSN      string `envconfig:"SENTRY_DSN"`
-	SESFromEmail   string `envconfig:"SES_FROM_EMAIL"`
-	SESConfigSet   string `envconfig:"SES_CONFIG_SET"`
+	SESFromEmail        string `envconfig:"SES_FROM_EMAIL"`
+	SESConfigSet        string `envconfig:"SES_CONFIG_SET"`
+	ResendAPIKey        string `envconfig:"RESEND_API_KEY"`
+	ResendFromEmail     string `envconfig:"RESEND_FROM_EMAIL"`
+	ResendWebhookSecret string `envconfig:"RESEND_WEBHOOK_SECRET"`
 }
 
 func Load() (*Config, error) {

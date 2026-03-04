@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -15,11 +16,30 @@ type AdminHandler struct {
 	userRepo       *repository.UserRepository
 	userUpdateRepo *repository.UserUpdateRepository
 	pipelineRepo   *repository.PipelineRepository
+	emailPrefsRepo *repository.EmailPreferencesRepository
+	sentEmailsRepo *repository.SentEmailsRepository
+	emailSvc       *email.Service
 	logger         *slog.Logger
 }
 
-func NewAdminHandler(userRepo *repository.UserRepository, userUpdateRepo *repository.UserUpdateRepository, pipelineRepo *repository.PipelineRepository, logger *slog.Logger) *AdminHandler {
-	return &AdminHandler{userRepo: userRepo, userUpdateRepo: userUpdateRepo, pipelineRepo: pipelineRepo, logger: logger}
+func NewAdminHandler(
+	userRepo *repository.UserRepository,
+	userUpdateRepo *repository.UserUpdateRepository,
+	pipelineRepo *repository.PipelineRepository,
+	emailPrefsRepo *repository.EmailPreferencesRepository,
+	sentEmailsRepo *repository.SentEmailsRepository,
+	emailSvc *email.Service,
+	logger *slog.Logger,
+) *AdminHandler {
+	return &AdminHandler{
+		userRepo:       userRepo,
+		userUpdateRepo: userUpdateRepo,
+		pipelineRepo:   pipelineRepo,
+		emailPrefsRepo: emailPrefsRepo,
+		sentEmailsRepo: sentEmailsRepo,
+		emailSvc:       emailSvc,
+		logger:         logger,
+	}
 }
 
 type adminUserResponse struct {
@@ -370,6 +390,71 @@ func (h *AdminHandler) UpdateReconcileDQResolution(w http.ResponseWriter, r *htt
 
 	if err := h.pipelineRepo.UpdateReconcileDQResolution(r.Context(), id, body.Resolved, body.ResolutionNote); err != nil {
 		h.logger.Error("update reconcile dq resolution failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) ListEmailPreferences(w http.ResponseWriter, r *http.Request) {
+	prefs, err := h.emailPrefsRepo.ListAllWithUsers(r.Context())
+	if err != nil {
+		h.logger.Error("list email preferences failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prefs)
+}
+
+func (h *AdminHandler) ListSentEmails(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	emails, total, err := h.sentEmailsRepo.List(r.Context(), page, 50)
+	if err != nil {
+		h.logger.Error("list sent emails failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"emails": emails,
+		"total":  total,
+		"page":   page,
+		"limit":  50,
+	})
+}
+
+func (h *AdminHandler) ResendEmail(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "missing id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		ToEmail string `json:"to_email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ToEmail == "" {
+		http.Error(w, "to_email is required", http.StatusBadRequest)
+		return
+	}
+
+	if h.emailSvc == nil {
+		http.Error(w, "email service not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := h.emailSvc.ResendExistingEmail(r.Context(), id, body.ToEmail); err != nil {
+		h.logger.Error("resend email failed", "id", id, "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
