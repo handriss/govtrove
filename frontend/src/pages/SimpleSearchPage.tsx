@@ -15,7 +15,6 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getFacetCounts } from '../services/api';
-import { preloadWhatsNew } from '../services/whatsNewCache';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
 
@@ -47,8 +46,6 @@ export default function SimpleSearchPage() {
     const stored = localStorage.getItem(PAGE_SIZE_KEY);
     return stored ? parseInt(stored, 10) : 25;
   });
-
-  useEffect(() => { preloadWhatsNew(); }, []);
 
   // "/" keyboard shortcut to focus search
   useEffect(() => {
@@ -231,8 +228,12 @@ export default function SimpleSearchPage() {
 
             <div className="text-center space-y-4 animate-in fade-in duration-500">
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Link
-                  to="/whats-new"
+                <button
+                  onClick={() => {
+                    const yesterday = new Date();
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    fs.setFilter('postedFrom', yesterday.toISOString().split('T')[0]);
+                  }}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium
                              border border-accent/40 bg-accent/20 text-accent
                              hover:bg-accent/30 hover:border-accent/50 transition-all duration-200
@@ -240,7 +241,7 @@ export default function SimpleSearchPage() {
                 >
                   <Clock size={14} strokeWidth={1.5} />
                   What's New Today?
-                </Link>
+                </button>
               </div>
 
               <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
