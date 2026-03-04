@@ -59,44 +59,48 @@ func NewOpportunityRepository(pool *pgxpool.Pool) *OpportunityRepository {
 }
 
 func (r *OpportunityRepository) Search(ctx context.Context, params models.SearchParams) (*models.SearchResult, error) {
-	query, args := r.buildSearchQuery(params)
+	countQuery, countArgs, dataQuery, dataArgs := r.buildSearchQuery(params)
 
-	rows, err := r.pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("executing search query: %w", err)
+	var totalCount int
+	if err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&totalCount); err != nil {
+		return nil, fmt.Errorf("counting search results: %w", err)
 	}
-	defer rows.Close()
 
 	var opportunities []models.OpportunityListItem
-	var totalCount int
-
-	for rows.Next() {
-		var opp models.OpportunityListItem
-		err := rows.Scan(
-			&opp.ID,
-			&opp.NoticeID,
-			&opp.Title,
-			&opp.Description,
-			&opp.SolicitationNumber,
-			&opp.Type,
-			&opp.Department,
-			&opp.PostedDate,
-			&opp.ResponseDeadline,
-			&opp.SetAsideCode,
-			&opp.SetAsideDesc,
-			&opp.NAICSCode,
-			&opp.PopState,
-			&opp.Active,
-			&totalCount,
-		)
+	if totalCount > 0 {
+		rows, err := r.pool.Query(ctx, dataQuery, dataArgs...)
 		if err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
+			return nil, fmt.Errorf("executing search query: %w", err)
 		}
-		opportunities = append(opportunities, opp)
-	}
+		defer rows.Close()
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating rows: %w", err)
+		for rows.Next() {
+			var opp models.OpportunityListItem
+			err := rows.Scan(
+				&opp.ID,
+				&opp.NoticeID,
+				&opp.Title,
+				&opp.Description,
+				&opp.SolicitationNumber,
+				&opp.Type,
+				&opp.Department,
+				&opp.PostedDate,
+				&opp.ResponseDeadline,
+				&opp.SetAsideCode,
+				&opp.SetAsideDesc,
+				&opp.NAICSCode,
+				&opp.PopState,
+				&opp.Active,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("scanning row: %w", err)
+			}
+			opportunities = append(opportunities, opp)
+		}
+
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterating rows: %w", err)
+		}
 	}
 
 	totalPages := (totalCount + params.Limit - 1) / params.Limit
@@ -267,30 +271,31 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	return conditions, args, argNum, ftsExpr
 }
 
-func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (string, []any) {
+func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (countQuery string, countArgs []any, dataQuery string, dataArgs []any) {
 	conditions, args, argNum, ftsExpr := buildFilterConditions(params, "", 1)
+	where := strings.Join(conditions, " AND ")
+
+	countQuery = fmt.Sprintf("SELECT COUNT(*) FROM opportunities WHERE %s", where)
+	countArgs = append([]any{}, args...)
 
 	orderClause := r.buildOrderClause(params, ftsExpr)
-
 	offset := (params.Page - 1) * params.Limit
 	args = append(args, params.Limit, offset)
-	limitArg := argNum
-	offsetArg := argNum + 1
 
-	query := fmt.Sprintf(`
+	dataQuery = fmt.Sprintf(`
 		SELECT
 			id, notice_id, title, description, solicitation_number, type,
 			department, posted_date, response_deadline,
 			set_aside_code, set_aside_description, naics_code,
-			pop_state, active,
-			COUNT(*) OVER() as total_count
+			pop_state, active
 		FROM opportunities
 		WHERE %s
 		%s
 		LIMIT $%d OFFSET $%d
-	`, strings.Join(conditions, " AND "), orderClause, limitArg, offsetArg)
+	`, where, orderClause, argNum, argNum+1)
+	dataArgs = args
 
-	return query, args
+	return
 }
 
 func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, ftsExpr string) string {
