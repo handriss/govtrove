@@ -1017,38 +1017,50 @@ interface TemplateField {
   label: string;
   type: 'text' | 'number' | 'select' | 'json';
   options?: string[];
+  default?: string;
 }
+
+const UNSUB_DEFAULT = 'https://api.govtrove.com/api/unsubscribe?token=test&uid=1';
 
 const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
   'welcome.html': [
-    { name: 'Greeting', label: 'Greeting', type: 'text' },
+    { name: 'Greeting', label: 'Greeting', type: 'text', default: 'Hi there,' },
   ],
   'opportunity_update.html': [
-    { name: 'ChangeType', label: 'ChangeType', type: 'select', options: ['amendment', 'field_changes'] },
-    { name: 'OpportunityTitle', label: 'OpportunityTitle', type: 'text' },
-    { name: 'SolicitationNumber', label: 'SolicitationNumber', type: 'text' },
-    { name: 'OpportunityURL', label: 'OpportunityURL', type: 'text' },
-    { name: 'Changes', label: 'Changes', type: 'json' },
-    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+    { name: 'ChangeType', label: 'ChangeType', type: 'select', options: ['amendment', 'field_changes'], default: 'amendment' },
+    { name: 'OpportunityTitle', label: 'OpportunityTitle', type: 'text', default: 'Sample Opportunity Title' },
+    { name: 'SolicitationNumber', label: 'SolicitationNumber', type: 'text', default: 'W912345-26-R-0001' },
+    { name: 'OpportunityURL', label: 'OpportunityURL', type: 'text', default: 'https://app.govtrove.com/opportunities/1' },
+    { name: 'Changes', label: 'Changes', type: 'json', default: JSON.stringify([{ Field: "Response Date", Old: "2026-03-01", New: "2026-04-01" }], null, 2) },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text', default: UNSUB_DEFAULT },
   ],
   'search_results.html': [
-    { name: 'MatchCount', label: 'MatchCount', type: 'number' },
-    { name: 'SearchName', label: 'SearchName', type: 'text' },
-    { name: 'SearchURL', label: 'SearchURL', type: 'text' },
-    { name: 'Opportunities', label: 'Opportunities', type: 'json' },
-    { name: 'HasMore', label: 'HasMore', type: 'select', options: ['true', 'false'] },
-    { name: 'RemainingCount', label: 'RemainingCount', type: 'number' },
-    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+    { name: 'MatchCount', label: 'MatchCount', type: 'number', default: '3' },
+    { name: 'SearchName', label: 'SearchName', type: 'text', default: 'My Saved Search' },
+    { name: 'SearchURL', label: 'SearchURL', type: 'text', default: 'https://app.govtrove.com/?q=logistics' },
+    { name: 'Opportunities', label: 'Opportunities', type: 'json', default: JSON.stringify([{ Title: "Logistics Support Services", SolicitationNumber: "W912345-26-R-0001", Agency: "Department of the Army", URL: "https://app.govtrove.com/opportunities/1" }, { Title: "IT Infrastructure Modernization", SolicitationNumber: "FA8750-26-R-0002", Agency: "Department of the Air Force", URL: "https://app.govtrove.com/opportunities/2" }], null, 2) },
+    { name: 'HasMore', label: 'HasMore', type: 'select', options: ['true', 'false'], default: 'false' },
+    { name: 'RemainingCount', label: 'RemainingCount', type: 'number', default: '0' },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text', default: UNSUB_DEFAULT },
   ],
   'digest.html': [
-    { name: 'Greeting', label: 'Greeting', type: 'text' },
-    { name: 'SearchAlerts', label: 'SearchAlerts', type: 'json' },
-    { name: 'OpportunityAlerts', label: 'OpportunityAlerts', type: 'json' },
-    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text' },
+    { name: 'Greeting', label: 'Greeting', type: 'text', default: 'Hi there,' },
+    { name: 'SearchAlerts', label: 'SearchAlerts', type: 'json', default: JSON.stringify([{ SearchName: "Logistics", MatchCount: 2, SearchURL: "https://app.govtrove.com/?q=logistics", Opportunities: [{ Title: "Logistics Support", SolicitationNumber: "W912345-26-R-0001", Agency: "Dept of Army", URL: "https://app.govtrove.com/opportunities/1" }] }], null, 2) },
+    { name: 'OpportunityAlerts', label: 'OpportunityAlerts', type: 'json', default: JSON.stringify([{ OpportunityTitle: "Sample Opportunity", SolicitationNumber: "FA8750-26-R-0002", ChangeType: "amendment", OpportunityURL: "https://app.govtrove.com/opportunities/2", Changes: [{ Field: "Response Date", Old: "2026-03-01", New: "2026-04-01" }] }], null, 2) },
+    { name: 'UnsubscribeURL', label: 'UnsubscribeURL', type: 'text', default: UNSUB_DEFAULT },
   ],
 };
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATE_FIELDS);
+
+function getTemplateDefaults(templateName: string): Record<string, string> {
+  const fields = TEMPLATE_FIELDS[templateName] || [];
+  const defaults: Record<string, string> = {};
+  for (const f of fields) {
+    if (f.default !== undefined) defaults[f.name] = f.default;
+  }
+  return defaults;
+}
 
 function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   const [emails, setEmails] = useState<AdminSentEmail[]>([]);
@@ -1064,7 +1076,7 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   const [composeTemplate, setComposeTemplate] = useState(TEMPLATE_NAMES[0]);
   const [composeToEmail, setComposeToEmail] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
-  const [composeFields, setComposeFields] = useState<Record<string, string>>({});
+  const [composeFields, setComposeFields] = useState<Record<string, string>>(() => getTemplateDefaults(TEMPLATE_NAMES[0]));
   const [composeSending, setComposeSending] = useState(false);
   const [composeStatus, setComposeStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [composeError, setComposeError] = useState('');
@@ -1089,7 +1101,7 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
 
   function handleTemplateChange(name: string) {
     setComposeTemplate(name);
-    setComposeFields({});
+    setComposeFields(getTemplateDefaults(name));
     setComposeStatus('idle');
     setComposeError('');
   }
@@ -1132,8 +1144,8 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
         setShowCompose(false);
         setComposeToEmail('');
         setComposeSubject('');
-        setComposeFields({});
         setComposeTemplate(TEMPLATE_NAMES[0]);
+        setComposeFields(getTemplateDefaults(TEMPLATE_NAMES[0]));
         setComposeStatus('idle');
       }, 1500);
     } catch {
