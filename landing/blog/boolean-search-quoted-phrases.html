@@ -100,7 +100,8 @@
         .article-cta { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 0.5rem; padding: 2.5rem; text-align: center; margin-bottom: 4rem; }
         .article-cta h3 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
         .article-cta p { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
-        .article-cta .btn { text-decoration: none; }
+        .article-cta .btn { text-decoration: none; color: #fff; }
+        .article-cta .btn:hover { color: #fff; }
 
         .footer { padding: 4rem 0 2rem; border-top: 1px solid var(--border-subtle); }
         .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 2rem; margin-bottom: 3rem; }
@@ -204,8 +205,8 @@
                     <p>Wrapping words in double quotes tells the search engine to find that exact phrase, in that exact order. The difference can be dramatic:</p>
 
                     <ul>
-                        <li><code>fleet management</code> &rarr; <strong>121 results</strong> (includes &ldquo;fleet&rdquo; and &ldquo;management&rdquo; appearing separately)</li>
-                        <li><code>"fleet management"</code> &rarr; <strong>5 results</strong> (only the exact phrase)</li>
+                        <li><a href="https://app.govtrove.com/?q=fleet+management"><code>fleet management</code></a> &rarr; <strong>121 results</strong> (includes &ldquo;fleet&rdquo; and &ldquo;management&rdquo; appearing separately)</li>
+                        <li><a href="https://app.govtrove.com/?q=%22fleet+management%22"><code>"fleet management"</code></a> &rarr; <strong>5 results</strong> (only the exact phrase)</li>
                     </ul>
 
                     <p>That's 121 vs. 5. Without quotes, you're seeing every opportunity that mentions &ldquo;fleet&rdquo; in one paragraph and &ldquo;management&rdquo; in another &mdash; contracts for fleet vehicle repairs alongside project management RFPs that happen to mention a vehicle fleet.</p>
@@ -213,8 +214,8 @@
                     <p>Another example:</p>
 
                     <ul>
-                        <li><code>system integration</code> &rarr; <strong>1,407 results</strong></li>
-                        <li><code>"system integration"</code> &rarr; <strong>23 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=system+integration"><code>system integration</code></a> &rarr; <strong>1,407 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=%22system+integration%22"><code>"system integration"</code></a> &rarr; <strong>23 results</strong></li>
                     </ul>
 
                     <p>The unquoted search matches everything from weapons systems to integration testing to system administration. Quotes narrow it down to opportunities that specifically mention system integration as a phrase.</p>
@@ -243,9 +244,9 @@
                     <p>Here's the impact:</p>
 
                     <ul>
-                        <li><code>cybersecurity</code> alone &rarr; <strong>364 results</strong></li>
-                        <li><code>"information security"</code> alone &rarr; <strong>20 results</strong></li>
-                        <li><code>cybersecurity OR "information security"</code> &rarr; <strong>376 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=cybersecurity"><code>cybersecurity</code></a> alone &rarr; <strong>364 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=%22information+security%22"><code>"information security"</code></a> alone &rarr; <strong>20 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=cybersecurity+OR+%22information+security%22"><code>cybersecurity OR "information security"</code></a> &rarr; <strong>376 results</strong></li>
                     </ul>
 
                     <p>The OR search found 12 opportunities that don't mention &ldquo;cybersecurity&rdquo; at all but do use the phrase &ldquo;information security.&rdquo; Without the OR operator, you'd miss them.</p>
@@ -253,9 +254,9 @@
                     <p>The effect is even bigger when neither term is dominant:</p>
 
                     <ul>
-                        <li><code>"IT support"</code> alone &rarr; <strong>15 results</strong></li>
-                        <li><code>"help desk"</code> alone &rarr; <strong>237 results</strong></li>
-                        <li><code>"IT support" OR "help desk"</code> &rarr; <strong>251 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=%22IT+support%22"><code>"IT support"</code></a> alone &rarr; <strong>15 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=%22help+desk%22"><code>"help desk"</code></a> alone &rarr; <strong>237 results</strong></li>
+                        <li><a href="https://app.govtrove.com/?q=%22IT+support%22+OR+%22help+desk%22"><code>"IT support" OR "help desk"</code></a> &rarr; <strong>251 results</strong></li>
                     </ul>
 
                     <p>If you only searched for <code>"IT support"</code>, you'd see 15 opportunities while 237 &ldquo;help desk&rdquo; opportunities &mdash; doing essentially the same work &mdash; went completely unseen.</p>
@@ -266,7 +267,7 @@
 
                     <h3>Facilities maintenance</h3>
 
-                    <p><code>"janitorial services" OR "custodial services"</code></p>
+                    <p><a href="https://app.govtrove.com/?q=%22janitorial+services%22+OR+%22custodial+services%22"><code>"janitorial services" OR "custodial services"</code></a></p>
 
                     <ul>
                         <li><code>"janitorial services"</code> alone &rarr; 79 results</li>
@@ -278,13 +279,13 @@
 
                     <h3>Cybersecurity</h3>
 
-                    <p><code>cybersecurity OR "vulnerability assessment" OR "information security"</code></p>
+                    <p><a href="https://app.govtrove.com/?q=cybersecurity+OR+%22vulnerability+assessment%22+OR+%22information+security%22"><code>cybersecurity OR "vulnerability assessment" OR "information security"</code></a></p>
 
                     <p>You can chain as many OR terms as you need. Mix quoted phrases for specific terms with unquoted keywords for broader coverage.</p>
 
                     <h3>IT services</h3>
 
-                    <p><code>"IT support" OR "help desk" OR "service desk" OR "technical support"</code></p>
+                    <p><a href="https://app.govtrove.com/?q=%22IT+support%22+OR+%22help+desk%22+OR+%22service+desk%22+OR+%22technical+support%22"><code>"IT support" OR "help desk" OR "service desk" OR "technical support"</code></a></p>
 
                     <p>Different agencies use different terms for the same work. One search catches them all.</p>
 
