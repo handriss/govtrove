@@ -6,7 +6,7 @@ import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
-  getAdminEmailPreferences, getAdminSentEmails, adminResendEmail,
+  getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
@@ -932,6 +932,20 @@ function EmailPrefsTab({ getToken }: { getToken: () => Promise<string> }) {
     })();
   }, [getToken]);
 
+  async function togglePref(userId: number, field: 'search_alerts' | 'opportunity_alerts') {
+    const user = prefs.find(p => p.user_id === userId);
+    if (!user) return;
+    const newValue = !user[field];
+    const updated = { search_alerts: user.search_alerts, opportunity_alerts: user.opportunity_alerts, [field]: newValue };
+    setPrefs(prev => prev.map(p => p.user_id === userId ? { ...p, [field]: newValue } : p));
+    try {
+      const token = await getToken();
+      await updateAdminEmailPreference(token, userId, updated);
+    } catch {
+      setPrefs(prev => prev.map(p => p.user_id === userId ? { ...p, [field]: !newValue } : p));
+    }
+  }
+
   if (loading) return <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>;
 
   return (
@@ -961,16 +975,28 @@ function EmailPrefsTab({ getToken }: { getToken: () => Promise<string> }) {
                     : <span className="text-dark-600">&mdash;</span>}
                 </td>
                 <td className="px-4 py-3">
-                  {p.search_alerts
-                    ? <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">On</span>
-                    : <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-dark-800/60 border border-dark-700/30 text-dark-500">Off</span>
-                  }
+                  <button
+                    onClick={() => togglePref(p.user_id, 'search_alerts')}
+                    className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                      p.search_alerts ? 'bg-emerald-500' : 'bg-dark-700'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      p.search_alerts ? 'translate-x-4' : ''
+                    }`} />
+                  </button>
                 </td>
                 <td className="px-4 py-3">
-                  {p.opportunity_alerts
-                    ? <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">On</span>
-                    : <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-dark-800/60 border border-dark-700/30 text-dark-500">Off</span>
-                  }
+                  <button
+                    onClick={() => togglePref(p.user_id, 'opportunity_alerts')}
+                    className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                      p.opportunity_alerts ? 'bg-emerald-500' : 'bg-dark-700'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      p.opportunity_alerts ? 'translate-x-4' : ''
+                    }`} />
+                  </button>
                 </td>
                 <td className="px-4 py-3 text-dark-400 text-xs">
                   {p.unsubscribed_at ? formatDate(p.unsubscribed_at) : <span className="text-dark-600">&mdash;</span>}

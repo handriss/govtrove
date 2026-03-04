@@ -287,6 +287,7 @@ func main() {
 					r.Put("/reconcile-dq/{id}", adminHandler.UpdateReconcileDQResolution)
 					r.Get("/utm-analytics", utmHandler.GetAnalytics)
 					r.Get("/email-preferences", adminHandler.ListEmailPreferences)
+					r.Put("/email-preferences/{userId}", adminHandler.UpdateEmailPreference)
 					r.Get("/sent-emails", adminHandler.ListSentEmails)
 					r.Post("/sent-emails/{id}/resend", adminHandler.ResendEmail)
 				})

@@ -409,6 +409,31 @@ func (h *AdminHandler) ListEmailPreferences(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(prefs)
 }
 
+func (h *AdminHandler) UpdateEmailPreference(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+	if err != nil {
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		SearchAlerts      bool `json:"search_alerts"`
+		OpportunityAlerts bool `json:"opportunity_alerts"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.emailPrefsRepo.Upsert(r.Context(), userID, body.SearchAlerts, body.OpportunityAlerts); err != nil {
+		h.logger.Error("admin update email preference failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *AdminHandler) ListSentEmails(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {
