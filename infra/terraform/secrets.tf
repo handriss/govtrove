@@ -37,3 +37,23 @@ resource "aws_secretsmanager_secret_version" "workos_api_key" {
   secret_id     = aws_secretsmanager_secret.workos_api_key.id
   secret_string = var.workos_api_key
 }
+
+resource "aws_secretsmanager_secret" "resend_api_key" {
+  name        = "${var.project_name}/resend-api-key"
+  description = "Resend API key for transactional emails"
+}
+
+resource "aws_secretsmanager_secret_version" "resend_api_key" {
+  secret_id     = aws_secretsmanager_secret.resend_api_key.id
+  secret_string = var.resend_api_key
+}
+
+resource "aws_secretsmanager_secret" "resend_webhook_secret" {
+  name        = "${var.project_name}/resend-webhook-secret"
+  description = "Resend webhook secret (also used for unsubscribe HMAC)"
+}
+
+resource "aws_secretsmanager_secret_version" "resend_webhook_secret" {
+  secret_id     = aws_secretsmanager_secret.resend_webhook_secret.id
+  secret_string = var.resend_webhook_secret
+}

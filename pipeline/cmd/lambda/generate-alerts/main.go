@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	db     *database.DB
-	pool   *pgxpool.Pool
-	logger *slog.Logger
+	db          *database.DB
+	pool        *pgxpool.Pool
+	logger      *slog.Logger
+	emailSender *EmailSender
 )
 
 func init() {
@@ -71,6 +72,44 @@ func init() {
 	}
 	pool = db.Pool()
 
+	// Email sender — optional; digest emails are skipped if not configured
+	if resendARN := os.Getenv("RESEND_API_KEY_SECRET_ARN"); resendARN != "" {
+		resendResult, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+			SecretId: &resendARN,
+		})
+		if err != nil {
+			logger.Warn("failed to get Resend API key, digest emails disabled", "error", err)
+		} else {
+			unsubSecret := ""
+			if unsubARN := os.Getenv("UNSUBSCRIBE_SECRET_ARN"); unsubARN != "" {
+				unsubResult, err := smClient.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+					SecretId: &unsubARN,
+				})
+				if err != nil {
+					logger.Warn("failed to get unsubscribe secret", "error", err)
+				} else {
+					unsubSecret = *unsubResult.SecretString
+				}
+			}
+
+			emailFrom := os.Getenv("EMAIL_FROM")
+			if emailFrom == "" {
+				emailFrom = "GovTrove <notifications@govtrove.com>"
+			}
+			appBaseURL := os.Getenv("APP_BASE_URL")
+			if appBaseURL == "" {
+				appBaseURL = "https://app.govtrove.com"
+			}
+
+			es, err := NewEmailSender(*resendResult.SecretString, emailFrom, appBaseURL, unsubSecret, pool, logger)
+			if err != nil {
+				logger.Error("failed to create email sender", "error", err)
+			} else {
+				emailSender = es
+			}
+		}
+	}
+
 	logger.Info("cold start complete")
 }
 
@@ -84,12 +123,14 @@ type Output struct {
 	OpportunityAlerts         int    `json:"opportunity_alerts"`
 	SearchNotifications       int    `json:"search_notifications"`
 	OpportunityNotifications  int    `json:"opportunity_notifications"`
+	EmailsSent                int    `json:"emails_sent"`
 }
 
 type Handler struct {
 	Pool   *pgxpool.Pool
 	Store  database.Store
 	Logger *slog.Logger
+	Email  *EmailSender
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
@@ -148,6 +189,11 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Error("opportunity notifications failed (non-fatal)", "error", err)
 	}
 
+	emailsSent, err := h.sendDigestEmails(ctx)
+	if err != nil {
+		h.Logger.Error("digest emails failed (non-fatal)", "error", err)
+	}
+
 	durationMs := int(time.Since(start).Milliseconds())
 
 	if stepID != uuid.Nil {
@@ -156,6 +202,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			"opportunity_alerts":        oppAlerts,
 			"search_notifications":      searchNotifs,
 			"opportunity_notifications": oppNotifs,
+			"emails_sent":               emailsSent,
 		}
 		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
 			h.Logger.Warn("failed to complete pipeline step", "error", err)
@@ -167,6 +214,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		"opportunity_alerts", oppAlerts,
 		"search_notifications", searchNotifs,
 		"opportunity_notifications", oppNotifs,
+		"emails_sent", emailsSent,
 		"duration_ms", durationMs,
 	)
 
@@ -176,6 +224,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		OpportunityAlerts:         oppAlerts,
 		SearchNotifications:       searchNotifs,
 		OpportunityNotifications:  oppNotifs,
+		EmailsSent:                emailsSent,
 	}, nil
 }
 
@@ -877,6 +926,6 @@ func (h *Handler) releaseLock(ctx context.Context, jobName string) {
 }
 
 func main() {
-	h := &Handler{Pool: pool, Store: db, Logger: logger}
+	h := &Handler{Pool: pool, Store: db, Logger: logger, Email: emailSender}
 	lambda.Start(h.Handle)
 }
