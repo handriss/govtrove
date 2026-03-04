@@ -458,6 +458,27 @@ func (h *AdminHandler) ListSentEmails(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// coerceFloats converts float64 values (from JSON unmarshal) to int where
+// possible, so Go templates can compare them with integer literals via eq.
+func coerceFloats(m map[string]any) {
+	for k, v := range m {
+		switch val := v.(type) {
+		case float64:
+			if val == float64(int(val)) {
+				m[k] = int(val)
+			}
+		case map[string]any:
+			coerceFloats(val)
+		case []any:
+			for _, item := range val {
+				if sub, ok := item.(map[string]any); ok {
+					coerceFloats(sub)
+				}
+			}
+		}
+	}
+}
+
 var allowedTemplates = map[string]bool{
 	"welcome.html":            true,
 	"opportunity_update.html": true,
@@ -491,6 +512,8 @@ func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "email service not configured", http.StatusServiceUnavailable)
 		return
 	}
+
+	coerceFloats(body.TemplateData)
 
 	sentID, err := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
 		UserID:       0,
