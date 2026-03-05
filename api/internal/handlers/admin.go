@@ -17,7 +17,6 @@ import (
 
 type AdminHandler struct {
 	userRepo       *repository.UserRepository
-	userUpdateRepo *repository.UserUpdateRepository
 	pipelineRepo   *repository.PipelineRepository
 	emailPrefsRepo *repository.EmailPreferencesRepository
 	sentEmailsRepo *repository.SentEmailsRepository
@@ -28,7 +27,6 @@ type AdminHandler struct {
 
 func NewAdminHandler(
 	userRepo *repository.UserRepository,
-	userUpdateRepo *repository.UserUpdateRepository,
 	pipelineRepo *repository.PipelineRepository,
 	emailPrefsRepo *repository.EmailPreferencesRepository,
 	sentEmailsRepo *repository.SentEmailsRepository,
@@ -38,7 +36,6 @@ func NewAdminHandler(
 ) *AdminHandler {
 	return &AdminHandler{
 		userRepo:       userRepo,
-		userUpdateRepo: userUpdateRepo,
 		pipelineRepo:   pipelineRepo,
 		emailPrefsRepo: emailPrefsRepo,
 		sentEmailsRepo: sentEmailsRepo,
@@ -87,41 +84,6 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
-}
-
-func (h *AdminHandler) ListNotifications(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.URL.Query().Get("user_id")
-	if userIDStr == "" {
-		http.Error(w, "user_id is required", http.StatusBadRequest)
-		return
-	}
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "invalid user_id", http.StatusBadRequest)
-		return
-	}
-
-	page := 1
-	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
-		}
-	}
-
-	updates, total, err := h.userUpdateRepo.List(r.Context(), userID, false, page, 50)
-	if err != nil {
-		h.logger.Error("admin list notifications failed", "user_id", userID, "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"updates": updates,
-		"total":   total,
-		"page":    page,
-		"limit":   50,
-	})
 }
 
 func (h *AdminHandler) ListApiKeys(w http.ResponseWriter, r *http.Request) {

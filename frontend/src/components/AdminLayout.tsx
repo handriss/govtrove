@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send } from 'lucide-react';
+import { Users, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getAdminUsers, type AdminUser } from '../services/api';
 
 interface AdminContextValue {
   users: AdminUser[];
+  setUsers: React.Dispatch<React.SetStateAction<AdminUser[]>>;
   getToken: () => Promise<string>;
 }
 
@@ -36,7 +37,6 @@ const navGroups: NavGroup[] = [
     label: 'Users & Analytics',
     items: [
       { label: 'Users', icon: Users, path: '/admin' },
-      { label: 'Notifications', icon: Bell, path: '/admin', tab: 'notifications' },
       { label: 'Searches', icon: Search, path: '/admin', tab: 'searches' },
     ],
   },
@@ -149,7 +149,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AdminContext.Provider value={{ users, getToken: getAccessToken }}>
+    <AdminContext.Provider value={{ users, setUsers, getToken: getAccessToken }}>
       {/* Sidebar */}
       <aside className={`fixed left-0 top-0 h-screen ${sidebarW} border-r border-dark-700/50 bg-dark-900 flex flex-col transition-all duration-200 z-40`}>
         {/* Header */}

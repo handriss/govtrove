@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, UserUpdatesResponse, UserUpdateCount, NotificationsResponse, NotificationCount, AgencyResult, AgencySearchResponse } from '../types/api';
+import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, NotificationsResponse, NotificationCount, AgencyResult, AgencySearchResponse } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -313,56 +313,7 @@ export async function runSavedSearch(
   return response.json();
 }
 
-// --- User Updates ---
-
-export async function getUpdates(
-  token: string,
-  params: { unread_only?: boolean; page?: number; limit?: number } = {},
-): Promise<UserUpdatesResponse> {
-  const searchParams = new URLSearchParams();
-  if (params.unread_only) searchParams.set('unread_only', 'true');
-  if (params.page) searchParams.set('page', String(params.page));
-  if (params.limit) searchParams.set('limit', String(params.limit));
-  const response = await fetch(`${API_BASE}/updates?${searchParams}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch updates: ${response.statusText}`); }
-  return response.json();
-}
-
-export async function getUpdatesCount(token: string): Promise<UserUpdateCount> {
-  const response = await fetch(`${API_BASE}/updates/count`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch updates count: ${response.statusText}`); }
-  return response.json();
-}
-
-export async function markUpdateRead(token: string, id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/updates/${id}/read`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark update read: ${response.statusText}`); }
-}
-
-export async function markAllUpdatesRead(token: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/updates/read-all`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) { checkAuth(response); throw new Error(`Failed to mark all updates read: ${response.statusText}`); }
-}
-
-export async function deleteUpdate(token: string, id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/updates/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) { checkAuth(response); throw new Error(`Failed to delete update: ${response.statusText}`); }
-}
-
-// --- Notifications (v2) ---
+// --- Notifications ---
 
 export async function getNotifications(
   token: string,
@@ -428,18 +379,6 @@ export interface AdminUser {
 
 export async function getAdminUsers(token: string): Promise<AdminUser[]> {
   const response = await fetch(`${API_BASE}/admin/users`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) throw new Error(`${response.status}`);
-  return response.json();
-}
-
-export async function getAdminNotifications(
-  token: string,
-  userId: number,
-  page = 1,
-): Promise<UserUpdatesResponse> {
-  const response = await fetch(`${API_BASE}/admin/notifications?user_id=${userId}&page=${page}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(`${response.status}`);

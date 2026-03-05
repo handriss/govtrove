@@ -235,26 +235,3 @@ export interface NotificationsResponse {
   limit: number;
 }
 
-export interface UserUpdate {
-  id: string;
-  user_id: number;
-  update_type: 'saved_search_matches' | 'opportunity_amended' | 'opportunity_changed';
-  source_id?: number;
-  opportunity_ids?: number[];
-  summary: string;
-  details?: Record<string, unknown>;
-  is_read: boolean;
-  created_at: string;
-}
-
-export interface UserUpdateCount {
-  unread: number;
-  total: number;
-}
-
-export interface UserUpdatesResponse {
-  updates: UserUpdate[];
-  total: number;
-  page: number;
-  limit: number;
-}
