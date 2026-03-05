@@ -22,6 +22,9 @@ export interface GovTroveUser {
   first_name: string;
   last_name: string;
   plan: string;
+  subscription_status?: string;
+  cancel_at_period_end: boolean;
+  current_period_end?: string;
   created_at: string;
   updated_at: string;
 }

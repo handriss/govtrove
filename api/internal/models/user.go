@@ -8,9 +8,14 @@ type User struct {
 	Email     string    `json:"email"`
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
-	Plan      string    `json:"plan"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Plan               string     `json:"plan"`
+	StripeCustomerID   *string    `json:"-"`
+	SubscriptionID     *string    `json:"-"`
+	SubscriptionStatus *string    `json:"subscription_status,omitempty"`
+	CancelAtPeriodEnd  bool       `json:"cancel_at_period_end"`
+	CurrentPeriodEnd   *time.Time `json:"current_period_end,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type UpsertUserInput struct {
