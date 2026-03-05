@@ -1,0 +1,1 @@
+ALTER TABLE sent_emails ALTER COLUMN user_id DROP NOT NULL;

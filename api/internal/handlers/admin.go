@@ -523,7 +523,7 @@ func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
 	coerceFloats(body.TemplateData)
 
 	sentID, err := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
-		UserID:       0,
+		UserID:       nil,
 		ToEmail:      body.ToEmail,
 		EmailType:    "admin_test",
 		TemplateName: body.TemplateName,

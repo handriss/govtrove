@@ -82,9 +82,9 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 			h.logger.Error("failed to update email status", "resend_id", resendID, "error", err)
 		}
 		userID, _ := h.sentEmailsRepo.GetUserIDByResendID(ctx, resendID)
-		if userID > 0 {
-			if err := h.emailPrefsRepo.Unsubscribe(ctx, userID, "bounce"); err != nil {
-				h.logger.Error("failed to unsubscribe bounced user", "user_id", userID, "error", err)
+		if userID != nil && *userID > 0 {
+			if err := h.emailPrefsRepo.Unsubscribe(ctx, *userID, "bounce"); err != nil {
+				h.logger.Error("failed to unsubscribe bounced user", "user_id", *userID, "error", err)
 			}
 		}
 
@@ -93,9 +93,9 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 			h.logger.Error("failed to update email status", "resend_id", resendID, "error", err)
 		}
 		userID, _ := h.sentEmailsRepo.GetUserIDByResendID(ctx, resendID)
-		if userID > 0 {
-			if err := h.emailPrefsRepo.Unsubscribe(ctx, userID, "complaint"); err != nil {
-				h.logger.Error("failed to unsubscribe complaining user", "user_id", userID, "error", err)
+		if userID != nil && *userID > 0 {
+			if err := h.emailPrefsRepo.Unsubscribe(ctx, *userID, "complaint"); err != nil {
+				h.logger.Error("failed to unsubscribe complaining user", "user_id", *userID, "error", err)
 			}
 		}
 

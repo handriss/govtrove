@@ -48,7 +48,7 @@ func NewService(apiKey, from, webhookSecret string, pool *pgxpool.Pool, logger *
 }
 
 type SendEmailInput struct {
-	UserID       int
+	UserID       *int
 	ToEmail      string
 	EmailType    string
 	TemplateName string
@@ -149,7 +149,7 @@ func (s *Service) ResendExistingEmail(ctx context.Context, sentEmailID, toEmail 
 	var templateName string
 	var templateDataStr *string
 	var subject string
-	var userID int
+	var userID *int
 
 	err := s.pool.QueryRow(ctx,
 		`SELECT user_id, template_name, template_data, subject FROM sent_emails WHERE id = $1`,
