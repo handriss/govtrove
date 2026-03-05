@@ -1,23 +1,24 @@
-import { useEffect } from 'react';
+import { Component, Suspense, lazy, useEffect } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import * as Sentry from '@sentry/react';
 import { AuthKitProvider } from '@workos-inc/authkit-react';
 import { AuthProvider, useAppAuth } from './contexts/AuthContext';
 import SimpleSearchPage from './pages/SimpleSearchPage';
-import WhatsNewPage from './pages/WhatsNewPage';
-import OpportunityDetail from './pages/OpportunityDetail';
-import ProfilePage from './pages/ProfilePage';
-import SavedPage from './pages/SavedPage';
-import NotificationsPage from './pages/NotificationsPage';
-import AdminPage from './pages/AdminPage';
-import AdminPipelineRunDetailPage from './pages/AdminPipelineRunDetailPage';
-import AdminDataQualityPage from './pages/AdminDataQualityPage';
-import AdminReconcileDQPage from './pages/AdminReconcileDQPage';
-import AdminCampaignsPage from './pages/AdminCampaignsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import useUTMCapture from './hooks/useUTMCapture';
 import useTawk from './hooks/useTawk';
 import Footer from './components/Footer';
+
+const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage'));
+const OpportunityDetail = lazy(() => import('./pages/OpportunityDetail'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const SavedPage = lazy(() => import('./pages/SavedPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const AdminPipelineRunDetailPage = lazy(() => import('./pages/AdminPipelineRunDetailPage'));
+const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
+const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
+const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -42,21 +43,37 @@ function AuthCallback() {
   return <Navigate to="/" replace />;
 }
 
-function ErrorFallback() {
+function LoadingFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center max-w-md px-4">
-        <h1 className="text-2xl font-bold text-dark-900 mb-2">Something went wrong</h1>
-        <p className="text-dark-500 mb-4">An unexpected error occurred. Please try refreshing the page.</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-        >
-          Refresh page
-        </button>
-      </div>
+      <div className="h-6 w-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
     </div>
   );
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    import('@sentry/react').then(Sentry => Sentry.captureException(error, { extra: { componentStack: info.componentStack } })).catch(() => {});
+  }
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <h1 className="text-2xl font-bold text-dark-900 mb-2">Something went wrong</h1>
+          <p className="text-dark-500 mb-4">An unexpected error occurred. Please try refreshing the page.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Refresh page
+          </button>
+        </div>
+      </div>
+    );
+  }
 }
 
 function AppRoutes() {
@@ -64,27 +81,29 @@ function AppRoutes() {
   useTawk();
 
   return (
-    <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
-      <Routes>
-        <Route path="/" element={<SimpleSearchPage />} />
-        <Route path="/whats-new" element={<WhatsNewPage />} />
-        <Route path="/opportunity/:id" element={<OpportunityDetail />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/saved" element={<SavedPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
-        <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
-        <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
-        <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
-        <Route path="/callback" element={<AuthCallback />} />
-        <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
-        <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
-        <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<SimpleSearchPage />} />
+          <Route path="/whats-new" element={<WhatsNewPage />} />
+          <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/saved" element={<SavedPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
+          <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
+          <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
+          <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
+          <Route path="/callback" element={<AuthCallback />} />
+          <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
+          <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
+          <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
       <Footer />
-    </Sentry.ErrorBoundary>
+    </ErrorBoundary>
   );
 }
 
