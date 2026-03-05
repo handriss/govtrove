@@ -96,30 +96,6 @@ func (s *Service) SendEmail(ctx context.Context, input SendEmailInput) (string, 
 	return sentID, nil
 }
 
-func (s *Service) SendWelcome(ctx context.Context, to, firstName string) error {
-	greeting := "Hi there,"
-	if firstName != "" {
-		greeting = fmt.Sprintf("Hi %s,", firstName)
-	}
-
-	data := map[string]any{
-		"Greeting": greeting,
-	}
-
-	html, err := s.RenderTemplate("welcome.html", data)
-	if err != nil {
-		return fmt.Errorf("rendering welcome template: %w", err)
-	}
-
-	_, err = s.callResendAPI(ctx, to, "You're in — start exploring federal opportunities", html)
-	if err != nil {
-		return fmt.Errorf("sending welcome email to %s: %w", to, err)
-	}
-
-	s.logger.Info("welcome email sent", "to", to)
-	return nil
-}
-
 func (s *Service) RenderTemplate(name string, data map[string]any) (string, error) {
 	var buf bytes.Buffer
 	if err := s.templates.ExecuteTemplate(&buf, name, data); err != nil {

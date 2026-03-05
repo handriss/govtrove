@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
@@ -15,12 +14,11 @@ import (
 type AuthHandler struct {
 	repo           *repository.UserRepository
 	emailPrefsRepo *repository.EmailPreferencesRepository
-	emailSvc       *email.Service
 	logger         *slog.Logger
 }
 
-func NewAuthHandler(repo *repository.UserRepository, emailPrefsRepo *repository.EmailPreferencesRepository, emailSvc *email.Service, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{repo: repo, emailPrefsRepo: emailPrefsRepo, emailSvc: emailSvc, logger: logger}
+func NewAuthHandler(repo *repository.UserRepository, emailPrefsRepo *repository.EmailPreferencesRepository, logger *slog.Logger) *AuthHandler {
+	return &AuthHandler{repo: repo, emailPrefsRepo: emailPrefsRepo, logger: logger}
 }
 
 type syncRequest struct {

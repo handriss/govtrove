@@ -3,12 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/handriss/govtrove/api/internal/email"
+	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
@@ -19,6 +22,7 @@ type AdminHandler struct {
 	emailPrefsRepo *repository.EmailPreferencesRepository
 	sentEmailsRepo *repository.SentEmailsRepository
 	emailSvc       *email.Service
+	workosAPIKey   string
 	logger         *slog.Logger
 }
 
@@ -29,6 +33,7 @@ func NewAdminHandler(
 	emailPrefsRepo *repository.EmailPreferencesRepository,
 	sentEmailsRepo *repository.SentEmailsRepository,
 	emailSvc *email.Service,
+	workosAPIKey string,
 	logger *slog.Logger,
 ) *AdminHandler {
 	return &AdminHandler{
@@ -38,19 +43,22 @@ func NewAdminHandler(
 		emailPrefsRepo: emailPrefsRepo,
 		sentEmailsRepo: sentEmailsRepo,
 		emailSvc:       emailSvc,
+		workosAPIKey:   workosAPIKey,
 		logger:         logger,
 	}
 }
 
 type adminUserResponse struct {
-	ID        int    `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Plan      string `json:"plan"`
-	IsAdmin   bool   `json:"is_admin"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID              int    `json:"id"`
+	Email           string `json:"email"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
+	Plan            string `json:"plan"`
+	IsAdmin         bool   `json:"is_admin"`
+	CreatedAt       string `json:"created_at"`
+	UpdatedAt       string `json:"updated_at"`
+	PendingExport   bool   `json:"pending_export"`
+	PendingDeletion bool   `json:"pending_deletion"`
 }
 
 func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
@@ -64,14 +72,16 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	out := make([]adminUserResponse, len(users))
 	for i, u := range users {
 		out[i] = adminUserResponse{
-			ID:        u.ID,
-			Email:     u.Email,
-			FirstName: u.FirstName,
-			LastName:  u.LastName,
-			Plan:      u.Plan,
-			IsAdmin:   u.IsAdmin,
-			CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:              u.ID,
+			Email:           u.Email,
+			FirstName:       u.FirstName,
+			LastName:        u.LastName,
+			Plan:            u.Plan,
+			IsAdmin:         u.IsAdmin,
+			CreatedAt:       u.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:       u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			PendingExport:   u.PendingExport,
+			PendingDeletion: u.PendingDeletion,
 		}
 	}
 
@@ -480,10 +490,7 @@ func coerceFloats(m map[string]any) {
 }
 
 var allowedTemplates = map[string]bool{
-	"welcome.html":            true,
-	"opportunity_update.html": true,
-	"search_results.html":     true,
-	"digest.html":             true,
+	"digest.html": true,
 }
 
 func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
@@ -561,4 +568,101 @@ func (h *AdminHandler) ResendEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) ExportUserData(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("export user data: get user failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	export, err := h.userRepo.ExportUserData(r.Context(), userID, user.Email)
+	if err != nil {
+		h.logger.Error("export user data failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(export)
+}
+
+func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("delete user: get user failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	// Prevent self-deletion
+	requestingWorkOSID := authmw.UserIDFromContext(r.Context())
+	if requestingWorkOSID == user.WorkOSID {
+		http.Error(w, "cannot delete your own account", http.StatusBadRequest)
+		return
+	}
+
+	// Delete from WorkOS (revoke sessions + delete user)
+	if h.workosAPIKey != "" && user.WorkOSID != "" {
+		if err := h.deleteWorkOSUser(user.WorkOSID); err != nil {
+			h.logger.Error("workos user deletion failed", "workos_id", user.WorkOSID, "error", err)
+			// Continue with DB deletion even if WorkOS fails
+		}
+	}
+
+	if err := h.userRepo.DeleteUser(r.Context(), userID, user.Email); err != nil {
+		h.logger.Error("delete user failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("user deleted", "user_id", userID, "email", user.Email)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) deleteWorkOSUser(workosID string) error {
+	client := &http.Client{}
+
+	// Delete user (which also invalidates all sessions)
+	req, err := http.NewRequest("DELETE",
+		fmt.Sprintf("https://api.workos.com/user_management/users/%s", workosID), nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+h.workosAPIKey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("deleting workos user: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("workos delete returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
