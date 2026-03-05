@@ -23,12 +23,6 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 		SELECT n.id, n.user_id, n.update_type, n.details, n.created_at
 		FROM notifications n
 		WHERE n.created_at > NOW() - INTERVAL '20 minutes'
-		AND NOT EXISTS (
-			SELECT 1 FROM sent_emails se
-			WHERE se.user_id = n.user_id
-			AND se.email_type = 'digest'
-			AND se.created_at > NOW() - INTERVAL '23 hours'
-		)
 		ORDER BY n.user_id, n.update_type, n.created_at
 	`)
 	if err != nil {
@@ -48,16 +42,16 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 	sent := 0
 	for userID, notifs := range byUser {
 		var email, firstName string
-		var searchAlerts, oppAlerts bool
+		var searchAlerts, oppAlerts, isAdmin bool
 		var unsubscribedAt *time.Time
 
 		err := h.Pool.QueryRow(ctx, `
-			SELECT u.email, COALESCE(u.first_name, ''),
+			SELECT u.email, COALESCE(u.first_name, ''), u.is_admin,
 				COALESCE(ep.search_alerts, true), COALESCE(ep.opportunity_alerts, true), ep.unsubscribed_at
 			FROM users u
 			LEFT JOIN email_preferences ep ON ep.user_id = u.id
 			WHERE u.id = $1
-		`, userID).Scan(&email, &firstName, &searchAlerts, &oppAlerts, &unsubscribedAt)
+		`, userID).Scan(&email, &firstName, &isAdmin, &searchAlerts, &oppAlerts, &unsubscribedAt)
 		if err != nil {
 			h.Logger.Warn("skip user: can't fetch email/prefs", "user_id", userID, "error", err)
 			continue
@@ -65,6 +59,20 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 
 		if unsubscribedAt != nil {
 			continue
+		}
+
+		if !isAdmin {
+			var recentDigest bool
+			_ = h.Pool.QueryRow(ctx, `
+				SELECT EXISTS(
+					SELECT 1 FROM sent_emails
+					WHERE user_id = $1 AND email_type = 'digest'
+					AND created_at > NOW() - INTERVAL '16 hours'
+				)
+			`, userID).Scan(&recentDigest)
+			if recentDigest {
+				continue
+			}
 		}
 
 		var searchNotifs, oppNotifs []notificationRow
