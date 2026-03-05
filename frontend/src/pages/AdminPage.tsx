@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2 } from 'lucide-react';
+import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
-  getAdminApiKeys, getAdminSamgovRequests,
+  getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser, type AdminSendNewEmailInput,
@@ -12,6 +12,7 @@ import {
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
 } from '../services/api';
+import type { Notification } from '../types/api';
 import { useAppAuth } from '../contexts/AuthContext';
 
 function formatDate(dateStr: string) {
@@ -22,6 +23,21 @@ function formatDate(dateStr: string) {
 function formatDateTime(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  search_matches: 'Search Match',
+  opportunity_amended: 'Amendment',
+  opportunity_updated: 'Change',
+};
+
+function NotificationTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'search_matches': return <Search size={14} className="text-accent" />;
+    case 'opportunity_amended': return <Bell size={14} className="text-amber-400" />;
+    case 'opportunity_updated': return <Bell size={14} className="text-blue-400" />;
+    default: return <Bell size={14} className="text-dark-400" />;
+  }
 }
 
 function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getToken: () => Promise<string>; onUserDeleted: (userId: number) => void }) {
@@ -181,6 +197,130 @@ function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getT
             </div>
           </div>
         </div>
+      )}
+    </section>
+  );
+}
+
+function NotificationsTab({ users, getToken }: { users: AdminUser[]; getToken: () => Promise<string> }) {
+  const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const limit = 50;
+
+  const fetchNotifications = useCallback(async (userId: number, p: number) => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await getAdminNotifications(token, userId, p);
+      setNotifications(res.notifications || []);
+      setTotal(res.total);
+      setPage(p);
+    } catch {
+      setNotifications([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    if (selectedUserId === '') return;
+    fetchNotifications(selectedUserId, 1);
+  }, [selectedUserId, fetchNotifications]);
+
+  const totalPages = Math.ceil(total / limit);
+  const selectedUser = users.find(u => u.id === selectedUserId);
+
+  return (
+    <section>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">Notifications</h2>
+
+      <div className="mb-6">
+        <label className="block text-sm text-dark-400 mb-2">Select user</label>
+        <select
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : '')}
+          className="w-full max-w-sm px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg
+                     text-dark-100 focus:outline-none focus:border-accent/50"
+        >
+          <option value="">Choose a user...</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.email}{u.first_name ? ` (${u.first_name} ${u.last_name})`.trimEnd() : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedUserId !== '' && (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-dark-400">
+              {loading ? 'Loading...' : `${total} notification${total !== 1 ? 's' : ''} for ${selectedUser?.email}`}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => fetchNotifications(selectedUserId as number, page - 1)}
+                  disabled={page <= 1 || loading}
+                  className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-dark-400">{page} / {totalPages}</span>
+                <button
+                  onClick={() => fetchNotifications(selectedUserId as number, page + 1)}
+                  disabled={page >= totalPages || loading}
+                  className="p-1 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!loading && notifications.length === 0 && (
+            <p className="text-dark-500 text-sm py-8 text-center">No notifications for this user.</p>
+          )}
+
+          {notifications.length > 0 && (
+            <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                    <th className="px-4 py-3 font-medium w-32">Type</th>
+                    <th className="px-4 py-3 font-medium">Summary</th>
+                    <th className="px-4 py-3 font-medium w-24">Read</th>
+                    <th className="px-4 py-3 font-medium w-44">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {notifications.map((n) => (
+                    <tr key={n.id} className={`border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 ${!n.is_read ? 'bg-accent/[0.03]' : ''}`}>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-dark-300">
+                          <NotificationTypeIcon type={n.update_type} />
+                          <span className="text-xs">{NOTIFICATION_TYPE_LABELS[n.update_type] || n.update_type}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-dark-200 max-w-md truncate">{(n.details as Record<string, unknown>)?.summary as string || n.update_type}</td>
+                      <td className="px-4 py-3">
+                        {n.is_read
+                          ? <span className="text-dark-600 text-xs">Read</span>
+                          : <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-accent/15 border border-accent/30 text-accent">Unread</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3 text-dark-400 text-xs">{formatDateTime(n.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
@@ -1367,7 +1507,7 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails';
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -1386,6 +1526,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       {activeTab === 'users' && <UsersTab users={users} getToken={getToken} onUserDeleted={(id) => setUsers(prev => prev.filter(u => u.id !== id))} />}
+      {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getToken} />}
       {activeTab === 'api-keys' && <ApiKeysTab getToken={getToken} />}
       {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getToken} />}
       {activeTab === 'usage' && <UsageChartTab getToken={getToken} />}

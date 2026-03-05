@@ -385,6 +385,18 @@ export async function getAdminUsers(token: string): Promise<AdminUser[]> {
   return response.json();
 }
 
+export async function getAdminNotifications(
+  token: string,
+  userId: number,
+  page = 1,
+): Promise<NotificationsResponse> {
+  const response = await fetch(`${API_BASE}/admin/notifications?user_id=${userId}&page=${page}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 export interface AdminApiKey {
   key_hash: string;
   email: string;
