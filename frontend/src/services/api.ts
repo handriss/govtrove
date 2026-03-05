@@ -853,7 +853,7 @@ export async function getAdminEmailPreferences(token: string): Promise<AdminEmai
 
 export interface AdminSentEmail {
   id: string;
-  user_id: number;
+  user_id: number | null;
   to_email: string;
   email_type: string;
   template_name: string;

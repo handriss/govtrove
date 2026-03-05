@@ -19,7 +19,7 @@ func NewSentEmailsRepository(pool *pgxpool.Pool) *SentEmailsRepository {
 
 type SentEmail struct {
 	ID              string     `json:"id"`
-	UserID          int        `json:"user_id"`
+	UserID          *int       `json:"user_id"`
 	ToEmail         string     `json:"to_email"`
 	EmailType       string     `json:"email_type"`
 	TemplateName    string     `json:"template_name"`
@@ -66,16 +66,16 @@ func (r *SentEmailsRepository) UpdateStatusByResendID(ctx context.Context, resen
 	return nil
 }
 
-func (r *SentEmailsRepository) GetUserIDByResendID(ctx context.Context, resendMessageID string) (int, error) {
-	var userID int
+func (r *SentEmailsRepository) GetUserIDByResendID(ctx context.Context, resendMessageID string) (*int, error) {
+	var userID *int
 	err := r.pool.QueryRow(ctx,
 		`SELECT user_id FROM sent_emails WHERE resend_message_id = $1`, resendMessageID,
 	).Scan(&userID)
 	if err == pgx.ErrNoRows {
-		return 0, nil
+		return nil, nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("getting user_id by resend_id: %w", err)
+		return nil, fmt.Errorf("getting user_id by resend_id: %w", err)
 	}
 	return userID, nil
 }
@@ -113,9 +113,9 @@ func (r *SentEmailsRepository) List(ctx context.Context, page, limit int) ([]Sen
 	rows, err := r.pool.Query(ctx,
 		`SELECT se.id, se.user_id, se.to_email, se.email_type, se.template_name, se.template_data,
 			se.subject, se.resend_message_id, se.status, se.opened_at, se.clicked_at, se.created_at, se.updated_at,
-			u.email, COALESCE(u.first_name || ' ' || u.last_name, u.email)
+			COALESCE(u.email, se.to_email), COALESCE(u.first_name || ' ' || u.last_name, se.to_email)
 		 FROM sent_emails se
-		 JOIN users u ON u.id = se.user_id
+		 LEFT JOIN users u ON u.id = se.user_id
 		 ORDER BY se.created_at DESC
 		 LIMIT $1 OFFSET $2`, limit, offset,
 	)
