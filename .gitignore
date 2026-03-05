@@ -67,6 +67,9 @@ api/ogpreview
 # n8n output
 n8n/output/*.json
 
+# Landing page build output
+landing-dist/
+
 # Pipeline Lambda binaries
 pipeline/download-csvs
 pipeline/ingest-active
