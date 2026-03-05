@@ -21,9 +21,10 @@ const PAGE_SIZE_KEY = 'govtrove_page_size';
 export default function SimpleSearchPage() {
   const fs = useFilterState();
   const { facets, total: facetTotal, isLoading: facetsLoading } = useFacetCounts(fs.toFacetParams());
-  const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch();
+  const { isAuthenticated, getAccessToken } = useAppAuth();
+  const authOptions = useMemo(() => ({ getAccessToken }), [getAccessToken]);
+  const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch(authOptions);
   const saved = useSavedOpportunities();
-  const { isAuthenticated } = useAppAuth();
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);

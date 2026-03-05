@@ -44,7 +44,9 @@ func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
 func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	params := h.parseSearchParams(r)
 
+	start := time.Now()
 	result, err := h.repo.Search(r.Context(), params)
+	durationMs := int(time.Since(start).Milliseconds())
 	if err != nil {
 		h.logger.Error("search failed", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -65,7 +67,7 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, result)
 
 	userID := h.resolveOptionalUserID(r)
-	event := &models.SearchEvent{EventType: "search"}
+	event := &models.SearchEvent{EventType: "search", DurationMs: &durationMs}
 	if params.Query != "" {
 		event.Query = &params.Query
 	}

@@ -26,9 +26,9 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 	query := `
 		INSERT INTO search_events (
 			event_type, user_id, query, filters, sort_by, page,
-			total_results, opportunity_id,
+			total_results, opportunity_id, duration_ms,
 			user_agent, referer, utm_campaign
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
 	_, err = r.pool.Exec(ctx, query,
@@ -40,6 +40,7 @@ func (r *EventRepository) Create(ctx context.Context, event *models.SearchEvent)
 		event.Page,
 		event.TotalResults,
 		event.OpportunityID,
+		event.DurationMs,
 		event.UserAgent,
 		event.Referer,
 		event.UtmCampaign,

@@ -146,6 +146,7 @@ type SearchEventRow struct {
 	Page         *int    `json:"page"`
 	TotalResults *int    `json:"total_results"`
 	UserID       *string `json:"user_id"`
+	DurationMs   *int    `json:"duration_ms"`
 	CreatedAt    string  `json:"created_at"`
 }
 
@@ -271,7 +272,7 @@ func (r *PipelineRepository) ListSearchEvents(ctx context.Context, page, limit i
 
 	offset := (page - 1) * limit
 	query := `
-		SELECT id, query, filters::text, sort_by, page, total_results, user_id, created_at
+		SELECT id, query, filters::text, sort_by, page, total_results, user_id, duration_ms, created_at
 		FROM search_events
 		` + whereClause + `
 		ORDER BY created_at DESC
@@ -289,7 +290,7 @@ func (r *PipelineRepository) ListSearchEvents(ctx context.Context, page, limit i
 		var ev SearchEventRow
 		var createdAt time.Time
 		if err := rows.Scan(&ev.ID, &ev.Query, &ev.Filters, &ev.SortBy, &ev.Page,
-			&ev.TotalResults, &ev.UserID, &createdAt); err != nil {
+			&ev.TotalResults, &ev.UserID, &ev.DurationMs, &createdAt); err != nil {
 			return nil, 0, err
 		}
 		ev.CreatedAt = createdAt.Format(time.RFC3339)

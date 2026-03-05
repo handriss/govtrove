@@ -12,7 +12,11 @@ interface UseSearchState {
   suggestion: string | null;
 }
 
-export function useSearch() {
+interface UseSearchOptions {
+  getAccessToken?: () => Promise<string>;
+}
+
+export function useSearch(options?: UseSearchOptions) {
   const [state, setState] = useState<UseSearchState>({
     results: [],
     total: 0,
@@ -27,7 +31,11 @@ export function useSearch() {
     setState((prev) => ({ ...prev, loading: true, error: null, suggestion: null }));
 
     try {
-      const data: SearchResult = await searchOpportunities(params);
+      let token: string | undefined;
+      if (options?.getAccessToken) {
+        try { token = await options.getAccessToken(); } catch { /* not authenticated */ }
+      }
+      const data: SearchResult = await searchOpportunities(params, token);
       setState({
         results: data.opportunities || [],
         total: data.total,
@@ -44,7 +52,7 @@ export function useSearch() {
         error: err instanceof Error ? err.message : 'Search failed',
       }));
     }
-  }, []);
+  }, [options?.getAccessToken]);
 
   const inject = useCallback((data: SearchResult) => {
     setState({

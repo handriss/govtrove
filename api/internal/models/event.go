@@ -14,6 +14,7 @@ type SearchEvent struct {
 	Page          *int                   `json:"page,omitempty"`
 	TotalResults  *int                   `json:"total_results,omitempty"`
 	OpportunityID *int                   `json:"opportunity_id,omitempty"`
+	DurationMs    *int                   `json:"duration_ms,omitempty"`
 	CreatedAt     time.Time              `json:"created_at"`
 	UserAgent     *string                `json:"user_agent,omitempty"`
 	Referer       *string                `json:"referer,omitempty"`

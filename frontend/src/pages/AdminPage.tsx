@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2 } from 'lucide-react';
+import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
@@ -859,6 +859,22 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
     { value: '30d', label: '30d' },
   ];
 
+  function buildReplayUrl(ev: AdminSearchEvent): string {
+    const params = new URLSearchParams();
+    if (ev.query) params.set('q', ev.query);
+    if (ev.filters) {
+      try {
+        const f = JSON.parse(ev.filters);
+        for (const [k, v] of Object.entries(f)) {
+          if (v == null || v === '') continue;
+          params.set(k, Array.isArray(v) ? v.join(',') : String(v));
+        }
+      } catch { /* ignore */ }
+    }
+    if (ev.sort_by) params.set('sort', ev.sort_by);
+    return `https://api.govtrove.com/api/opportunities?${params}`;
+  }
+
   function truncateFilters(filters: string | null) {
     if (!filters) return '—';
     try {
@@ -1006,7 +1022,9 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
                   <th className="px-4 py-3 font-medium">Query</th>
                   <th className="px-4 py-3 font-medium">Filters</th>
                   <th className="px-4 py-3 font-medium w-24">Results</th>
+                  <th className="px-4 py-3 font-medium w-20">Duration</th>
                   <th className="px-4 py-3 font-medium w-32">User ID</th>
+                  <th className="px-4 py-3 font-medium w-12"></th>
                 </tr>
               </thead>
               <tbody>
@@ -1020,7 +1038,15 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
                       <td className={`px-4 py-3 text-xs font-medium ${isZero ? 'text-red-400' : 'text-dark-200'}`}>
                         {ev.total_results?.toLocaleString() ?? '—'}
                       </td>
+                      <td className="px-4 py-3 text-xs text-dark-400 tabular-nums">
+                        {ev.duration_ms != null ? `${ev.duration_ms}ms` : '—'}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-dark-400 truncate max-w-[8rem]">{ev.user_id ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <a href={buildReplayUrl(ev)} target="_blank" rel="noopener noreferrer" className="text-dark-500 hover:text-accent transition-colors" title="Replay search">
+                          <ExternalLink size={14} />
+                        </a>
+                      </td>
                     </tr>
                   );
                 })}

@@ -26,7 +26,7 @@ export interface GovTroveUser {
   updated_at: string;
 }
 
-export async function searchOpportunities(params: SearchParams = {}): Promise<SearchResult> {
+export async function searchOpportunities(params: SearchParams = {}, token?: string): Promise<SearchResult> {
   const searchParams = new URLSearchParams();
 
   if (params.q) searchParams.set('q', params.q);
@@ -48,8 +48,11 @@ export async function searchOpportunities(params: SearchParams = {}): Promise<Se
   if (params.page) searchParams.set('page', String(params.page));
   if (params.limit) searchParams.set('limit', String(params.limit));
 
+  const headers: Record<string, string> = { ...utmHeaders() };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}/opportunities?${searchParams}`, {
-    headers: { ...utmHeaders() },
+    headers,
   });
   if (!response.ok) {
     throw new Error(`Search failed: ${response.statusText}`);
@@ -182,6 +185,26 @@ export async function createAccountRequest(
     const text = await response.text();
     throw new Error(text || response.statusText);
   }
+}
+
+// --- Billing ---
+
+export async function createCheckoutSession(token: string): Promise<{ url: string }> {
+  const response = await fetch(`${API_BASE}/billing/checkout`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Checkout failed: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function createPortalSession(token: string): Promise<{ url: string }> {
+  const response = await fetch(`${API_BASE}/billing/portal`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Portal failed: ${response.statusText}`); }
+  return response.json();
 }
 
 // --- Saved Opportunities ---
@@ -546,6 +569,7 @@ export interface AdminSearchEvent {
   page: number | null;
   total_results: number | null;
   user_id: string | null;
+  duration_ms: number | null;
   created_at: string;
 }
 
