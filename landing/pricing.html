@@ -233,6 +233,22 @@
             text-align: center;
         }
 
+        .pricing-card .features li.coming-soon {
+            background: var(--accent-subtle);
+            border: 1px solid rgba(37, 99, 235, 0.25);
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.625rem;
+            margin-top: 0.25rem;
+        }
+        .pricing-card .features li.coming-soon::after {
+            content: 'Soon';
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 600px) {
             .pricing-grid {
                 grid-template-columns: 1fr;
@@ -286,7 +302,7 @@
                         <li>Email alerts for new matches</li>
                         <li>Daily digest notifications</li>
                         <li>Priority support</li>
-                        <li>AI-powered opportunity analysis <span style="font-size:0.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#fff;background:var(--accent);padding:0.1875rem 0.5rem;border-radius:9999px;margin-left:0.375rem;">Coming soon</span></li>
+                        <li class="coming-soon">AI-powered opportunity analysis</li>
                     </ul>
                     <a href="https://app.govtrove.com" class="cta cta-primary">Get Started</a>
                 </div>
