@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import { useDropdownPosition } from './useDropdownPosition';
 import {
-  PSC_TREE,
+  getPscTree,
   PSC_TITLE_BY_CODE,
   aggregatePscFacetCounts,
   searchPscCodes,
   getPscAncestorCodes,
   isPscAncestorSelected,
+  pscDataReady,
 } from './pscTree';
 import type { PscTreeNode } from './pscTree';
 import type { FacetValue } from '../../types/api';
@@ -80,7 +81,12 @@ export default function PscTreeSelector({
 }: PscTreeSelectorProps) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dataReady, setDataReady] = useState(() => getPscTree().length > 0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!dataReady) pscDataReady.then(() => setDataReady(true));
+  }, [dataReady]);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const facetCounts = useMemo(() => (facets ? aggregatePscFacetCounts(facets) : null), [facets]);
@@ -347,7 +353,7 @@ export default function PscTreeSelector({
         </div>
       ) : (
         <div role="tree" aria-label="PSC code hierarchy" className={`overflow-y-auto ${inline ? 'max-h-[300px] mt-2' : 'flex-1'} p-1`}>
-          {PSC_TREE.map((root) => (
+          {getPscTree().map((root) => (
             <TreeNodeRow key={root.code} node={root} />
           ))}
         </div>

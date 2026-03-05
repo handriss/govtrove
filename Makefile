@@ -3,7 +3,7 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	test test-e2e lambda-build \
-	ecr-login deploy-frontend deploy-landing deploy-api deploy-pipeline deploy-all \
+	ecr-login deploy-frontend minify-landing deploy-landing deploy-api deploy-pipeline deploy-all \
 	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
@@ -340,7 +340,16 @@ deploy-frontend: frontend-build
 	cd frontend && npm run build && \
 	BUCKET=$$(cd ../infra/terraform && terraform output -raw frontend_bucket_name) && \
 	DIST_ID=$$(cd ../infra/terraform && terraform output -raw cloudfront_distribution_id) && \
-	aws s3 sync dist s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
+	echo "Syncing hashed assets (immutable cache)..." && \
+	aws s3 sync dist s3://$$BUCKET --delete \
+		--exclude "*.html" --exclude "robots.txt" --exclude "sitemap.xml" --exclude "favicon.svg" \
+		--cache-control "public, max-age=31536000, immutable" \
+		--profile $(AWS_PROFILE) && \
+	echo "Syncing HTML + metadata (no-cache)..." && \
+	aws s3 sync dist s3://$$BUCKET \
+		--exclude "*" --include "*.html" --include "robots.txt" --include "sitemap.xml" --include "favicon.svg" \
+		--cache-control "no-cache" \
+		--profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
 	rm -f ../.env.production && \
@@ -368,13 +377,26 @@ deploy-pipeline: lambda-build
 	done
 	@echo "All pipeline Lambda functions deployed!"
 
-deploy-landing:
+minify-landing:
+	@echo "Minifying landing page..."
+	@rm -rf landing-dist
+	@cp -r landing landing-dist
+	@find landing-dist -name '*.html' -exec npx --yes html-minifier-terser \
+		--collapse-whitespace --remove-comments --remove-redundant-attributes \
+		--minify-css true --minify-js true \
+		-o {} {} \;
+	@find landing-dist -name '*.js' ! -name '*.min.js' -exec npx --yes terser {} -o {} --compress --mangle \;
+	@find landing-dist -name '*.css' -exec npx --yes csso-cli {} -o {} \;
+	@echo "Minification complete → landing-dist/"
+
+deploy-landing: minify-landing
 	@echo "Deploying landing page to S3/CloudFront..."
 	@BUCKET=$$(cd infra/terraform && terraform output -raw landing_bucket_name) && \
 	DIST_ID=$$(cd infra/terraform && terraform output -raw landing_distribution_id) && \
-	aws s3 sync landing s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
+	aws s3 sync landing-dist s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
+	rm -rf landing-dist && \
 	echo "Landing page deployed successfully!"
 
 deploy-all: deploy-api deploy-pipeline deploy-frontend deploy-landing

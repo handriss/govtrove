@@ -1,4 +1,3 @@
-import { PSC_CODES } from '../../data/pscCodes';
 import type { PscCode } from '../../data/pscCodes';
 import type { FacetValue } from '../../types/api';
 
@@ -14,6 +13,18 @@ interface SearchResult {
   code: PscCode;
   role: 'parent' | 'match' | 'child';
 }
+
+// --- Lazy-loaded data ---
+
+let PSC_CODES: PscCode[] = [];
+let dataLoaded = false;
+
+export const pscDataReady = import('../../data/pscCodes').then((m) => {
+  PSC_CODES = m.PSC_CODES;
+  dataLoaded = true;
+});
+
+// ---
 
 const NODE_BY_CODE = new Map<string, PscTreeNode>();
 const TITLE_BY_CODE = new Map<string, string>();
@@ -63,11 +74,19 @@ function buildTree(): PscTreeNode[] {
   return roots;
 }
 
-const PSC_TREE = buildTree();
+let PSC_TREE: PscTreeNode[] | undefined;
 
-export { PSC_TREE, NODE_BY_CODE as PSC_NODE_BY_CODE, TITLE_BY_CODE as PSC_TITLE_BY_CODE };
+function ensureInitialized(): PscTreeNode[] {
+  if (!dataLoaded) return [];
+  if (!PSC_TREE) PSC_TREE = buildTree();
+  return PSC_TREE;
+}
+
+export { ensureInitialized as getPscTree, NODE_BY_CODE as PSC_NODE_BY_CODE, TITLE_BY_CODE as PSC_TITLE_BY_CODE };
 
 export function aggregatePscFacetCounts(facets: FacetValue[]): Map<string, number> {
+  if (!dataLoaded) return new Map();
+  ensureInitialized();
   const counts = new Map<string, number>();
   for (const f of facets) {
     counts.set(f.value, (counts.get(f.value) ?? 0) + f.count);
@@ -82,6 +101,7 @@ export function aggregatePscFacetCounts(facets: FacetValue[]): Map<string, numbe
 }
 
 export function searchPscCodes(query: string): SearchResult[] {
+  if (!dataLoaded) return [];
   const q = query.trim();
   if (!q) return [];
 
@@ -135,6 +155,8 @@ export function isPscAncestorSelected(code: string, selectedSet: Set<string>): b
 }
 
 export function expandPscToLeafCodes(codes: string[]): string[] {
+  if (!dataLoaded) return codes;
+  ensureInitialized();
   const result: string[] = [];
   for (const code of codes) {
     const node = NODE_BY_CODE.get(code);
@@ -148,6 +170,7 @@ export function expandPscToLeafCodes(codes: string[]): string[] {
 }
 
 export function getPscAncestorCodes(code: string): string[] {
+  ensureInitialized();
   const ancestors: string[] = [];
   for (let len = 1; len < code.length; len++) {
     const prefix = code.slice(0, len);

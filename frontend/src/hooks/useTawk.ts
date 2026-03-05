@@ -13,29 +13,54 @@ declare global {
 
 const TAWK_PROPERTY_ID = import.meta.env.VITE_TAWK_PROPERTY_ID || '69a7180d7b02b21c3601dced/1jiqbbtmn';
 
+function injectTawk() {
+  if (document.querySelector(`script[src*="embed.tawk.to"]`)) return;
+
+  window.Tawk_API = window.Tawk_API || {};
+  window.Tawk_LoadStart = new Date();
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://embed.tawk.to/${TAWK_PROPERTY_ID}`;
+  script.charset = 'UTF-8';
+  script.setAttribute('crossorigin', '*');
+  document.head.appendChild(script);
+}
+
 export default function useTawk() {
   const { user } = useAppAuth();
+  const isAdminPage = window.location.pathname.startsWith('/admin');
+  const skip = !TAWK_PROPERTY_ID || isAdminPage;
 
   useEffect(() => {
-    if (!TAWK_PROPERTY_ID) return;
+    if (skip) return;
 
-    window.Tawk_API = window.Tawk_API || {};
-    window.Tawk_LoadStart = new Date();
+    const interactionEvents = ['scroll', 'click', 'keydown', 'touchstart'] as const;
+    const onInteraction = () => injectTawk();
 
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `https://embed.tawk.to/${TAWK_PROPERTY_ID}`;
-    script.charset = 'UTF-8';
-    script.setAttribute('crossorigin', '*');
-    document.head.appendChild(script);
+    for (const evt of interactionEvents) {
+      window.addEventListener(evt, onInteraction, { once: true, passive: true });
+    }
+
+    const hasRIC = typeof window.requestIdleCallback === 'function';
+    const ricHandle = hasRIC
+      ? window.requestIdleCallback(() => injectTawk(), { timeout: 4000 })
+      : setTimeout(() => injectTawk(), 4000);
 
     return () => {
-      script.remove();
+      for (const evt of interactionEvents) {
+        window.removeEventListener(evt, onInteraction);
+      }
+      if (hasRIC) {
+        window.cancelIdleCallback(ricHandle as number);
+      } else {
+        clearTimeout(ricHandle);
+      }
     };
-  }, []);
+  }, [skip]);
 
   useEffect(() => {
-    if (!TAWK_PROPERTY_ID || !user) return;
+    if (skip || !user) return;
 
     const name = [user.firstName, user.lastName].filter(Boolean).join(' ');
     const attrs: Record<string, string> = {};
