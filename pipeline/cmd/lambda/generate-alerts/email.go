@@ -115,12 +115,7 @@ func (e *EmailSender) SendDigest(ctx context.Context, userID int, toEmail, first
 		return fmt.Errorf("render digest: %w", err)
 	}
 
-	subject := "Your GovTrove Update"
-	if len(data.SearchAlerts) > 0 && len(data.OpportunityAlerts) == 0 {
-		subject = "New matches for your saved searches"
-	} else if len(data.SearchAlerts) == 0 && len(data.OpportunityAlerts) > 0 {
-		subject = "Updates to your saved opportunities"
-	}
+	subject := e.buildSubject(data.SearchAlerts, data.OpportunityAlerts)
 
 	resendID, err := e.callResendAPI(ctx, toEmail, subject, buf.String())
 	if err != nil {
@@ -154,8 +149,13 @@ func (e *EmailSender) buildSearchAlert(n notificationRow) (searchAlertData, erro
 		}
 	}
 
+	matchCount := details.MatchCount
+	if matchCount == 0 {
+		matchCount = len(details.Matches)
+	}
+
 	sa := searchAlertData{
-		MatchCount: details.MatchCount,
+		MatchCount: matchCount,
 		SearchName: details.SearchName,
 		SearchURL:  searchURL,
 	}
@@ -273,6 +273,49 @@ func (e *EmailSender) buildSearchURL(filters map[string]any) string {
 		result += p
 	}
 	return result
+}
+
+func (e *EmailSender) buildSubject(searches []searchAlertData, opps []oppAlertData) string {
+	totalMatches := 0
+	for _, s := range searches {
+		totalMatches += s.MatchCount
+	}
+
+	switch {
+	case len(searches) == 1 && len(opps) == 0:
+		return fmt.Sprintf("%d new match%s for \"%s\"",
+			searches[0].MatchCount, plural(searches[0].MatchCount), searches[0].SearchName)
+	case len(searches) > 1 && len(opps) == 0:
+		return fmt.Sprintf("%d new matches across %d saved searches", totalMatches, len(searches))
+	case len(searches) == 0 && len(opps) == 1:
+		return fmt.Sprintf("Update: %s", truncate(opps[0].OpportunityTitle, 60))
+	case len(searches) == 0 && len(opps) > 1:
+		return fmt.Sprintf("%d updates to your saved opportunities", len(opps))
+	default:
+		return fmt.Sprintf("%d new match%s + %d opportunity update%s",
+			totalMatches, plural(totalMatches), len(opps), pluralS(len(opps)))
+	}
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "es"
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max-1] + "…"
 }
 
 type resendRequest struct {
