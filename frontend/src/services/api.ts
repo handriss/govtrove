@@ -422,6 +422,8 @@ export interface AdminUser {
   is_admin: boolean;
   created_at: string;
   updated_at: string;
+  pending_export: boolean;
+  pending_deletion: boolean;
 }
 
 export async function getAdminUsers(token: string): Promise<AdminUser[]> {
@@ -989,4 +991,25 @@ export async function getAdminUTMAnalytics(
   });
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
+}
+
+// --- GDPR: Export & Delete ---
+
+export async function adminExportUserData(token: string, userId: number): Promise<Record<string, unknown>> {
+  const response = await fetch(`${API_BASE}/admin/users/${userId}/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminDeleteUser(token: string, userId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
 }

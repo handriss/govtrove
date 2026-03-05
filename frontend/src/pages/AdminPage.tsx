@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, RotateCw, Plus } from 'lucide-react';
+import { Shield, Bell, Search, FileText, AlertCircle, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
-  adminSendNewEmail, type AdminSendNewEmailInput,
+  adminSendNewEmail, adminExportUserData, adminDeleteUser, type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
@@ -40,7 +40,47 @@ function UpdateTypeIcon({ type }: { type: string }) {
   }
 }
 
-function UsersTab({ users }: { users: AdminUser[] }) {
+function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getToken: () => Promise<string>; onUserDeleted: (userId: number) => void }) {
+  const [exportingId, setExportingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<AdminUser | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+
+  const handleExport = async (user: AdminUser) => {
+    setExportingId(user.id);
+    try {
+      const token = await getToken();
+      const data = await adminExportUserData(token, user.id);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dsar-export-${user.email}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setExportingId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDeleteUser || confirmText !== 'DELETE') return;
+    setDeletingId(confirmDeleteUser.id);
+    try {
+      const token = await getToken();
+      await adminDeleteUser(token, confirmDeleteUser.id);
+      onUserDeleted(confirmDeleteUser.id);
+      setConfirmDeleteUser(null);
+      setConfirmText('');
+    } catch (e) {
+      alert(`Delete failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <section>
       <h2 className="text-lg font-medium text-dark-200 mb-4">
@@ -55,6 +95,9 @@ function UsersTab({ users }: { users: AdminUser[] }) {
               <th className="px-4 py-3 font-medium">Plan</th>
               <th className="px-4 py-3 font-medium">Admin</th>
               <th className="px-4 py-3 font-medium">Joined</th>
+              <th className="px-4 py-3 font-medium">Requests</th>
+              <th className="px-4 py-3 font-medium">Export</th>
+              <th className="px-4 py-3 font-medium">Delete</th>
             </tr>
           </thead>
           <tbody>
@@ -80,11 +123,81 @@ function UsersTab({ users }: { users: AdminUser[] }) {
                   )}
                 </td>
                 <td className="px-4 py-3 text-dark-400">{formatDate(u.created_at)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col gap-1">
+                    {u.pending_export && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/15 border border-blue-500/30 text-blue-400">
+                        <Download size={10} />
+                        Export
+                      </span>
+                    )}
+                    {u.pending_deletion && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 border border-red-500/30 text-red-400">
+                        <Trash2 size={10} />
+                        Deletion
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => handleExport(u)}
+                    disabled={exportingId === u.id}
+                    className="p-1.5 rounded hover:bg-dark-700/50 text-dark-400 hover:text-dark-200 disabled:opacity-50 transition-colors"
+                    title="Export user data (DSAR)"
+                  >
+                    {exportingId === u.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => { setConfirmDeleteUser(u); setConfirmText(''); }}
+                    disabled={u.is_admin || deletingId === u.id}
+                    className="p-1.5 rounded hover:bg-red-500/15 text-dark-500 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title={u.is_admin ? 'Cannot delete admin users' : 'Delete user'}
+                  >
+                    {deletingId === u.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {confirmDeleteUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-dark-800 border border-dark-700 rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-medium text-dark-200 mb-2">Delete user</h3>
+            <p className="text-dark-400 text-sm mb-4">
+              Delete user <strong className="text-dark-200">{confirmDeleteUser.email}</strong>? This will permanently remove all their data from GovTrove and WorkOS. Type <strong className="text-red-400">DELETE</strong> to confirm.
+            </p>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="w-full px-3 py-2 rounded-lg bg-dark-900 border border-dark-600 text-dark-200 text-sm mb-4 focus:outline-none focus:border-red-500"
+              autoFocus
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { setConfirmDeleteUser(null); setConfirmText(''); }}
+                className="px-4 py-2 text-sm rounded-lg border border-dark-600 text-dark-300 hover:bg-dark-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={confirmText !== 'DELETE' || deletingId !== null}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {deletingId ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -1408,11 +1521,11 @@ export default function AdminPage() {
 }
 
 function AdminPageContent({ activeTab }: { activeTab: Tab }) {
-  const { users, getToken } = useAdminContext();
+  const { users, setUsers, getToken } = useAdminContext();
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
-      {activeTab === 'users' && <UsersTab users={users} />}
+      {activeTab === 'users' && <UsersTab users={users} getToken={getToken} onUserDeleted={(id) => setUsers(prev => prev.filter(u => u.id !== id))} />}
       {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getToken} />}
       {activeTab === 'api-keys' && <ApiKeysTab getToken={getToken} />}
       {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getToken} />}
