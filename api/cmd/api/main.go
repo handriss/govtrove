@@ -173,6 +173,20 @@ func main() {
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
+	appURL := "https://app.govtrove.com"
+	if strings.Contains(cfg.AllowedOrigins, "localhost") {
+		appURL = "http://localhost:5173"
+	}
+
+	var stripeHandler *handlers.StripeHandler
+	if cfg.StripeSecretKey != "" {
+		stripeHandler = handlers.NewStripeHandler(
+			userRepo, cfg.StripeSecretKey, cfg.StripeWebhookSecret,
+			cfg.StripePriceMonthly, appURL, logger,
+		)
+		logger.Info("Stripe billing configured")
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -234,6 +248,9 @@ func main() {
 		r.Use(authmw.MaxBodySize(1 << 20))
 
 		r.Post("/webhooks/resend", webhookHandler.HandleResend)
+		if stripeHandler != nil {
+			r.Post("/webhooks/stripe", stripeHandler.HandleWebhook)
+		}
 		r.Get("/unsubscribe", unsubscribeHandler.HandleUnsubscribe)
 
 		r.Group(func(r chi.Router) {
@@ -264,6 +281,10 @@ func main() {
 				r.Use(authmw.RequireAuth(jwks))
 				r.Get("/me", userHandler.GetMe)
 				r.Post("/auth/sync", authHandler.Sync)
+				if stripeHandler != nil {
+					r.Post("/billing/checkout", stripeHandler.CreateCheckoutSession)
+					r.Post("/billing/portal", stripeHandler.CreatePortalSession)
+				}
 				r.Post("/account/requests", accountRequestHandler.Create)
 				r.Get("/preferences", preferencesHandler.Get)
 				r.Put("/preferences", preferencesHandler.Update)

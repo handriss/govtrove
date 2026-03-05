@@ -57,3 +57,27 @@ resource "aws_secretsmanager_secret_version" "resend_webhook_secret" {
   secret_id     = aws_secretsmanager_secret.resend_webhook_secret.id
   secret_string = var.resend_webhook_secret
 }
+
+resource "aws_secretsmanager_secret" "stripe_secret_key" {
+  count       = var.stripe_secret_key != "" ? 1 : 0
+  name        = "${var.project_name}/stripe-secret-key"
+  description = "Stripe secret API key"
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_secret_key" {
+  count         = var.stripe_secret_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.stripe_secret_key[0].id
+  secret_string = var.stripe_secret_key
+}
+
+resource "aws_secretsmanager_secret" "stripe_webhook_secret" {
+  count       = var.stripe_webhook_secret != "" ? 1 : 0
+  name        = "${var.project_name}/stripe-webhook-secret"
+  description = "Stripe webhook endpoint signing secret"
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
+  count         = var.stripe_webhook_secret != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.stripe_webhook_secret[0].id
+  secret_string = var.stripe_webhook_secret
+}

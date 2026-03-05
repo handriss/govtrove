@@ -52,13 +52,16 @@ resource "aws_iam_role_policy" "apprunner_secrets" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = [
+        Resource = concat([
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.workos_client_id.arn,
           aws_secretsmanager_secret.workos_api_key.arn,
           aws_secretsmanager_secret.resend_api_key.arn,
           aws_secretsmanager_secret.resend_webhook_secret.arn,
-        ]
+        ],
+          var.stripe_secret_key != "" ? [aws_secretsmanager_secret.stripe_secret_key[0].arn] : [],
+          var.stripe_webhook_secret != "" ? [aws_secretsmanager_secret.stripe_webhook_secret[0].arn] : [],
+        )
       }
     ]
   })
@@ -138,13 +141,16 @@ resource "aws_apprunner_service" "api" {
       image_configuration {
         port = tostring(var.api_port)
 
-        runtime_environment_secrets = {
+        runtime_environment_secrets = merge({
           DATABASE_URL           = aws_secretsmanager_secret.database_url.arn
           WORKOS_CLIENT_ID       = aws_secretsmanager_secret.workos_client_id.arn
           WORKOS_API_KEY         = aws_secretsmanager_secret.workos_api_key.arn
           RESEND_API_KEY         = aws_secretsmanager_secret.resend_api_key.arn
           RESEND_WEBHOOK_SECRET  = aws_secretsmanager_secret.resend_webhook_secret.arn
-        }
+        },
+          var.stripe_secret_key != "" ? { STRIPE_SECRET_KEY = aws_secretsmanager_secret.stripe_secret_key[0].arn } : {},
+          var.stripe_webhook_secret != "" ? { STRIPE_WEBHOOK_SECRET = aws_secretsmanager_secret.stripe_webhook_secret[0].arn } : {},
+        )
 
         runtime_environment_variables = {
           PORT            = tostring(var.api_port)
@@ -156,7 +162,8 @@ resource "aws_apprunner_service" "api" {
           SENTRY_DSN      = var.sentry_dsn
           RESEND_FROM_EMAIL = "GovTrove <notifications@govtrove.com>"
           SES_FROM_EMAIL    = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
-          SES_CONFIG_SET  = aws_sesv2_configuration_set.main.configuration_set_name
+          SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
+          STRIPE_PRICE_MONTHLY = var.stripe_price_monthly
         }
       }
     }
