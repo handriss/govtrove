@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  Calendar,
   CreditCard,
   Download,
   Trash2,
@@ -10,13 +9,20 @@ import {
   Check,
   Loader2,
   Mail,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
-import { createAccountRequest, getEmailPreferences, updateEmailPreferences } from '../services/api';
+import { createAccountRequest, getEmailPreferences, updateEmailPreferences, createCheckoutSession, createPortalSession } from '../services/api';
 
 function formatMemberSince(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function ProfilePage() {
@@ -28,6 +34,19 @@ export default function ProfilePage() {
   const [searchAlerts, setSearchAlerts] = useState(true);
   const [opportunityAlerts, setOpportunityAlerts] = useState(true);
   const [prefsLoading, setPrefsLoading] = useState(true);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showUpgraded, setShowUpgraded] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('upgraded') === '1') {
+      setShowUpgraded(true);
+      searchParams.delete('upgraded');
+      setSearchParams(searchParams, { replace: true });
+      const t = setTimeout(() => setShowUpgraded(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadPrefs = useCallback(async () => {
     try {
@@ -40,7 +59,8 @@ export default function ProfilePage() {
   }, [getAccessToken]);
 
   useEffect(() => {
-    if (isAuthenticated) loadPrefs();
+    if (!isAuthenticated) return;
+    loadPrefs();
   }, [isAuthenticated, loadPrefs]);
 
   async function togglePref(field: 'search_alerts' | 'opportunity_alerts', value: boolean) {
@@ -73,6 +93,11 @@ export default function ProfilePage() {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
   const memberSince = govtroveUser?.created_at ? formatMemberSince(govtroveUser.created_at) : null;
   const plan = govtroveUser?.plan || 'free';
+  const subStatus = govtroveUser?.subscription_status;
+  const cancelAtPeriodEnd = govtroveUser?.cancel_at_period_end ?? false;
+  const periodEnd = govtroveUser?.current_period_end;
+  const isPastDue = subStatus === 'past_due';
+  const isCanceling = plan === 'pro' && cancelAtPeriodEnd && periodEnd;
 
   async function handleRequest(type: 'data_export' | 'account_deletion') {
     const setStatus = type === 'data_export' ? setExportStatus : setDeleteStatus;
@@ -86,6 +111,19 @@ export default function ProfilePage() {
     } catch (e) {
       setStatus('error');
       setErrorMsg(e instanceof Error ? e.message : 'Something went wrong');
+    }
+  }
+
+  async function handleBilling(action: 'checkout' | 'portal') {
+    setBillingLoading(true);
+    try {
+      const token = await getAccessToken();
+      const { url } = action === 'checkout'
+        ? await createCheckoutSession(token)
+        : await createPortalSession(token);
+      window.location.href = url;
+    } catch {
+      setBillingLoading(false);
     }
   }
 
@@ -108,26 +146,71 @@ export default function ProfilePage() {
           </div>
           <h1 className="text-xl font-semibold text-dark-50 mb-1">{fullName}</h1>
           <p className="text-sm text-dark-400">{user.email}</p>
+          {memberSince && (
+            <p className="text-xs text-dark-500 mt-1">Member since {memberSince}</p>
+          )}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          {memberSince && (
-            <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4">
-              <div className="flex items-center gap-2 text-dark-500 text-xs uppercase tracking-wider mb-2">
-                <Calendar size={14} strokeWidth={1.5} />
-                Member since
-              </div>
-              <p className="text-dark-100 font-medium">{memberSince}</p>
+        {showUpgraded && (
+          <div className="mb-6 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 text-center">
+            Welcome to GovTrove Pro! Your subscription is now active.
+          </div>
+        )}
+
+        {/* Plan Card */}
+        <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-5 mb-8">
+          <div className="flex items-center gap-2 text-dark-500 text-xs uppercase tracking-wider mb-3">
+            <CreditCard size={14} strokeWidth={1.5} />
+            Plan
+          </div>
+
+          {plan === 'pro' ? (
+            <div>
+              <p className="text-dark-100 font-medium text-lg mb-1">Pro</p>
+
+              {isPastDue && (
+                <div className="mt-3 mb-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <AlertTriangle size={16} strokeWidth={1.5} className="text-amber-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm text-amber-300 font-medium">Payment issue</p>
+                    <p className="text-xs text-amber-400/80 mt-0.5">
+                      Your last payment failed. Please update your payment method to keep your Pro access.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!isPastDue && isCanceling && periodEnd && (
+                <p className="text-sm text-dark-400">Cancels on {formatDate(periodEnd)}</p>
+              )}
+              {!isPastDue && !isCanceling && periodEnd && (
+                <p className="text-sm text-dark-400">Renews on {formatDate(periodEnd)}</p>
+              )}
+
+              <button
+                onClick={() => handleBilling(isPastDue ? 'portal' : 'portal')}
+                disabled={billingLoading}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors disabled:opacity-50"
+              >
+                {billingLoading ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} strokeWidth={1.5} />}
+                {isPastDue ? 'Update payment method' : 'Manage subscription'}
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-dark-100 font-medium text-lg mb-3">Free</p>
+              <button
+                onClick={() => handleBilling('checkout')}
+                disabled={billingLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
+                           border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
+                           transition-all duration-200 disabled:opacity-50"
+              >
+                {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
+                Upgrade to Pro — $30/mo
+              </button>
             </div>
           )}
-          <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-dark-500 text-xs uppercase tracking-wider mb-2">
-              <CreditCard size={14} strokeWidth={1.5} />
-              Plan
-            </div>
-            <p className="text-dark-100 font-medium capitalize">{plan}</p>
-          </div>
         </div>
 
         {/* Email Notifications */}
