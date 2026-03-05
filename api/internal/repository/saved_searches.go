@@ -98,7 +98,7 @@ func (r *SavedSearchRepository) Delete(ctx context.Context, id, userID int) erro
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `DELETE FROM user_updates WHERE source_id = $1 AND update_type = 'saved_search_matches'`, id)
+	_, err = tx.Exec(ctx, `DELETE FROM notifications WHERE source_id = $1 AND update_type = 'search_matches'`, id)
 	if err != nil {
 		return fmt.Errorf("deleting related updates: %w", err)
 	}

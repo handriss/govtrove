@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LogIn, LogOut, User, Star, Bell } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
-import { useUpdatesCount } from '../hooks/useUpdates';
+import { useNotificationsCount } from '../hooks/useNotifications';
 
 export default function AuthButton() {
   const { user, isLoading, isAuthenticated, signIn, signOut } = useAppAuth();
-  const { count } = useUpdatesCount();
+  const { count } = useNotificationsCount();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

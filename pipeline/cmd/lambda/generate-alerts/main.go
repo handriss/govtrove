@@ -359,36 +359,6 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 		return false, nil
 	}
 
-	// Grab IDs for the new matches (cap at 50)
-	idsQuery := fmt.Sprintf("SELECT id FROM opportunities WHERE %s ORDER BY posted_date DESC LIMIT 50", strings.Join(conditions, " AND "))
-	idsRows, err := h.Pool.Query(ctx, idsQuery, args...)
-	if err != nil {
-		return false, fmt.Errorf("query match ids: %w", err)
-	}
-	defer idsRows.Close()
-
-	var oppIDs []int
-	for idsRows.Next() {
-		var id int
-		if err := idsRows.Scan(&id); err != nil {
-			return false, fmt.Errorf("scan match id: %w", err)
-		}
-		oppIDs = append(oppIDs, id)
-	}
-
-	summary := fmt.Sprintf("%d new opportunities match your saved search", matchCount)
-	if matchCount == 1 {
-		summary = "1 new opportunity matches your saved search"
-	}
-
-	_, err = h.Pool.Exec(ctx, `
-		INSERT INTO user_updates (id, user_id, update_type, source_id, opportunity_ids, summary, details)
-		VALUES ($1, $2, 'saved_search_matches', $3, $4, $5, $6)
-	`, uuid.New(), s.UserID, s.ID, oppIDs, summary, nil)
-	if err != nil {
-		return false, fmt.Errorf("insert update: %w", err)
-	}
-
 	return true, nil
 }
 
@@ -646,23 +616,6 @@ func (h *Handler) detectAmendments(ctx context.Context) (int, error) {
 
 	count := 0
 	for _, a := range amendments {
-		summary := fmt.Sprintf("New amendment posted for %s: %s", a.SolNumber, a.Title)
-		details, _ := json.Marshal(map[string]any{
-			"type":              "amendment",
-			"solicitation_number": a.SolNumber,
-			"new_notice_id":     a.NewNoticeID,
-			"new_opportunity_id": a.NewOppID,
-		})
-
-		_, err := h.Pool.Exec(ctx, `
-			INSERT INTO user_updates (id, user_id, update_type, source_id, opportunity_ids, summary, details)
-			VALUES ($1, $2, 'opportunity_amended', $3, $4, $5, $6)
-		`, uuid.New(), a.UserID, a.SavedOppID, []int{a.NewOppID}, summary, string(details))
-		if err != nil {
-			h.Logger.Error("insert amendment update", "error", err)
-			continue
-		}
-
 		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, a.SavedOppID)
 		count++
 	}
@@ -720,66 +673,17 @@ func (h *Handler) detectInPlaceChanges(ctx context.Context) (int, error) {
 			return count, fmt.Errorf("scan version change: %w", err)
 		}
 
-		var fieldNames []string
-		var diffs []map[string]any
+		hasChanges := !strPtrEqual(r.OldTitle, r.NewTitle) ||
+			!timePtrEqual(r.OldResponseDeadline, r.NewResponseDeadline) ||
+			!timePtrEqual(r.OldArchiveDate, r.NewArchiveDate) ||
+			!strPtrEqual(r.OldDescription, r.NewDescription) ||
+			!strPtrEqual(r.OldSetAsideCode, r.NewSetAsideCode) ||
+			!floatPtrEqual(r.OldAwardAmount, r.NewAwardAmount)
 
-		if !strPtrEqual(r.OldTitle, r.NewTitle) {
-			fieldNames = append(fieldNames, "Title")
-			diffs = append(diffs, diffPtrs("title", r.OldTitle, r.NewTitle))
-		}
-		if !timePtrEqual(r.OldResponseDeadline, r.NewResponseDeadline) {
-			fieldNames = append(fieldNames, friendlyFieldName("response_deadline"))
-			diffs = append(diffs, diffTimePtrs("response_deadline", r.OldResponseDeadline, r.NewResponseDeadline))
-		}
-		if !timePtrEqual(r.OldArchiveDate, r.NewArchiveDate) {
-			fieldNames = append(fieldNames, friendlyFieldName("archive_date"))
-			diffs = append(diffs, diffTimePtrs("archive_date", r.OldArchiveDate, r.NewArchiveDate))
-		}
-		if !strPtrEqual(r.OldDescription, r.NewDescription) {
-			fieldNames = append(fieldNames, friendlyFieldName("description"))
-			diffs = append(diffs, map[string]any{"field": "description"})
-		}
-		if !strPtrEqual(r.OldSetAsideCode, r.NewSetAsideCode) {
-			fieldNames = append(fieldNames, friendlyFieldName("set_aside_code"))
-			diffs = append(diffs, diffPtrs("set_aside_code", r.OldSetAsideCode, r.NewSetAsideCode))
-		}
-		if !floatPtrEqual(r.OldAwardAmount, r.NewAwardAmount) {
-			fieldNames = append(fieldNames, friendlyFieldName("award_amount"))
-			diffs = append(diffs, diffFloatPtrs("award_amount", r.OldAwardAmount, r.NewAwardAmount))
-		}
-		if added, removed := diffResourceLinks(r.OldResourceLinks, r.NewResourceLinks); len(added) > 0 || len(removed) > 0 {
-			parts := []string{}
-			if len(added) > 0 {
-				parts = append(parts, fmt.Sprintf("%d added", len(added)))
+		if !hasChanges {
+			if added, removed := diffResourceLinks(r.OldResourceLinks, r.NewResourceLinks); len(added) == 0 && len(removed) == 0 {
+				continue
 			}
-			if len(removed) > 0 {
-				parts = append(parts, fmt.Sprintf("%d removed", len(removed)))
-			}
-			fieldNames = append(fieldNames, fmt.Sprintf("Attachments (%s)", strings.Join(parts, ", ")))
-			diffs = append(diffs, map[string]any{
-				"field":   "resource_links",
-				"added":   added,
-				"removed": removed,
-			})
-		}
-
-		if len(fieldNames) == 0 {
-			continue
-		}
-
-		summary := fmt.Sprintf("Changes detected: %s", strings.Join(fieldNames, ", "))
-		details, _ := json.Marshal(map[string]any{
-			"type":    "field_changes",
-			"changes": diffs,
-		})
-
-		_, err := h.Pool.Exec(ctx, `
-			INSERT INTO user_updates (id, user_id, update_type, source_id, summary, details)
-			VALUES ($1, $2, 'opportunity_changed', $3, $4, $5)
-		`, uuid.New(), r.UserID, r.SavedOppID, summary, string(details))
-		if err != nil {
-			h.Logger.Error("insert change update", "error", err)
-			continue
 		}
 
 		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, r.SavedOppID)

@@ -72,7 +72,7 @@ func (r *SavedOpportunityRepository) ListWithDetails(ctx context.Context, userID
 		SELECT so.id, so.opportunity_id, so.notice_id, so.solicitation_number, so.notes, so.created_at,
 		       o.title, o.description, o.type, o.department, o.posted_date, o.response_deadline,
 		       o.set_aside_code, o.set_aside_description, o.naics_code, o.pop_state, o.active,
-		       EXISTS(SELECT 1 FROM user_updates uu WHERE uu.source_id = so.id AND uu.user_id = so.user_id AND uu.is_read = false) as has_updates
+		       EXISTS(SELECT 1 FROM notifications n WHERE n.source_id = so.id AND n.user_id = so.user_id AND n.is_read = false) as has_updates
 		FROM saved_opportunities so
 		JOIN opportunities o ON o.id = so.opportunity_id
 		WHERE %s
