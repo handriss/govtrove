@@ -147,6 +147,27 @@ variable "resend_webhook_secret" {
   sensitive   = true
 }
 
+# Stripe
+variable "stripe_secret_key" {
+  description = "Stripe secret API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe webhook endpoint signing secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_monthly" {
+  description = "Stripe Price ID for the monthly Pro plan"
+  type        = string
+  default     = ""
+}
+
 # Domain (optional, for future custom domain support)
 variable "domain_name" {
   description = "Custom domain name for the application (optional)"
