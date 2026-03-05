@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import { useDropdownPosition } from './useDropdownPosition';
 import {
-  NAICS_TREE,
+  getNaicsTree,
   TITLE_BY_CODE,
   aggregateFacetCounts,
   searchNaicsCodes,
   getAncestorCodes,
   isAncestorSelected,
+  naicsDataReady,
 } from './naicsTree';
 import type { NaicsTreeNode } from './naicsTree';
 import type { FacetValue } from '../../types/api';
@@ -82,7 +83,12 @@ export default function NaicsTreeSelector({
 }: NaicsTreeSelectorProps) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dataReady, setDataReady] = useState(() => getNaicsTree().length > 0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!dataReady) naicsDataReady.then(() => setDataReady(true));
+  }, [dataReady]);
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const facetCounts = useMemo(() => (facets ? aggregateFacetCounts(facets) : null), [facets]);
@@ -368,7 +374,7 @@ export default function NaicsTreeSelector({
       ) : (
         // Tree view
         <div role="tree" aria-label="NAICS code hierarchy" className={`overflow-y-auto ${inline ? 'max-h-[300px] mt-2' : 'flex-1'} p-1`}>
-          {NAICS_TREE.map((root) => (
+          {getNaicsTree().map((root) => (
             <TreeNodeRow key={root.code} node={root} />
           ))}
         </div>

@@ -1,4 +1,3 @@
-import { NAICS_CODES } from '../../data/naicsCodes';
 import type { NaicsCode } from '../../data/naicsCodes';
 import type { FacetValue } from '../../types/api';
 
@@ -15,7 +14,17 @@ interface SearchResult {
   role: 'parent' | 'match' | 'child';
 }
 
-// --- Module-level constants (built once on import) ---
+// --- Lazy-loaded data ---
+
+let NAICS_CODES: NaicsCode[] = [];
+let dataLoaded = false;
+
+export const naicsDataReady = import('../../data/naicsCodes').then((m) => {
+  NAICS_CODES = m.NAICS_CODES;
+  dataLoaded = true;
+});
+
+// --- Module-level constants (built once on first access) ---
 
 const NODE_BY_CODE = new Map<string, NaicsTreeNode>();
 const TITLE_BY_CODE = new Map<string, string>();
@@ -107,13 +116,21 @@ function buildTree(): NaicsTreeNode[] {
   return roots;
 }
 
-const NAICS_TREE = buildTree();
+let NAICS_TREE: NaicsTreeNode[] | undefined;
 
-export { NAICS_TREE, NODE_BY_CODE, TITLE_BY_CODE };
+function ensureInitialized(): NaicsTreeNode[] {
+  if (!dataLoaded) return [];
+  if (!NAICS_TREE) NAICS_TREE = buildTree();
+  return NAICS_TREE;
+}
+
+export { ensureInitialized as getNaicsTree, NODE_BY_CODE, TITLE_BY_CODE };
 
 // --- Exported functions ---
 
 export function aggregateFacetCounts(facets: FacetValue[]): Map<string, number> {
+  if (!dataLoaded) return new Map();
+  ensureInitialized();
   const counts = new Map<string, number>();
   for (const f of facets) {
     counts.set(f.value, (counts.get(f.value) ?? 0) + f.count);
@@ -134,6 +151,7 @@ export function aggregateFacetCounts(facets: FacetValue[]): Map<string, number> 
 }
 
 export function searchNaicsCodes(query: string): SearchResult[] {
+  if (!dataLoaded) return [];
   const q = query.trim();
   if (!q) return [];
 
@@ -178,6 +196,8 @@ export function isAncestorSelected(code: string, selectedSet: Set<string>): bool
 
 /** Expand any parent codes in the selection to their leaf codes (for API queries). */
 export function expandToLeafCodes(codes: string[]): string[] {
+  if (!dataLoaded) return codes;
+  ensureInitialized();
   const result: string[] = [];
   for (const code of codes) {
     const node = NODE_BY_CODE.get(code);
@@ -191,8 +211,8 @@ export function expandToLeafCodes(codes: string[]): string[] {
 }
 
 export function getAncestorCodes(code: string): string[] {
+  ensureInitialized();
   const ancestors: string[] = [];
-  // Check for range sector parent (e.g. "31-33" for codes starting with 31/32/33)
   const rangeCode = PREFIX_TO_RANGE.get(code.slice(0, 2));
   if (rangeCode && NODE_BY_CODE.has(rangeCode)) {
     ancestors.push(rangeCode);

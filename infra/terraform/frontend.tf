@@ -42,6 +42,27 @@ resource "aws_cloudfront_function" "og_redirect" {
   code    = file("${path.root}/../cf-functions/og-redirect.js")
 }
 
+resource "aws_cloudfront_cache_policy" "frontend" {
+  name        = "govtrove-frontend"
+  min_ttl     = 0
+  default_ttl = 3600
+  max_ttl     = 31536000
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "none"
+    }
+    headers_config {
+      header_behavior = "none"
+    }
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+    enable_accept_encoding_gzip   = true
+    enable_accept_encoding_brotli = true
+  }
+}
+
 # CloudFront distribution
 resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
@@ -65,21 +86,12 @@ resource "aws_cloudfront_distribution" "frontend" {
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.frontend.id
 
-    forwarded_values {
-      query_string = false
-      cookies {
-        forward = "none"
-      }
-    }
+    cache_policy_id = aws_cloudfront_cache_policy.frontend.id
 
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.og_redirect.arn
     }
-
-    min_ttl     = 0
-    default_ttl = 3600
-    max_ttl     = 86400
   }
 
   # SPA routing: return index.html for 404s
