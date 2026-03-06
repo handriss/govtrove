@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -508,8 +509,9 @@ func coerceFloats(m map[string]any) {
 }
 
 var allowedTemplates = map[string]bool{
-	"digest.html":       true,
-	"promo-invite.html": true,
+	"digest.html":        true,
+	"promo-invite.html":  true,
+	"promo-revoked.html": true,
 }
 
 func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
@@ -712,11 +714,12 @@ func (h *AdminHandler) CreatePromoCode(w http.ResponseWriter, r *http.Request) {
 		_ = h.userRepo.SetStripeCustomerID(r.Context(), user.ID, customerID)
 	}
 
-	// Generate a readable code
+	// Generate a readable code (Stripe only allows [a-zA-Z0-9\-_])
 	randBytes := make([]byte, 2)
 	rand.Read(randBytes)
 	suffix := strings.ToUpper(hex.EncodeToString(randBytes))
-	firstName := strings.ToUpper(strings.ReplaceAll(user.FirstName, " ", ""))
+	asciiOnly := regexp.MustCompile(`[^a-zA-Z0-9]`)
+	firstName := strings.ToUpper(asciiOnly.ReplaceAllString(user.FirstName, ""))
 	if firstName == "" {
 		firstName = "USER"
 	}
@@ -838,6 +841,85 @@ func (h *AdminHandler) SendPromoInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) RevokePromoCode(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	if h.sc == nil {
+		http.Error(w, "stripe not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	promo, err := h.promoRepo.GetByID(r.Context(), id)
+	if err != nil || promo == nil {
+		http.Error(w, "promo code not found", http.StatusNotFound)
+		return
+	}
+	if promo.RevokedAt != nil {
+		http.Error(w, "promo code already revoked", http.StatusConflict)
+		return
+	}
+
+	// Deactivate in Stripe
+	_, err = h.sc.V1PromotionCodes.Update(r.Context(), promo.StripePromoID, &stripe.PromotionCodeUpdateParams{
+		Active: stripe.Bool(false),
+	})
+	if err != nil {
+		h.logger.Error("stripe promo deactivate failed", "error", err)
+		http.Error(w, "failed to deactivate in Stripe", http.StatusInternalServerError)
+		return
+	}
+
+	// If redeemed, cancel the subscription and downgrade the user
+	if promo.RedeemedBy != nil {
+		user, userErr := h.userRepo.GetByID(r.Context(), *promo.RedeemedBy)
+		if userErr == nil && user != nil && user.SubscriptionID != nil {
+			_, cancelErr := h.sc.V1Subscriptions.Cancel(r.Context(), *user.SubscriptionID, nil)
+			if cancelErr != nil {
+				h.logger.Error("failed to cancel subscription for revoked promo", "user_id", user.ID, "error", cancelErr)
+			}
+		}
+		status := "revoked"
+		if userErr == nil && user != nil {
+			_ = h.userRepo.UpdateSubscription(r.Context(), user.ID, "free", nil, &status, false, nil)
+			h.logger.Info("user downgraded due to promo revocation", "user_id", user.ID)
+
+			if h.emailSvc != nil {
+				firstName := user.FirstName
+				if firstName == "" {
+					firstName = "there"
+				}
+				_, emailErr := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+					UserID:       &user.ID,
+					ToEmail:      user.Email,
+					EmailType:    "promo_revoked",
+					TemplateName: "promo-revoked.html",
+					Subject:      "Your GovTrove Pro access has ended",
+					TemplateData: map[string]any{
+						"FirstName":  firstName,
+						"ProfileURL": h.appURL + "/profile",
+					},
+				})
+				if emailErr != nil {
+					h.logger.Error("failed to send promo revoked email", "user_id", user.ID, "error", emailErr)
+				}
+			}
+		}
+	}
+
+	if err := h.promoRepo.Revoke(r.Context(), id); err != nil {
+		h.logger.Error("failed to revoke promo code", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("promo code revoked", "id", id, "code", promo.Code)
 	w.WriteHeader(http.StatusNoContent)
 }
 

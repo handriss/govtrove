@@ -322,6 +322,7 @@ func main() {
 				r.Post("/promo-codes", adminHandler.CreatePromoCode)
 				r.Get("/promo-codes", adminHandler.ListPromoCodes)
 				r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
+				r.Delete("/promo-codes/{id}", adminHandler.RevokePromoCode)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)
 				})

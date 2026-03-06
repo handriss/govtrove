@@ -20,6 +20,9 @@ const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
 const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
 const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
 const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
+const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
+const SearchGuideInteractivePage = lazy(() => import('./pages/SearchGuideInteractivePage'));
+const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -93,6 +96,9 @@ function AppRoutes() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/guide" element={<SearchGuidePage />} />
+            <Route path="/guide/interactive" element={<SearchGuideInteractivePage />} />
+            <Route path="/glossary" element={<GlossaryPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           {/* Admin routes — keep AdminLayout */}

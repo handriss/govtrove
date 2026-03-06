@@ -8,7 +8,7 @@ import {
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
-  getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite,
+  getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
@@ -1540,10 +1540,11 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   const [codes, setCodes] = useState<AdminPromoCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
-  const [expiresInDays, setExpiresInDays] = useState(30);
+  const [expiresInDays, setExpiresInDays] = useState(365);
   const [generating, setGenerating] = useState(false);
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [sendStatus, setSendStatus] = useState<Record<number, 'success' | 'error'>>({});
+  const [revokingId, setRevokingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<number | null>(null);
 
@@ -1595,7 +1596,24 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
     setTimeout(() => setCopied(null), 2000);
   }
 
+  async function handleRevoke(promoId: number) {
+    if (!confirm('Revoke this promo code? If redeemed, the user\'s Pro access will be cancelled.')) return;
+    setRevokingId(promoId);
+    try {
+      const token = await getToken();
+      await adminRevokePromoCode(token, promoId);
+      await loadCodes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to revoke');
+    } finally {
+      setRevokingId(null);
+    }
+  }
+
   function statusBadge(code: AdminPromoCode) {
+    if (code.revoked_at) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Revoked</span>;
+    }
     if (code.redeemed_at) {
       return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">Redeemed</span>;
     }
@@ -1681,26 +1699,38 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
                   <td className="px-4 py-3 text-dark-400 text-xs">{c.expires_at ? formatDate(c.expires_at) : '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCopy(c)}
-                        title="Copy invite link"
-                        className="p-1 text-dark-400 hover:text-accent transition-colors"
-                      >
-                        {copied === c.id ? <span className="text-xs text-green-400">Copied</span> : <Copy size={14} />}
-                      </button>
-                      {!c.redeemed_at && c.for_user_email && (
-                        sendStatus[c.id] === 'success' ? (
-                          <span className="text-xs text-green-400">Sent</span>
-                        ) : (
+                      {!c.revoked_at && (
+                        <>
                           <button
-                            onClick={() => handleSend(c.id)}
-                            disabled={sendingId === c.id}
-                            title="Send invite email"
-                            className="p-1 text-dark-400 hover:text-accent transition-colors disabled:opacity-50"
+                            onClick={() => handleCopy(c)}
+                            title="Copy invite link"
+                            className="p-1 text-dark-400 hover:text-accent transition-colors"
                           >
-                            {sendingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <SendIcon size={14} />}
+                            {copied === c.id ? <span className="text-xs text-green-400">Copied</span> : <Copy size={14} />}
                           </button>
-                        )
+                          {!c.redeemed_at && c.for_user_email && (
+                            sendStatus[c.id] === 'success' ? (
+                              <span className="text-xs text-green-400">Sent</span>
+                            ) : (
+                              <button
+                                onClick={() => handleSend(c.id)}
+                                disabled={sendingId === c.id}
+                                title="Send invite email"
+                                className="p-1 text-dark-400 hover:text-accent transition-colors disabled:opacity-50"
+                              >
+                                {sendingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <SendIcon size={14} />}
+                              </button>
+                            )
+                          )}
+                          <button
+                            onClick={() => handleRevoke(c.id)}
+                            disabled={revokingId === c.id}
+                            title="Revoke code"
+                            className="p-1 text-dark-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                          >
+                            {revokingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>

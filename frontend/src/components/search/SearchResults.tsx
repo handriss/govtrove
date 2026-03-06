@@ -8,7 +8,10 @@ import {
   ChevronLeft,
   ChevronRight,
   WifiOff,
+  BookOpen,
+  ArrowRight,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import OpportunityCard from './OpportunityCard';
 import SortDropdown from './SortDropdown';
 import type { OpportunityListItem, FacetResult } from '../../types/api';
@@ -351,6 +354,15 @@ function ZeroResults({
           </li>
         </ul>
       </div>
+
+      <Link
+        to="/guide"
+        className="mt-4 inline-flex items-center gap-1.5 text-xs text-dark-500 hover:text-dark-300 transition-colors"
+      >
+        <BookOpen size={12} />
+        Learn how to use all search filters
+        <ArrowRight size={12} />
+      </Link>
     </div>
   );
 }

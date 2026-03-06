@@ -1,0 +1,1 @@
+ALTER TABLE promo_codes ADD COLUMN revoked_at TIMESTAMPTZ;
