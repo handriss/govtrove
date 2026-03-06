@@ -67,7 +67,8 @@ function deadlineColor(deadline?: string): string {
 }
 
 export default function SavedPage() {
-  const { isAuthenticated, getAccessToken } = useAppAuth();
+  const { isAuthenticated, getAccessToken, govtroveUser } = useAppAuth();
+  const isPro = govtroveUser?.plan === 'pro';
   const saved = useSavedOpportunities();
   const { savedSearches, loading: searchesLoading, deleteSearch, toggleAlert, renameSearch } = useSavedSearches();
   const navigate = useNavigate();
@@ -216,11 +217,12 @@ export default function SavedPage() {
                       <p className="text-xs text-dark-500 truncate mt-0.5">{filterSummary(search.filters)}</p>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); toggleAlert(search.id, !search.alert_enabled); }}
-                      className="text-dark-500 hover:text-dark-300 transition-colors p-1"
-                      title={search.alert_enabled ? 'Disable alerts' : 'Enable alerts'}
+                      onClick={(e) => { e.stopPropagation(); if (isPro) toggleAlert(search.id, !search.alert_enabled); }}
+                      className={`transition-colors p-1 ${isPro ? 'text-dark-500 hover:text-dark-300' : 'text-dark-700 cursor-not-allowed'}`}
+                      title={!isPro ? 'Pro feature' : search.alert_enabled ? 'Disable alerts' : 'Enable alerts'}
+                      disabled={!isPro}
                     >
-                      {search.alert_enabled ? <Bell size={14} /> : <BellOff size={14} className="text-dark-700" />}
+                      {search.alert_enabled && isPro ? <Bell size={14} /> : <BellOff size={14} className="text-dark-700" />}
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteSearch(search.id); }}
