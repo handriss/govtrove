@@ -318,7 +318,9 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			"dq_issues":      len(allDQEntries),
 			"reconcile_dq":   len(reconcileDQ),
 		}
-		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
+		completionCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.Store.CompletePipelineStep(completionCtx, stepID, stepStats, durationMs); err != nil {
 			h.Logger.Warn("failed to complete pipeline step", "error", err)
 		}
 	}

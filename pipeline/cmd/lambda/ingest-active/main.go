@@ -190,7 +190,11 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			"changed":      stats.changedRecords,
 			"disappeared":  stats.disappearedRecords,
 		}
-		if err := h.Store.CompletePipelineStep(ctx, stepID, stepStats, durationMs); err != nil {
+		// Use a detached context — the Lambda context may be nearly expired
+		// after processing a large CSV, causing this write to fail silently.
+		completionCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.Store.CompletePipelineStep(completionCtx, stepID, stepStats, durationMs); err != nil {
 			h.Logger.Warn("failed to complete pipeline step", "error", err)
 		}
 	}
