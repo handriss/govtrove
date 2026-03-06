@@ -7,6 +7,12 @@ import { useSavedSearches } from '../hooks/useSavedSearches';
 import { getSavedOpportunitiesWithDetails, updateSavedOpportunityNotes } from '../services/api';
 import type { SavedOpportunityDetail } from '../types/api';
 
+function getAgency(filters: Record<string, unknown>): string[] {
+  if (Array.isArray(filters.agency) && filters.agency.length) return filters.agency as string[];
+  if (typeof filters.department === 'string' && filters.department) return [filters.department];
+  return [];
+}
+
 function filterSummary(filters: Record<string, unknown>): string {
   const parts: string[] = [];
   if (filters.keyword) parts.push(`"${filters.keyword}"`);
@@ -14,7 +20,8 @@ function filterSummary(filters: Record<string, unknown>): string {
   if (Array.isArray(filters.psc) && filters.psc.length) parts.push(`PSC: ${filters.psc.join(', ')}`);
   if (Array.isArray(filters.setAside) && filters.setAside.length) parts.push(`Set-Aside: ${filters.setAside.join(', ')}`);
   if (Array.isArray(filters.noticeType) && filters.noticeType.length) parts.push(`Type: ${filters.noticeType.join(', ')}`);
-  if (filters.department) parts.push(`Dept: ${filters.department}`);
+  const agencies = getAgency(filters);
+  if (agencies.length) parts.push(`Agency: ${agencies.join(', ')}`);
   if (filters.state) parts.push(`State: ${filters.state}`);
   return parts.join(' | ') || 'All opportunities';
 }
@@ -26,7 +33,8 @@ function filtersToURLParams(filters: Record<string, unknown>): string {
   if (Array.isArray(filters.psc) && filters.psc.length) params.set('psc', filters.psc.join(','));
   if (Array.isArray(filters.setAside) && filters.setAside.length) params.set('set_aside', filters.setAside.join(','));
   if (Array.isArray(filters.noticeType) && filters.noticeType.length) params.set('type', filters.noticeType.join(','));
-  if (filters.department) params.set('department', String(filters.department));
+  const agencies = getAgency(filters);
+  if (agencies.length) params.set('agency', agencies.join(','));
   if (filters.state) params.set('state', String(filters.state));
   if (filters.postedFrom) params.set('posted_from', String(filters.postedFrom));
   if (filters.postedTo) params.set('posted_to', String(filters.postedTo));
