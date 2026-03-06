@@ -146,6 +146,34 @@ type FieldChange struct {
 	NewValue  *string `json:"new_value,omitempty"`
 }
 
+// SAM.gov single-letter notice type codes → full names stored in the DB.
+var noticeTypeCodeMap = map[string]string{
+	"o": "Solicitation",
+	"p": "Presolicitation",
+	"k": "Combined Synopsis/Solicitation",
+	"r": "Sources Sought",
+	"s": "Special Notice",
+	"g": "Sale of Surplus Property",
+	"i": "Intent to Bundle",
+	"a": "Award Notice",
+	"u": "Justification and Approval (J&A)",
+}
+
+// NormalizeNoticeTypes converts SAM.gov single-letter codes to the full
+// type names used in the database. Values that are already full names
+// pass through unchanged.
+func NormalizeNoticeTypes(types []string) []string {
+	out := make([]string, len(types))
+	for i, t := range types {
+		if full, ok := noticeTypeCodeMap[t]; ok {
+			out[i] = full
+		} else {
+			out[i] = t
+		}
+	}
+	return out
+}
+
 type SolicitationHistory struct {
 	SolicitationNumber string                    `json:"solicitation_number"`
 	TotalNotices       int                       `json:"total_notices"`

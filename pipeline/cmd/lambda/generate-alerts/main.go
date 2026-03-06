@@ -390,6 +390,30 @@ func splitOR(query string) []string {
 	return segments
 }
 
+var noticeTypeCodeMap = map[string]string{
+	"o": "Solicitation",
+	"p": "Presolicitation",
+	"k": "Combined Synopsis/Solicitation",
+	"r": "Sources Sought",
+	"s": "Special Notice",
+	"g": "Sale of Surplus Property",
+	"i": "Intent to Bundle",
+	"a": "Award Notice",
+	"u": "Justification and Approval (J&A)",
+}
+
+func normalizeNoticeTypes(types []string) []string {
+	out := make([]string, len(types))
+	for i, t := range types {
+		if full, ok := noticeTypeCodeMap[t]; ok {
+			out[i] = full
+		} else {
+			out[i] = t
+		}
+	}
+	return out
+}
+
 func appendFilterConditions(conditions []string, args []any, argNum int, f savedFilters) ([]string, []any, int) {
 	if f.Keyword != "" {
 		kw := f.Keyword
@@ -442,7 +466,7 @@ func appendFilterConditions(conditions []string, args []any, argNum int, f saved
 
 	if len(f.NoticeType) > 0 {
 		conditions = append(conditions, fmt.Sprintf("type = ANY($%d)", argNum))
-		args = append(args, f.NoticeType)
+		args = append(args, normalizeNoticeTypes(f.NoticeType))
 		argNum++
 	}
 

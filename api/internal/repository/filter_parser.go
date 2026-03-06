@@ -31,7 +31,7 @@ func ParseSavedFilters(raw json.RawMessage) (models.SearchParams, error) {
 
 	p := models.SearchParams{
 		Query:      f.Keyword,
-		Types:      f.NoticeType,
+		Types:      models.NormalizeNoticeTypes(f.NoticeType),
 		SetAsides:  f.SetAside,
 		NAICSCodes: f.NAICS,
 		PSCCodes:   f.PSC,
