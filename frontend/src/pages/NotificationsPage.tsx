@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2 } from 'lucide-react';
+import { Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2 } from 'lucide-react';
 import type { OpportunityListItem, Notification } from '../types/api';
 import { useNotifications } from '../hooks/useNotifications';
-import AuthButton from '../components/AuthButton';
 
 // --- Local utils (duplicated from OpportunityCard to avoid coupling) ---
 
@@ -571,15 +570,8 @@ export default function NotificationsPage() {
     <div className="min-h-screen relative">
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
 
-      <div className="absolute top-4 right-6 z-20">
-        <AuthButton />
-      </div>
-
       <div className="relative z-10 max-w-3xl mx-auto px-6 pt-10 pb-10">
         <div className="flex items-center gap-4 mb-8">
-          <Link to="/" className="text-dark-400 hover:text-dark-200 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
           <h1 className="text-2xl font-semibold text-dark-100">Updates</h1>
           {unreadCount > 0 && (
             <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-full">

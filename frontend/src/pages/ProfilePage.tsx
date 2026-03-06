@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   CreditCard,
   Download,
   Trash2,
@@ -114,12 +113,14 @@ export default function ProfilePage() {
     }
   }
 
+  const promoCode = searchParams.get('promo') || undefined;
+
   async function handleBilling(action: 'checkout' | 'portal') {
     setBillingLoading(true);
     try {
       const token = await getAccessToken();
       const { url } = action === 'checkout'
-        ? await createCheckoutSession(token)
+        ? await createCheckoutSession(token, promoCode)
         : await createPortalSession(token);
       window.location.href = url;
     } catch {
@@ -131,14 +132,7 @@ export default function ProfilePage() {
     <div className="min-h-screen relative">
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
 
-      <div className="relative z-10 max-w-2xl mx-auto px-6 pt-6 pb-10">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6"
-        >
-          <ArrowLeft size={16} strokeWidth={1.5} />
-          Back to Search
-        </Link>
+      <div className="relative z-10 max-w-2xl mx-auto px-6 pt-10 pb-10">
         {/* User Info */}
         <div className="flex flex-col items-center text-center mb-8">
           <div className="w-16 h-16 rounded-full bg-accent/20 border border-accent/30 text-accent text-2xl font-semibold flex items-center justify-center mb-4">
@@ -154,6 +148,12 @@ export default function ProfilePage() {
         {showUpgraded && (
           <div className="mb-6 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-sm text-green-400 text-center">
             Welcome to GovTrove Pro! Your subscription is now active.
+          </div>
+        )}
+
+        {promoCode && plan !== 'pro' && (
+          <div className="mb-6 px-4 py-3 rounded-xl bg-accent/10 border border-accent/20 text-sm text-accent text-center">
+            Promo code applied — upgrade for free!
           </div>
         )}
 
@@ -207,7 +207,7 @@ export default function ProfilePage() {
                            transition-all duration-200 disabled:opacity-50"
               >
                 {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
-                Upgrade to Pro — $30/mo
+                {promoCode ? 'Activate Pro — Free' : 'Upgrade to Pro — $30/mo'}
               </button>
             </div>
           )}

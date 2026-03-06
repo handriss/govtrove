@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Clock, Bookmark, X } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import QuickFilterChips from '../components/QuickFilterChips';
-import AuthButton from '../components/AuthButton';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
 import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
@@ -174,18 +173,6 @@ export default function SimpleSearchPage() {
       {/* Ambient glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/[0.03] rounded-full blur-3xl pointer-events-none" />
 
-      {/* Header: wordmark left, auth right */}
-      {!showResults && (
-        <div className="absolute top-5 left-6 z-20">
-          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-dark-300 tracking-tight">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-            GovTrove
-          </span>
-        </div>
-      )}
-      <div className="absolute top-4 right-6 z-20">
-        <AuthButton />
-      </div>
 
       <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'flex-1 justify-center pb-24'}`}>
         {/* Logo */}
@@ -253,7 +240,7 @@ export default function SimpleSearchPage() {
 
       {/* Empty state footer hint */}
       {!showResults && (
-        <div className="absolute bottom-6 left-0 right-0 z-10 text-center">
+        <div className="absolute bottom-20 md:bottom-6 left-0 right-0 z-10 text-center">
           <p className="text-dark-600 text-xs tracking-wide">
             Data sourced from SAM.gov &middot; Press <kbd className="px-1.5 py-0.5 rounded bg-dark-800/60 border border-dark-700/30 text-dark-500 font-mono text-[10px]">/</kbd> to search
           </p>
