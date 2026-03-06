@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -404,12 +405,28 @@ var reconcileDQSortColumns = map[string]string{
 	"created_at": "dq.created_at",
 }
 
-func (r *PipelineRepository) ListDataQualityIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool) ([]DataQualityRow, int, error) {
-	where := ""
+func (r *PipelineRepository) ListDataQualityIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool, snapshotDate, issueType, fieldName string) ([]DataQualityRow, int, error) {
+	var conditions []string
 	var args []any
 	if resolved != nil {
-		where = "WHERE dq.resolved = $1"
 		args = append(args, *resolved)
+		conditions = append(conditions, fmt.Sprintf("dq.resolved = $%d", len(args)))
+	}
+	if snapshotDate != "" {
+		args = append(args, snapshotDate)
+		conditions = append(conditions, fmt.Sprintf("dq.snapshot_date::date = $%d::date", len(args)))
+	}
+	if issueType != "" {
+		args = append(args, issueType)
+		conditions = append(conditions, fmt.Sprintf("dq.issue_type = $%d", len(args)))
+	}
+	if fieldName != "" {
+		args = append(args, fieldName)
+		conditions = append(conditions, fmt.Sprintf("dq.field_name = $%d", len(args)))
+	}
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	var total int
@@ -467,12 +484,28 @@ func (r *PipelineRepository) ListDataQualityIssues(ctx context.Context, page, li
 	return items, total, rows.Err()
 }
 
-func (r *PipelineRepository) ListReconcileDQIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool) ([]ReconcileDQRow, int, error) {
-	where := ""
+func (r *PipelineRepository) ListReconcileDQIssues(ctx context.Context, page, limit int, sort, order string, resolved *bool, snapshotDate, issueType, fieldName string) ([]ReconcileDQRow, int, error) {
+	var conditions []string
 	var args []any
 	if resolved != nil {
-		where = "WHERE dq.resolved = $1"
 		args = append(args, *resolved)
+		conditions = append(conditions, fmt.Sprintf("dq.resolved = $%d", len(args)))
+	}
+	if snapshotDate != "" {
+		args = append(args, snapshotDate)
+		conditions = append(conditions, fmt.Sprintf("dq.snapshot_date::date = $%d::date", len(args)))
+	}
+	if issueType != "" {
+		args = append(args, issueType)
+		conditions = append(conditions, fmt.Sprintf("dq.issue_type = $%d", len(args)))
+	}
+	if fieldName != "" {
+		args = append(args, fieldName)
+		conditions = append(conditions, fmt.Sprintf("dq.field_name = $%d", len(args)))
+	}
+	where := ""
+	if len(conditions) > 0 {
+		where = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	var total int
@@ -528,6 +561,68 @@ func (r *PipelineRepository) ListReconcileDQIssues(ctx context.Context, page, li
 		items = append(items, row)
 	}
 	return items, total, rows.Err()
+}
+
+type DQSummaryRow struct {
+	SnapshotDate string  `json:"snapshot_date"`
+	IssueType    string  `json:"issue_type"`
+	FieldName    *string `json:"field_name"`
+	Total        int     `json:"total"`
+	Unresolved   int     `json:"unresolved"`
+}
+
+func (r *PipelineRepository) DataQualitySummary(ctx context.Context) ([]DQSummaryRow, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT snapshot_date::date, issue_type, field_name,
+		       COUNT(*) AS total,
+		       COUNT(*) FILTER (WHERE NOT resolved) AS unresolved
+		FROM pipeline.snap_data_quality
+		GROUP BY snapshot_date::date, issue_type, field_name
+		ORDER BY snapshot_date::date DESC, issue_type, field_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []DQSummaryRow
+	for rows.Next() {
+		var row DQSummaryRow
+		var d time.Time
+		if err := rows.Scan(&d, &row.IssueType, &row.FieldName, &row.Total, &row.Unresolved); err != nil {
+			return nil, err
+		}
+		row.SnapshotDate = d.Format("2006-01-02")
+		items = append(items, row)
+	}
+	return items, rows.Err()
+}
+
+func (r *PipelineRepository) ReconcileDQSummary(ctx context.Context) ([]DQSummaryRow, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT snapshot_date::date, issue_type, field_name,
+		       COUNT(*) AS total,
+		       COUNT(*) FILTER (WHERE NOT resolved) AS unresolved
+		FROM pipeline.snap_reconcile_dq
+		GROUP BY snapshot_date::date, issue_type, field_name
+		ORDER BY snapshot_date::date DESC, issue_type, field_name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []DQSummaryRow
+	for rows.Next() {
+		var row DQSummaryRow
+		var d time.Time
+		if err := rows.Scan(&d, &row.IssueType, &row.FieldName, &row.Total, &row.Unresolved); err != nil {
+			return nil, err
+		}
+		row.SnapshotDate = d.Format("2006-01-02")
+		items = append(items, row)
+	}
+	return items, rows.Err()
 }
 
 func (r *PipelineRepository) GetDataQualityDetail(ctx context.Context, id int64) (*DataQualityDetail, error) {

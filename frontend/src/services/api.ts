@@ -715,9 +715,33 @@ export interface AdminDQListResponse<T> {
   limit: number;
 }
 
+export interface DQSummaryRow {
+  snapshot_date: string;
+  issue_type: string;
+  field_name: string | null;
+  total: number;
+  unresolved: number;
+}
+
+export async function getAdminDataQualitySummary(token: string): Promise<DQSummaryRow[]> {
+  const response = await fetch(`${API_BASE}/admin/data-quality/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminReconcileDQSummary(token: string): Promise<DQSummaryRow[]> {
+  const response = await fetch(`${API_BASE}/admin/reconcile-dq/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 export async function getAdminDataQualityIssues(
   token: string,
-  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string } = {},
+  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string; snapshot_date?: string; issue_type?: string; field_name?: string } = {},
 ): Promise<AdminDQListResponse<AdminDataQualityRow>> {
   const sp = new URLSearchParams();
   if (params.page) sp.set('page', String(params.page));
@@ -725,6 +749,9 @@ export async function getAdminDataQualityIssues(
   if (params.sort) sp.set('sort', params.sort);
   if (params.order) sp.set('order', params.order);
   if (params.resolved) sp.set('resolved', params.resolved);
+  if (params.snapshot_date) sp.set('snapshot_date', params.snapshot_date);
+  if (params.issue_type) sp.set('issue_type', params.issue_type);
+  if (params.field_name) sp.set('field_name', params.field_name);
   const response = await fetch(`${API_BASE}/admin/data-quality?${sp}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -758,7 +785,7 @@ export async function updateAdminDataQualityResolution(
 
 export async function getAdminReconcileDQIssues(
   token: string,
-  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string } = {},
+  params: { page?: number; limit?: number; sort?: string; order?: string; resolved?: string; snapshot_date?: string; issue_type?: string; field_name?: string } = {},
 ): Promise<AdminDQListResponse<AdminReconcileDQRow>> {
   const sp = new URLSearchParams();
   if (params.page) sp.set('page', String(params.page));
@@ -766,6 +793,9 @@ export async function getAdminReconcileDQIssues(
   if (params.sort) sp.set('sort', params.sort);
   if (params.order) sp.set('order', params.order);
   if (params.resolved) sp.set('resolved', params.resolved);
+  if (params.snapshot_date) sp.set('snapshot_date', params.snapshot_date);
+  if (params.issue_type) sp.set('issue_type', params.issue_type);
+  if (params.field_name) sp.set('field_name', params.field_name);
   const response = await fetch(`${API_BASE}/admin/reconcile-dq?${sp}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
