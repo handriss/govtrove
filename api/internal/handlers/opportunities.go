@@ -364,7 +364,8 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 	}
 
 	if typeStr := q.Get("type"); typeStr != "" {
-		params.Types = capSlice(strings.Split(typeStr, ","), 50)
+		raw := capSlice(strings.Split(typeStr, ","), 50)
+		params.Types = models.NormalizeNoticeTypes(raw)
 	}
 
 	if setAsideStr := q.Get("set_aside"); setAsideStr != "" {
