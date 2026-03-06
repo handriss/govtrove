@@ -28,6 +28,7 @@ type PromoCodeRow struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	RedeemedAt    *time.Time `json:"redeemed_at"`
 	ExpiresAt     *time.Time `json:"expires_at"`
+	RevokedAt     *time.Time `json:"revoked_at"`
 }
 
 func (r *PromoCodeRepository) Create(ctx context.Context, code, stripePromoID string, forUserID *int, expiresAt *time.Time) (int, error) {
@@ -47,7 +48,7 @@ func (r *PromoCodeRepository) List(ctx context.Context) ([]PromoCodeRow, error) 
 		        fu.email AS for_user_email,
 		        COALESCE(fu.first_name || ' ' || fu.last_name, '') AS for_user_name,
 		        pc.redeemed_by, ru.email AS redeemed_email,
-		        pc.created_at, pc.redeemed_at, pc.expires_at
+		        pc.created_at, pc.redeemed_at, pc.expires_at, pc.revoked_at
 		 FROM promo_codes pc
 		 LEFT JOIN users fu ON fu.id = pc.for_user_id
 		 LEFT JOIN users ru ON ru.id = pc.redeemed_by
@@ -64,7 +65,7 @@ func (r *PromoCodeRepository) List(ctx context.Context) ([]PromoCodeRow, error) 
 			&row.ID, &row.Code, &row.StripePromoID, &row.ForUserID,
 			&row.ForUserEmail, &row.ForUserName,
 			&row.RedeemedBy, &row.RedeemedEmail,
-			&row.CreatedAt, &row.RedeemedAt, &row.ExpiresAt,
+			&row.CreatedAt, &row.RedeemedAt, &row.ExpiresAt, &row.RevokedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -77,7 +78,7 @@ func (r *PromoCodeRepository) GetByCode(ctx context.Context, code string) (*Prom
 	var row PromoCodeRow
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, code, stripe_promo_id, for_user_id, redeemed_by, created_at, redeemed_at, expires_at
-		 FROM promo_codes WHERE code = $1`,
+		 FROM promo_codes WHERE code = $1 AND revoked_at IS NULL`,
 		code,
 	).Scan(&row.ID, &row.Code, &row.StripePromoID, &row.ForUserID, &row.RedeemedBy, &row.CreatedAt, &row.RedeemedAt, &row.ExpiresAt)
 	if err == pgx.ErrNoRows {
@@ -105,5 +106,23 @@ func (r *PromoCodeRepository) MarkRedeemed(ctx context.Context, promoCodeID, use
 		 WHERE id = $2 AND redeemed_by IS NULL`,
 		userID, promoCodeID,
 	)
+	return err
+}
+
+func (r *PromoCodeRepository) GetByID(ctx context.Context, id int) (*PromoCodeRow, error) {
+	var row PromoCodeRow
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, code, stripe_promo_id, for_user_id, redeemed_by, created_at, redeemed_at, expires_at, revoked_at
+		 FROM promo_codes WHERE id = $1`,
+		id,
+	).Scan(&row.ID, &row.Code, &row.StripePromoID, &row.ForUserID, &row.RedeemedBy, &row.CreatedAt, &row.RedeemedAt, &row.ExpiresAt, &row.RevokedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	return &row, err
+}
+
+func (r *PromoCodeRepository) Revoke(ctx context.Context, id int) error {
+	_, err := r.pool.Exec(ctx, `UPDATE promo_codes SET revoked_at = NOW() WHERE id = $1`, id)
 	return err
 }

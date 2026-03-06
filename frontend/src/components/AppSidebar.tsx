@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Star, Bell, Building2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, Star, Bell, Building2, BookOpen, BookText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useNotificationsCount } from '../hooks/useNotifications';
 import { useSidebar } from '../contexts/SidebarContext';
 
@@ -21,6 +21,8 @@ export default function AppSidebar() {
     { label: 'Search', icon: Search, path: '/' },
     { label: 'Saved', icon: Star, path: '/saved' },
     { label: 'Notifications', icon: Bell, path: '/notifications', badge: count.unread },
+    { label: 'Guide', icon: BookOpen, path: '/guide' },
+    { label: 'Glossary', icon: BookText, path: '/glossary' },
     { label: 'My Company', icon: Building2, path: '/company', disabled: true, tag: 'Soon' },
   ];
 

@@ -152,8 +152,19 @@ export default function ProfilePage() {
         )}
 
         {promoCode && plan !== 'pro' && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-accent/10 border border-accent/20 text-sm text-accent text-center">
-            Promo code applied — upgrade for free!
+          <div className="mb-6 rounded-xl bg-accent/10 border-2 border-accent/30 p-6 text-center">
+            <p className="text-lg font-semibold text-dark-50 mb-2">You've been invited to GovTrove Pro!</p>
+            <p className="text-sm text-dark-400 mb-5">Click below to activate your free Pro account. No credit card required.</p>
+            <button
+              onClick={() => handleBilling('checkout')}
+              disabled={billingLoading}
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-dark-950
+                         rounded-lg bg-accent hover:bg-accent/90
+                         transition-all duration-200 disabled:opacity-50"
+            >
+              {billingLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+              Activate Pro Account
+            </button>
           </div>
         )}
 
@@ -207,7 +218,7 @@ export default function ProfilePage() {
                            transition-all duration-200 disabled:opacity-50"
               >
                 {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
-                {promoCode ? 'Activate Pro — Free' : 'Upgrade to Pro — $30/mo'}
+                Upgrade to Pro — $30/mo
               </button>
             </div>
           )}

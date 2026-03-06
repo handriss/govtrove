@@ -254,21 +254,18 @@ func (h *StripeHandler) handleCheckoutCompleted(ctx context.Context, event *stri
 
 func (h *StripeHandler) trackPromoRedemption(ctx context.Context, sessionID string, userID int) {
 	expanded, err := h.sc.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{
-		Expand: []*string{stripe.String("total_details.breakdown.discounts.discount.promotion_code")},
+		Expand: []*string{stripe.String("discounts.promotion_code")},
 	})
 	if err != nil {
 		h.logger.Debug("could not expand checkout session for promo tracking", "error", err)
 		return
 	}
 
-	if expanded.TotalDetails == nil || expanded.TotalDetails.Breakdown == nil {
-		return
-	}
-	for _, d := range expanded.TotalDetails.Breakdown.Discounts {
-		if d.Discount == nil || d.Discount.PromotionCode == nil {
+	for _, d := range expanded.Discounts {
+		if d.PromotionCode == nil {
 			continue
 		}
-		promoID := d.Discount.PromotionCode.ID
+		promoID := d.PromotionCode.ID
 		row, err := h.promoRepo.GetByStripePromoID(ctx, promoID)
 		if err != nil {
 			h.logger.Error("promo lookup failed in webhook", "stripe_promo_id", promoID, "error", err)

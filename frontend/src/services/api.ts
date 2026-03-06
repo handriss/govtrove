@@ -1013,6 +1013,7 @@ export interface AdminPromoCode {
   created_at: string;
   redeemed_at: string | null;
   expires_at: string | null;
+  revoked_at: string | null;
 }
 
 export async function getAdminPromoCodes(token: string): Promise<AdminPromoCode[]> {
@@ -1105,6 +1106,17 @@ export async function getSnapAPIRecord(id: number): Promise<SnapAPIRecord> {
 export async function adminSendPromoInvite(token: string, promoId: number): Promise<void> {
   const response = await fetch(`${API_BASE}/admin/promo-codes/${promoId}/send`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+}
+
+export async function adminRevokePromoCode(token: string, promoId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/promo-codes/${promoId}`, {
+    method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
