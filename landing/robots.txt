@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://govtrove.com/sitemap.xml
+Llms-txt: https://govtrove.com/llms.txt
