@@ -168,6 +168,12 @@ variable "stripe_price_monthly" {
   default     = ""
 }
 
+variable "stripe_promo_coupon_id" {
+  description = "Stripe Coupon ID for promo code generation"
+  type        = string
+  default     = ""
+}
+
 # Domain (optional, for future custom domain support)
 variable "domain_name" {
   description = "Custom domain name for the application (optional)"

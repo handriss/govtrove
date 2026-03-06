@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -830,4 +831,118 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, execution
 	resp.OpportunityStats = oppStats
 
 	return resp, nil
+}
+
+// --- Snap Record Detail ---
+
+type SnapCSVRecord struct {
+	ID                 int64            `json:"id"`
+	NoticeID           string           `json:"notice_id"`
+	SolicitationNumber *string          `json:"solicitation_number"`
+	Title              *string          `json:"title"`
+	Type               *string          `json:"type"`
+	BaseType           *string          `json:"base_type"`
+	PostedDate         *string          `json:"posted_date"`
+	ResponseDeadline   *string          `json:"response_deadline"`
+	ArchiveDate        *string          `json:"archive_date"`
+	ArchiveType        *string          `json:"archive_type"`
+	SetAsideCode       *string          `json:"set_aside_code"`
+	NaicsCode          *string          `json:"naics_code"`
+	ClassificationCode *string          `json:"classification_code"`
+	Active             *bool            `json:"active"`
+	Department         *string          `json:"department"`
+	SubTier            *string          `json:"sub_tier"`
+	Office             *string          `json:"office"`
+	CGAC               *string          `json:"cgac"`
+	FPDSCode           *string          `json:"fpds_code"`
+	AACCode            *string          `json:"aac_code"`
+	AwardNumber        *string          `json:"award_number"`
+	AwardDate          *string          `json:"award_date"`
+	AwardAmount        *float64         `json:"award_amount"`
+	RawData            json.RawMessage  `json:"raw_data"`
+	ContentHash        string           `json:"content_hash"`
+	RunID              string           `json:"run_id"`
+	SnapshotDate       string           `json:"snapshot_date"`
+	DownloadID         *int64           `json:"download_id"`
+	CreatedAt          string           `json:"created_at"`
+}
+
+type SnapAPIRecord struct {
+	ID           int64           `json:"id"`
+	RunID        string          `json:"run_id"`
+	NoticeID     string          `json:"notice_id"`
+	RawData      json.RawMessage `json:"raw_data"`
+	ContentHash  string          `json:"content_hash"`
+	SnapshotDate string          `json:"snapshot_date"`
+	CreatedAt    string          `json:"created_at"`
+}
+
+func scanSnapCSVRecord(row pgx.Row) (*SnapCSVRecord, error) {
+	var r SnapCSVRecord
+	var postedDate, responseDeadline, snapshotDate *time.Time
+	var createdAt time.Time
+	err := row.Scan(
+		&r.ID, &r.NoticeID, &r.SolicitationNumber, &r.Title, &r.Type, &r.BaseType,
+		&postedDate, &responseDeadline, &r.ArchiveDate, &r.ArchiveType,
+		&r.SetAsideCode, &r.NaicsCode, &r.ClassificationCode, &r.Active,
+		&r.Department, &r.SubTier, &r.Office, &r.CGAC, &r.FPDSCode, &r.AACCode,
+		&r.AwardNumber, &r.AwardDate, &r.AwardAmount,
+		&r.RawData, &r.ContentHash, &r.RunID, &snapshotDate, &r.DownloadID, &createdAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if postedDate != nil {
+		s := postedDate.Format(time.RFC3339)
+		r.PostedDate = &s
+	}
+	if responseDeadline != nil {
+		s := responseDeadline.Format(time.RFC3339)
+		r.ResponseDeadline = &s
+	}
+	if snapshotDate != nil {
+		r.SnapshotDate = snapshotDate.Format(time.RFC3339)
+	}
+	r.CreatedAt = createdAt.Format(time.RFC3339)
+	return &r, nil
+}
+
+const snapCSVQuery = `
+	SELECT id, notice_id, solicitation_number, title, type, base_type,
+	       posted_date, response_deadline, archive_date, archive_type,
+	       set_aside_code, naics_code, classification_code, active,
+	       department, sub_tier, office, cgac, fpds_code, aac_code,
+	       award_number, award_date, award_amount::float8,
+	       raw_data, content_hash, run_id, snapshot_date, download_id, created_at
+`
+
+func (r *PipelineRepository) GetSnapCSVRecord(ctx context.Context, id int64) (*SnapCSVRecord, error) {
+	row := r.pool.QueryRow(ctx, snapCSVQuery+` FROM pipeline.snap_csv WHERE id = $1`, id)
+	return scanSnapCSVRecord(row)
+}
+
+func (r *PipelineRepository) GetSnapArchivedCSVRecord(ctx context.Context, id int64) (*SnapCSVRecord, error) {
+	row := r.pool.QueryRow(ctx, snapCSVQuery+` FROM pipeline.snap_archived_csv WHERE id = $1`, id)
+	return scanSnapCSVRecord(row)
+}
+
+func (r *PipelineRepository) GetSnapAPIRecord(ctx context.Context, id int64) (*SnapAPIRecord, error) {
+	var rec SnapAPIRecord
+	var snapshotDate, createdAt time.Time
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, run_id, notice_id, raw_data, content_hash, snapshot_date, created_at
+		FROM pipeline.snap_api WHERE id = $1
+	`, id).Scan(&rec.ID, &rec.RunID, &rec.NoticeID, &rec.RawData, &rec.ContentHash, &snapshotDate, &createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	rec.SnapshotDate = snapshotDate.Format(time.RFC3339)
+	rec.CreatedAt = createdAt.Format(time.RFC3339)
+	return &rec, nil
 }

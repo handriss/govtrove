@@ -20,9 +20,10 @@ type Config struct {
 	ResendAPIKey        string `envconfig:"RESEND_API_KEY"`
 	ResendFromEmail     string `envconfig:"RESEND_FROM_EMAIL"`
 	ResendWebhookSecret string `envconfig:"RESEND_WEBHOOK_SECRET"`
-	StripeSecretKey     string `envconfig:"STRIPE_SECRET_KEY"`
-	StripeWebhookSecret string `envconfig:"STRIPE_WEBHOOK_SECRET"`
-	StripePriceMonthly  string `envconfig:"STRIPE_PRICE_MONTHLY"`
+	StripeSecretKey      string `envconfig:"STRIPE_SECRET_KEY"`
+	StripeWebhookSecret  string `envconfig:"STRIPE_WEBHOOK_SECRET"`
+	StripePriceMonthly   string `envconfig:"STRIPE_PRICE_MONTHLY"`
+	StripePromoCouponID  string `envconfig:"STRIPE_PROMO_COUPON_ID"`
 }
 
 func Load() (*Config, error) {

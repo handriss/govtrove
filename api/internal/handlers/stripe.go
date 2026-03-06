@@ -18,6 +18,7 @@ import (
 
 type StripeHandler struct {
 	userRepo      *repository.UserRepository
+	promoRepo     *repository.PromoCodeRepository
 	sc            *stripe.Client
 	webhookSecret string
 	priceMonthly  string
@@ -27,7 +28,8 @@ type StripeHandler struct {
 
 func NewStripeHandler(
 	userRepo *repository.UserRepository,
-	stripeKey string,
+	promoRepo *repository.PromoCodeRepository,
+	sc *stripe.Client,
 	webhookSecret string,
 	priceMonthly string,
 	appURL string,
@@ -35,7 +37,8 @@ func NewStripeHandler(
 ) *StripeHandler {
 	return &StripeHandler{
 		userRepo:      userRepo,
-		sc:            stripe.NewClient(stripeKey),
+		promoRepo:     promoRepo,
+		sc:            sc,
 		webhookSecret: webhookSecret,
 		priceMonthly:  priceMonthly,
 		appURL:        appURL,
@@ -61,6 +64,14 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Parse optional promo code from request body
+	var body struct {
+		PromoCode string `json:"promo_code"`
+	}
+	if r.Body != nil {
+		json.NewDecoder(r.Body).Decode(&body)
+	}
+
 	customerID := ""
 	if user.StripeCustomerID != nil {
 		customerID = *user.StripeCustomerID
@@ -84,7 +95,7 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	sess, err := h.sc.V1CheckoutSessions.Create(r.Context(), &stripe.CheckoutSessionCreateParams{
+	params := &stripe.CheckoutSessionCreateParams{
 		Customer: stripe.String(customerID),
 		Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
@@ -95,7 +106,29 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		},
 		SuccessURL: stripe.String(h.appURL + "/profile?upgraded=1"),
 		CancelURL:  stripe.String(h.appURL + "/profile"),
-	})
+	}
+
+	if body.PromoCode != "" && h.promoRepo != nil {
+		promo, promoErr := h.promoRepo.GetByCode(r.Context(), body.PromoCode)
+		if promoErr != nil {
+			h.logger.Error("promo code lookup failed", "error", promoErr)
+		} else if promo == nil {
+			http.Error(w, "invalid promo code", http.StatusBadRequest)
+			return
+		} else if promo.RedeemedBy != nil {
+			http.Error(w, "promo code already used", http.StatusBadRequest)
+			return
+		} else if promo.ExpiresAt != nil && promo.ExpiresAt.Before(time.Now()) {
+			http.Error(w, "promo code expired", http.StatusBadRequest)
+			return
+		} else {
+			params.Discounts = []*stripe.CheckoutSessionCreateDiscountParams{
+				{PromotionCode: stripe.String(promo.StripePromoID)},
+			}
+		}
+	}
+
+	sess, err := h.sc.V1CheckoutSessions.Create(r.Context(), params)
 	if err != nil {
 		h.logger.Error("checkout session create failed", "error", err)
 		http.Error(w, "failed to create checkout session", http.StatusInternalServerError)
@@ -211,6 +244,44 @@ func (h *StripeHandler) handleCheckoutCompleted(ctx context.Context, event *stri
 		h.logger.Error("failed to upgrade user plan", "user_id", user.ID, "error", err)
 	} else {
 		h.logger.Info("user upgraded to pro", "user_id", user.ID, "email", user.Email)
+	}
+
+	// Track promo code redemption
+	if h.promoRepo != nil && session.ID != "" {
+		h.trackPromoRedemption(ctx, session.ID, user.ID)
+	}
+}
+
+func (h *StripeHandler) trackPromoRedemption(ctx context.Context, sessionID string, userID int) {
+	expanded, err := h.sc.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{
+		Expand: []*string{stripe.String("total_details.breakdown.discounts.discount.promotion_code")},
+	})
+	if err != nil {
+		h.logger.Debug("could not expand checkout session for promo tracking", "error", err)
+		return
+	}
+
+	if expanded.TotalDetails == nil || expanded.TotalDetails.Breakdown == nil {
+		return
+	}
+	for _, d := range expanded.TotalDetails.Breakdown.Discounts {
+		if d.Discount == nil || d.Discount.PromotionCode == nil {
+			continue
+		}
+		promoID := d.Discount.PromotionCode.ID
+		row, err := h.promoRepo.GetByStripePromoID(ctx, promoID)
+		if err != nil {
+			h.logger.Error("promo lookup failed in webhook", "stripe_promo_id", promoID, "error", err)
+			continue
+		}
+		if row == nil {
+			continue
+		}
+		if err := h.promoRepo.MarkRedeemed(ctx, row.ID, userID); err != nil {
+			h.logger.Error("failed to mark promo redeemed", "promo_id", row.ID, "error", err)
+		} else {
+			h.logger.Info("promo code redeemed", "promo_id", row.ID, "code", row.Code, "user_id", userID)
+		}
 	}
 }
 
