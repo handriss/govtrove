@@ -61,7 +61,7 @@ function deadlineColor(deadline?: string): string {
 export default function SavedPage() {
   const { isAuthenticated, getAccessToken } = useAppAuth();
   const saved = useSavedOpportunities();
-  const { savedSearches, loading: searchesLoading, deleteSearch, toggleAlert } = useSavedSearches();
+  const { savedSearches, loading: searchesLoading, deleteSearch, toggleAlert, renameSearch } = useSavedSearches();
   const navigate = useNavigate();
 
   const [opportunities, setOpportunities] = useState<SavedOpportunityDetail[]>([]);
@@ -69,6 +69,8 @@ export default function SavedPage() {
   const [loading, setLoading] = useState(false);
   const [sort, setSort] = useState<'saved' | 'deadline'>('saved');
   const [activeOnly, setActiveOnly] = useState(false);
+  const [editingSearchName, setEditingSearchName] = useState<number | null>(null);
+  const [searchNameText, setSearchNameText] = useState('');
   const [editingNotes, setEditingNotes] = useState<number | null>(null);
   const [notesText, setNotesText] = useState('');
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -113,6 +115,15 @@ export default function SavedPage() {
     setEditingNotes(null);
   }, [getAccessToken]);
 
+  const commitSearchRename = useCallback(async (id: number, newName: string, originalName: string) => {
+    setEditingSearchName(null);
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === originalName) return;
+    try {
+      await renameSearch(id, trimmed);
+    } catch { /* rollback handled by hook refetch */ }
+  }, [renameSearch]);
+
   const startEditingNotes = useCallback((opp: SavedOpportunityDetail) => {
     setEditingNotes(opp.id);
     setNotesText(opp.notes || '');
@@ -155,7 +166,34 @@ export default function SavedPage() {
                     <Search size={14} className="text-dark-500 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-dark-200 truncate">{search.name}</p>
+                        {editingSearchName === search.id ? (
+                          <input
+                            value={searchNameText}
+                            onChange={(e) => setSearchNameText(e.target.value)}
+                            onBlur={() => commitSearchRename(search.id, searchNameText, search.name)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                              if (e.key === 'Escape') setEditingSearchName(null);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-sm font-medium text-dark-200 bg-dark-800/50 border border-dark-700/50
+                                       rounded-lg px-2 py-0.5 focus:outline-none focus:border-accent/50 min-w-0 flex-1"
+                            autoFocus
+                            maxLength={100}
+                          />
+                        ) : (
+                          <p
+                            className="text-sm font-medium text-dark-200 truncate cursor-text hover:text-dark-100"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingSearchName(search.id);
+                              setSearchNameText(search.name);
+                            }}
+                            title="Click to rename"
+                          >
+                            {search.name}
+                          </p>
+                        )}
                         {search.last_match_count > 0 && (
                           <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full shrink-0">
                             +{search.last_match_count} new
