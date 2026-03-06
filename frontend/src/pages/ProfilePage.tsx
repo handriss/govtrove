@@ -134,10 +134,10 @@ export default function ProfilePage() {
       <div className="relative z-10 max-w-2xl mx-auto px-6 pt-6 pb-10">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6 md:hidden"
+          className="inline-flex items-center gap-2 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6"
         >
           <ArrowLeft size={16} strokeWidth={1.5} />
-          Back
+          Back to Search
         </Link>
         {/* User Info */}
         <div className="flex flex-col items-center text-center mb-8">
