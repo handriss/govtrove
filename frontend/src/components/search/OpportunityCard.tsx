@@ -176,15 +176,15 @@ export default memo(function OpportunityCard({
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleSave(opp.id); }}
-            className="shrink-0 pt-0.5 rounded focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-1 focus-visible:ring-offset-dark-950"
+            className="shrink-0 p-1 -m-1 rounded-full hover:bg-yellow-400/10 focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-1 focus-visible:ring-offset-dark-950 transition-colors"
             aria-label={isSaved ? 'Remove from saved' : 'Save opportunity'}
           >
             <Star
-              size={16}
+              size={18}
               className={`transition-colors duration-150 ${
                 isSaved
                   ? 'fill-yellow-400 text-yellow-400'
-                  : 'text-dark-600 hover:text-dark-400'
+                  : 'text-dark-500 hover:text-yellow-400/70'
               }`}
             />
           </button>

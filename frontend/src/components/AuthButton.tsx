@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut, User, UserPlus } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 
 export default function AuthButton() {
-  const { user, isLoading, isAuthenticated, signIn, signOut } = useAppAuth();
+  const { user, isLoading, isAuthenticated, signIn, signUp, signOut } = useAppAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -26,15 +26,25 @@ export default function AuthButton() {
 
   if (!isAuthenticated || !user) {
     return (
-      <button
-        onClick={() => signIn()}
-        className="flex items-center gap-2 px-3 py-1.5 text-sm text-dark-300 hover:text-dark-50
-                   border border-dark-700/50 hover:border-dark-600/50 rounded-lg
-                   bg-dark-800/30 hover:bg-dark-800/50 transition-all duration-200"
-      >
-        <LogIn size={14} strokeWidth={1.5} />
-        <span className="hidden sm:inline">Sign In</span>
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => signIn()}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm text-dark-300 hover:text-dark-50
+                     border border-dark-700/50 hover:border-dark-600/50 rounded-lg
+                     bg-dark-800/30 hover:bg-dark-800/50 transition-all duration-200"
+        >
+          <LogIn size={14} strokeWidth={1.5} />
+          <span className="hidden sm:inline">Sign In</span>
+        </button>
+        <button
+          onClick={() => signUp()}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white
+                     bg-accent hover:bg-accent-hover rounded-lg transition-all duration-200"
+        >
+          <UserPlus size={14} strokeWidth={1.5} />
+          <span className="hidden sm:inline">Sign Up Free</span>
+        </button>
+      </div>
     );
   }
 

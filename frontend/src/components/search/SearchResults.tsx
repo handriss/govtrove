@@ -14,6 +14,7 @@ import {
 import { Link } from 'react-router-dom';
 import OpportunityCard from './OpportunityCard';
 import SortDropdown from './SortDropdown';
+import SignupPromptModal, { type SignupPromptContext } from '../SignupPromptModal';
 import type { OpportunityListItem, FacetResult } from '../../types/api';
 import type { FilterState } from '../../hooks/useFilterState';
 
@@ -42,6 +43,7 @@ interface SearchResultsProps {
   onQuerySuggestionClick?: (suggestion: string) => void;
   error?: string | null;
   onRetry?: () => void;
+  isAuthenticated?: boolean;
 }
 
 export default function SearchResults({
@@ -67,8 +69,10 @@ export default function SearchResults({
   clearAllFilters,
   error,
   onRetry,
+  isAuthenticated,
 }: SearchResultsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const anySelected = selectedIds.size > 0;
   const displayKeyword = keyword?.replace(/^"+|"+$/g, '') || keyword;
@@ -107,10 +111,22 @@ export default function SearchResults({
     onPageSizeChange(size);
   }, [onPageSizeChange]);
 
+  const handleToggleSave = useCallback((id: number) => {
+    if (!isAuthenticated) {
+      setSignupPrompt('bookmark');
+      return;
+    }
+    onToggleSave(id);
+  }, [isAuthenticated, onToggleSave]);
+
   const handleSaveAll = useCallback(() => {
+    if (!isAuthenticated) {
+      setSignupPrompt('save-all');
+      return;
+    }
     onSaveAll([...selectedIds]);
     setSelectedIds(new Set());
-  }, [selectedIds, onSaveAll]);
+  }, [selectedIds, onSaveAll, isAuthenticated]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -215,7 +231,7 @@ export default function SearchResults({
                 isSaved={savedIds.has(opp.id)}
                 isSelected={selectedIds.has(opp.id)}
                 anySelected={anySelected}
-                onToggleSave={onToggleSave}
+                onToggleSave={handleToggleSave}
                 onToggleSelect={toggleSelect}
               />
             ))}
@@ -241,6 +257,10 @@ export default function SearchResults({
           onSaveAll={handleSaveAll}
           onClear={handleClearSelection}
         />
+      )}
+
+      {signupPrompt && (
+        <SignupPromptModal context={signupPrompt} onClose={() => setSignupPrompt(null)} />
       )}
     </div>
   );
