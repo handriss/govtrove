@@ -713,11 +713,32 @@ func (r *PipelineRepository) GetPipelineRunDetail(ctx context.Context, execution
 		return nil, ErrPipelineRunNotFound
 	}
 
-	// Derive overall status from the latest attempt per step_name
-	latestStatus := make(map[string]string)
+	// Derive overall status from the latest attempt per step_name.
+	// A step stuck as "running" when a later step already started means
+	// it completed but failed to write its status (e.g. Lambda context expired).
+	type stepInfo struct {
+		Status    string
+		StartedAt time.Time
+	}
+	latestByName := make(map[string]stepInfo)
 	for _, s := range steps {
 		if s.IsLatest {
-			latestStatus[s.StepName] = s.Status
+			sa, _ := time.Parse(time.RFC3339, s.StartedAt)
+			latestByName[s.StepName] = stepInfo{Status: s.Status, StartedAt: sa}
+		}
+	}
+	var maxStartedAt time.Time
+	for _, info := range latestByName {
+		if info.StartedAt.After(maxStartedAt) {
+			maxStartedAt = info.StartedAt
+		}
+	}
+	latestStatus := make(map[string]string)
+	for name, info := range latestByName {
+		if info.Status == "running" && info.StartedAt.Before(maxStartedAt) {
+			latestStatus[name] = "completed"
+		} else {
+			latestStatus[name] = info.Status
 		}
 	}
 	allCompleted := true
