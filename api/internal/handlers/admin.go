@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +10,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/stripe/stripe-go/v82"
+
 	"github.com/handriss/govtrove/api/internal/email"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/repository"
@@ -21,7 +27,11 @@ type AdminHandler struct {
 	pipelineRepo     *repository.PipelineRepository
 	emailPrefsRepo   *repository.EmailPreferencesRepository
 	sentEmailsRepo   *repository.SentEmailsRepository
+	promoRepo        *repository.PromoCodeRepository
 	emailSvc         *email.Service
+	sc               *stripe.Client
+	promoCouponID    string
+	appURL           string
 	workosAPIKey     string
 	logger           *slog.Logger
 }
@@ -32,7 +42,11 @@ func NewAdminHandler(
 	pipelineRepo *repository.PipelineRepository,
 	emailPrefsRepo *repository.EmailPreferencesRepository,
 	sentEmailsRepo *repository.SentEmailsRepository,
+	promoRepo *repository.PromoCodeRepository,
 	emailSvc *email.Service,
+	sc *stripe.Client,
+	promoCouponID string,
+	appURL string,
 	workosAPIKey string,
 	logger *slog.Logger,
 ) *AdminHandler {
@@ -42,7 +56,11 @@ func NewAdminHandler(
 		pipelineRepo:     pipelineRepo,
 		emailPrefsRepo:   emailPrefsRepo,
 		sentEmailsRepo:   sentEmailsRepo,
+		promoRepo:        promoRepo,
 		emailSvc:         emailSvc,
+		sc:               sc,
+		promoCouponID:    promoCouponID,
+		appURL:           appURL,
 		workosAPIKey:     workosAPIKey,
 		logger:           logger,
 	}
@@ -490,7 +508,8 @@ func coerceFloats(m map[string]any) {
 }
 
 var allowedTemplates = map[string]bool{
-	"digest.html": true,
+	"digest.html":       true,
+	"promo-invite.html": true,
 }
 
 func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
@@ -640,6 +659,252 @@ func (h *AdminHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("user deleted", "user_id", userID, "email", user.Email)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) CreatePromoCode(w http.ResponseWriter, r *http.Request) {
+	if h.sc == nil || h.promoCouponID == "" {
+		http.Error(w, "promo codes not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	var body struct {
+		UserID        int `json:"user_id"`
+		ExpiresInDays int `json:"expires_in_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if body.UserID == 0 {
+		http.Error(w, "user_id is required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), body.UserID)
+	if err != nil || user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if user.Plan == "pro" {
+		http.Error(w, "user is already pro", http.StatusConflict)
+		return
+	}
+
+	// Ensure user has a Stripe customer
+	customerID := ""
+	if user.StripeCustomerID != nil {
+		customerID = *user.StripeCustomerID
+	} else {
+		cust, custErr := h.sc.V1Customers.Create(r.Context(), &stripe.CustomerCreateParams{
+			Email: stripe.String(user.Email),
+			Name:  stripe.String(user.FirstName + " " + user.LastName),
+			Metadata: map[string]string{
+				"govtrove_user_id": fmt.Sprintf("%d", user.ID),
+				"workos_id":        user.WorkOSID,
+			},
+		})
+		if custErr != nil {
+			h.logger.Error("stripe customer create failed", "error", custErr)
+			http.Error(w, "failed to create stripe customer", http.StatusInternalServerError)
+			return
+		}
+		customerID = cust.ID
+		_ = h.userRepo.SetStripeCustomerID(r.Context(), user.ID, customerID)
+	}
+
+	// Generate a readable code
+	randBytes := make([]byte, 2)
+	rand.Read(randBytes)
+	suffix := strings.ToUpper(hex.EncodeToString(randBytes))
+	firstName := strings.ToUpper(strings.ReplaceAll(user.FirstName, " ", ""))
+	if firstName == "" {
+		firstName = "USER"
+	}
+	code := fmt.Sprintf("GOVTROVE-%s-%s", firstName, suffix)
+
+	promoParams := &stripe.PromotionCodeCreateParams{
+		Coupon:         stripe.String(h.promoCouponID),
+		Code:           stripe.String(code),
+		MaxRedemptions: stripe.Int64(1),
+		Customer:       stripe.String(customerID),
+	}
+
+	var expiresAt *time.Time
+	if body.ExpiresInDays > 0 {
+		t := time.Now().Add(time.Duration(body.ExpiresInDays) * 24 * time.Hour)
+		expiresAt = &t
+		promoParams.ExpiresAt = stripe.Int64(t.Unix())
+	}
+
+	stripePromo, err := h.sc.V1PromotionCodes.Create(r.Context(), promoParams)
+	if err != nil {
+		h.logger.Error("stripe promotion code create failed", "error", err)
+		http.Error(w, "failed to create promotion code", http.StatusInternalServerError)
+		return
+	}
+
+	userID := user.ID
+	id, err := h.promoRepo.Create(r.Context(), stripePromo.Code, stripePromo.ID, &userID, expiresAt)
+	if err != nil {
+		h.logger.Error("failed to save promo code", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	inviteURL := fmt.Sprintf("%s/profile?promo=%s", h.appURL, stripePromo.Code)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":         id,
+		"code":       stripePromo.Code,
+		"invite_url": inviteURL,
+	})
+}
+
+func (h *AdminHandler) ListPromoCodes(w http.ResponseWriter, r *http.Request) {
+	codes, err := h.promoRepo.List(r.Context())
+	if err != nil {
+		h.logger.Error("list promo codes failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if codes == nil {
+		codes = []repository.PromoCodeRow{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(codes)
+}
+
+func (h *AdminHandler) SendPromoInvite(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	if h.emailSvc == nil {
+		http.Error(w, "email service not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	codes, err := h.promoRepo.List(r.Context())
+	if err != nil {
+		h.logger.Error("list promo codes for send failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var promo *repository.PromoCodeRow
+	for i := range codes {
+		if codes[i].ID == id {
+			promo = &codes[i]
+			break
+		}
+	}
+	if promo == nil {
+		http.Error(w, "promo code not found", http.StatusNotFound)
+		return
+	}
+	if promo.ForUserEmail == nil {
+		http.Error(w, "no user associated with this promo code", http.StatusBadRequest)
+		return
+	}
+
+	firstName := "there"
+	if promo.ForUserName != nil && *promo.ForUserName != "" && *promo.ForUserName != " " {
+		firstName = strings.SplitN(*promo.ForUserName, " ", 2)[0]
+	}
+
+	inviteURL := fmt.Sprintf("%s/profile?promo=%s", h.appURL, promo.Code)
+	userID := promo.ForUserID
+
+	_, err = h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+		UserID:       userID,
+		ToEmail:      *promo.ForUserEmail,
+		EmailType:    "promo_invite",
+		TemplateName: "promo-invite.html",
+		Subject:      "You're invited to GovTrove Pro",
+		TemplateData: map[string]any{
+			"FirstName": firstName,
+			"InviteURL": inviteURL,
+			"Code":      promo.Code,
+		},
+	})
+	if err != nil {
+		h.logger.Error("send promo invite failed", "error", err)
+		http.Error(w, "failed to send invite", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) GetSnapCSVRecord(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	record, err := h.pipelineRepo.GetSnapCSVRecord(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get snap csv record failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if record == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(record)
+}
+
+func (h *AdminHandler) GetSnapArchivedCSVRecord(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	record, err := h.pipelineRepo.GetSnapArchivedCSVRecord(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get snap archived csv record failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if record == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(record)
+}
+
+func (h *AdminHandler) GetSnapAPIRecord(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	record, err := h.pipelineRepo.GetSnapAPIRecord(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get snap api record failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if record == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(record)
 }
 
 func (h *AdminHandler) deleteWorkOSUser(workosID string) error {

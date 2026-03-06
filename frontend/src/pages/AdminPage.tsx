@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink, Copy, Send as SendIcon } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
   getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
-  adminSendNewEmail, adminExportUserData, adminDeleteUser, type AdminSendNewEmailInput,
+  adminSendNewEmail, adminExportUserData, adminDeleteUser,
+  getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite,
+  type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
+  type AdminPromoCode,
 } from '../services/api';
 import type { Notification } from '../types/api';
 import { useAppAuth } from '../contexts/AuthContext';
@@ -1533,7 +1536,185 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails';
+function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () => Promise<string> }) {
+  const [codes, setCodes] = useState<AdminPromoCode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
+  const [expiresInDays, setExpiresInDays] = useState(30);
+  const [generating, setGenerating] = useState(false);
+  const [sendingId, setSendingId] = useState<number | null>(null);
+  const [sendStatus, setSendStatus] = useState<Record<number, 'success' | 'error'>>({});
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<number | null>(null);
+
+  const freeUsers = users.filter(u => u.plan !== 'pro');
+
+  const loadCodes = useCallback(async () => {
+    try {
+      const token = await getToken();
+      setCodes(await getAdminPromoCodes(token));
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [getToken]);
+
+  useEffect(() => { loadCodes(); }, [loadCodes]);
+
+  async function handleGenerate() {
+    if (!selectedUserId) return;
+    setGenerating(true);
+    setError('');
+    try {
+      const token = await getToken();
+      await adminCreatePromoCode(token, Number(selectedUserId), expiresInDays || undefined);
+      setSelectedUserId('');
+      await loadCodes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate code');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleSend(promoId: number) {
+    setSendingId(promoId);
+    try {
+      const token = await getToken();
+      await adminSendPromoInvite(token, promoId);
+      setSendStatus(prev => ({ ...prev, [promoId]: 'success' }));
+    } catch {
+      setSendStatus(prev => ({ ...prev, [promoId]: 'error' }));
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  function handleCopy(code: AdminPromoCode) {
+    const url = `${window.location.origin}/profile?promo=${code.code}`;
+    navigator.clipboard.writeText(url);
+    setCopied(code.id);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  function statusBadge(code: AdminPromoCode) {
+    if (code.redeemed_at) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">Redeemed</span>;
+    }
+    if (code.expires_at && new Date(code.expires_at) < new Date()) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Expired</span>;
+    }
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Pending</span>;
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">Promo Codes</h2>
+
+      {/* Generate form */}
+      <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 mb-6">
+        <h3 className="text-sm font-medium text-dark-300 mb-3">Generate New Code</h3>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">User</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : '')}
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[200px]"
+            >
+              <option value="">Select user...</option>
+              {freeUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.email} ({u.first_name})</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Expires in (days)</label>
+            <input
+              type="number"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(Number(e.target.value))}
+              min={0}
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={!selectedUserId || generating}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-dark-950 hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {generating ? 'Generating...' : 'Generate Code'}
+          </button>
+        </div>
+        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      </div>
+
+      {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
+
+      {!loading && codes.length === 0 && (
+        <p className="text-dark-500 text-sm py-8 text-center">No promo codes yet.</p>
+      )}
+
+      {!loading && codes.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Code</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium">Redeemed</th>
+                <th className="px-4 py-3 font-medium">Expires</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((c) => (
+                <tr key={c.id} className="border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30">
+                  <td className="px-4 py-3 text-dark-200 text-xs">{c.for_user_email || '—'}</td>
+                  <td className="px-4 py-3 text-dark-100 text-xs font-mono">{c.code}</td>
+                  <td className="px-4 py-3">{statusBadge(c)}</td>
+                  <td className="px-4 py-3 text-dark-400 text-xs">{formatDate(c.created_at)}</td>
+                  <td className="px-4 py-3 text-dark-400 text-xs">
+                    {c.redeemed_at ? formatDateTime(c.redeemed_at) : '—'}
+                    {c.redeemed_email && <span className="text-dark-500 ml-1">({c.redeemed_email})</span>}
+                  </td>
+                  <td className="px-4 py-3 text-dark-400 text-xs">{c.expires_at ? formatDate(c.expires_at) : '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleCopy(c)}
+                        title="Copy invite link"
+                        className="p-1 text-dark-400 hover:text-accent transition-colors"
+                      >
+                        {copied === c.id ? <span className="text-xs text-green-400">Copied</span> : <Copy size={14} />}
+                      </button>
+                      {!c.redeemed_at && c.for_user_email && (
+                        sendStatus[c.id] === 'success' ? (
+                          <span className="text-xs text-green-400">Sent</span>
+                        ) : (
+                          <button
+                            onClick={() => handleSend(c.id)}
+                            disabled={sendingId === c.id}
+                            title="Send invite email"
+                            className="p-1 text-dark-400 hover:text-accent transition-colors disabled:opacity-50"
+                          >
+                            {sendingId === c.id ? <Loader2 size={14} className="animate-spin" /> : <SendIcon size={14} />}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -1560,6 +1741,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'searches' && <SearchAnalyticsTab getToken={getToken} />}
       {activeTab === 'email-prefs' && <EmailPrefsTab getToken={getToken} />}
       {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
+      {activeTab === 'promo-codes' && <PromoCodesTab users={users} getToken={getToken} />}
     </div>
   );
 }

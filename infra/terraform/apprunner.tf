@@ -163,7 +163,8 @@ resource "aws_apprunner_service" "api" {
           RESEND_FROM_EMAIL = "GovTrove <notifications@govtrove.com>"
           SES_FROM_EMAIL    = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
           SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
-          STRIPE_PRICE_MONTHLY = var.stripe_price_monthly
+          STRIPE_PRICE_MONTHLY    = var.stripe_price_monthly
+          STRIPE_PROMO_COUPON_ID  = var.stripe_promo_coupon_id
         }
       }
     }

@@ -192,10 +192,17 @@ export async function createAccountRequest(
 
 // --- Billing ---
 
-export async function createCheckoutSession(token: string): Promise<{ url: string }> {
+export async function createCheckoutSession(token: string, promoCode?: string): Promise<{ url: string }> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  let body: string | undefined;
+  if (promoCode) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({ promo_code: promoCode });
+  }
   const response = await fetch(`${API_BASE}/billing/checkout`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers,
+    body,
   });
   if (!response.ok) { checkAuth(response); throw new Error(`Checkout failed: ${response.statusText}`); }
   return response.json();
@@ -984,6 +991,126 @@ export async function adminExportUserData(token: string, userId: number): Promis
 export async function adminDeleteUser(token: string, userId: number): Promise<void> {
   const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
     method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+}
+
+// --- Promo Codes ---
+
+export interface AdminPromoCode {
+  id: number;
+  code: string;
+  stripe_promo_id: string;
+  for_user_id: number | null;
+  for_user_email: string | null;
+  for_user_name: string | null;
+  redeemed_by: number | null;
+  redeemed_email: string | null;
+  created_at: string;
+  redeemed_at: string | null;
+  expires_at: string | null;
+}
+
+export async function getAdminPromoCodes(token: string): Promise<AdminPromoCode[]> {
+  const response = await fetch(`${API_BASE}/admin/promo-codes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminCreatePromoCode(
+  token: string,
+  userId: number,
+  expiresInDays?: number,
+): Promise<{ id: number; code: string; invite_url: string }> {
+  const response = await fetch(`${API_BASE}/admin/promo-codes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ user_id: userId, expires_in_days: expiresInDays || 0 }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+  return response.json();
+}
+
+// --- Snap Record Detail ---
+
+export interface SnapCSVRecord {
+  id: number;
+  notice_id: string;
+  solicitation_number: string | null;
+  title: string | null;
+  type: string | null;
+  base_type: string | null;
+  posted_date: string | null;
+  response_deadline: string | null;
+  archive_date: string | null;
+  archive_type: string | null;
+  set_aside_code: string | null;
+  naics_code: string | null;
+  classification_code: string | null;
+  active: boolean | null;
+  department: string | null;
+  sub_tier: string | null;
+  office: string | null;
+  cgac: string | null;
+  fpds_code: string | null;
+  aac_code: string | null;
+  award_number: string | null;
+  award_date: string | null;
+  award_amount: number | null;
+  raw_data: Record<string, unknown>;
+  content_hash: string;
+  run_id: string;
+  snapshot_date: string;
+  download_id: number | null;
+  created_at: string;
+}
+
+export interface SnapAPIRecord {
+  id: number;
+  run_id: string;
+  notice_id: string;
+  raw_data: Record<string, unknown>;
+  content_hash: string;
+  snapshot_date: string;
+  created_at: string;
+}
+
+export async function getAdminSnapCSVRecord(token: string, id: number): Promise<SnapCSVRecord> {
+  const response = await fetch(`${API_BASE}/admin/snap/csv/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminSnapArchivedCSVRecord(token: string, id: number): Promise<SnapCSVRecord> {
+  const response = await fetch(`${API_BASE}/admin/snap/archived-csv/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function getAdminSnapAPIRecord(token: string, id: number): Promise<SnapAPIRecord> {
+  const response = await fetch(`${API_BASE}/admin/snap/api/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminSendPromoInvite(token: string, promoId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/promo-codes/${promoId}/send`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {

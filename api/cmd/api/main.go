@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/getsentry/sentry-go"
 	"github.com/MicahParks/keyfunc/v3"
+	"github.com/stripe/stripe-go/v82"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -152,7 +153,24 @@ func main() {
 	utmRepo := repository.NewUTMRepository(pool)
 	emailPrefsRepo := repository.NewEmailPreferencesRepository(pool)
 	sentEmailsRepo := repository.NewSentEmailsRepository(pool)
+	promoRepo := repository.NewPromoCodeRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
+
+	appURL := "https://app.govtrove.com"
+	if strings.Contains(cfg.AllowedOrigins, "localhost") {
+		appURL = "http://localhost:5173"
+	}
+
+	var stripeHandler *handlers.StripeHandler
+	var stripeClient *stripe.Client
+	if cfg.StripeSecretKey != "" {
+		stripeClient = stripe.NewClient(cfg.StripeSecretKey)
+		stripeHandler = handlers.NewStripeHandler(
+			userRepo, promoRepo, stripeClient, cfg.StripeWebhookSecret,
+			cfg.StripePriceMonthly, appURL, logger,
+		)
+		logger.Info("Stripe billing configured")
+	}
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
@@ -160,7 +178,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, emailSvc, cfg.WorkOSAPIKey, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -172,20 +190,6 @@ func main() {
 	preferencesHandler := handlers.NewPreferencesHandler(emailPrefsRepo, userRepo, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
-
-	appURL := "https://app.govtrove.com"
-	if strings.Contains(cfg.AllowedOrigins, "localhost") {
-		appURL = "http://localhost:5173"
-	}
-
-	var stripeHandler *handlers.StripeHandler
-	if cfg.StripeSecretKey != "" {
-		stripeHandler = handlers.NewStripeHandler(
-			userRepo, cfg.StripeSecretKey, cfg.StripeWebhookSecret,
-			cfg.StripePriceMonthly, appURL, logger,
-		)
-		logger.Info("Stripe billing configured")
-	}
 
 	r := chi.NewRouter()
 
@@ -305,6 +309,9 @@ func main() {
 					r.Put("/data-quality/{id}", adminHandler.UpdateDataQualityResolution)
 					r.Get("/reconcile-dq", adminHandler.ListReconcileDQIssues)
 					r.Get("/reconcile-dq/{id}", adminHandler.GetReconcileDQDetail)
+					r.Get("/snap/csv/{id}", adminHandler.GetSnapCSVRecord)
+					r.Get("/snap/archived-csv/{id}", adminHandler.GetSnapArchivedCSVRecord)
+					r.Get("/snap/api/{id}", adminHandler.GetSnapAPIRecord)
 					r.Put("/reconcile-dq/{id}", adminHandler.UpdateReconcileDQResolution)
 					r.Get("/utm-analytics", utmHandler.GetAnalytics)
 					r.Get("/email-preferences", adminHandler.ListEmailPreferences)
@@ -312,6 +319,9 @@ func main() {
 					r.Get("/sent-emails", adminHandler.ListSentEmails)
 					r.Post("/sent-emails/{id}/resend", adminHandler.ResendEmail)
 					r.Post("/send-email", adminHandler.SendNewEmail)
+				r.Post("/promo-codes", adminHandler.CreatePromoCode)
+				r.Get("/promo-codes", adminHandler.ListPromoCodes)
+				r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)
 				})
