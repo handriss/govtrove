@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, ExternalLink, Table, BarChart3 } from 'lucide-react';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminDataQualityIssues,
   getAdminDataQualityDetail,
+  getAdminDataQualitySummary,
   updateAdminDataQualityResolution,
   type AdminDataQualityRow,
   type AdminDataQualityDetail,
+  type DQSummaryRow,
 } from '../services/api';
 
 function formatDate(dateStr: string) {
@@ -181,6 +183,192 @@ function DetailPanel({ detail, items, currentIndex, onNavigate, onClose, onSave 
   );
 }
 
+interface IssueTypeGroup {
+  issueType: string;
+  total: number;
+  unresolved: number;
+  fields: DQSummaryRow[];
+}
+
+function groupByDate(data: DQSummaryRow[]) {
+  const byDate: Record<string, DQSummaryRow[]> = {};
+  for (const row of data) (byDate[row.snapshot_date] ||= []).push(row);
+
+  return Object.entries(byDate).map(([date, rows]) => {
+    const byType: Record<string, IssueTypeGroup> = {};
+    for (const row of rows) {
+      const g = (byType[row.issue_type] ||= { issueType: row.issue_type, total: 0, unresolved: 0, fields: [] });
+      g.total += row.total;
+      g.unresolved += row.unresolved;
+      g.fields.push(row);
+    }
+    const total = rows.reduce((s, r) => s + r.total, 0);
+    const unresolved = rows.reduce((s, r) => s + r.unresolved, 0);
+    return { date, total, unresolved, issueTypes: Object.values(byType) };
+  });
+}
+
+function ExpandedRows({ date, issueType, fieldName, getToken }: {
+  date: string; issueType: string; fieldName: string | null; getToken: () => Promise<string>;
+}) {
+  const [rows, setRows] = useState<AdminDataQualityRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken();
+        const result = await getAdminDataQualityIssues(token, {
+          limit: 100,
+          snapshot_date: date,
+          issue_type: issueType,
+          field_name: fieldName || undefined,
+        });
+        setRows(result.items || []);
+      } catch { setRows([]); }
+      finally { setLoading(false); }
+    })();
+  }, [date, issueType, fieldName, getToken]);
+
+  if (loading) return (
+    <tr><td colSpan={5} className="px-8 py-2 text-dark-500 text-xs">Loading...</td></tr>
+  );
+
+  return (<>
+    {rows.map((row) => (
+      <tr key={row.id} className="bg-dark-800/20">
+        <td className="pl-8 pr-4 py-1.5 text-dark-400 font-mono text-xs">{row.notice_id}</td>
+        <td className="px-4 py-1.5 text-dark-400 text-xs">{row.field_value || '—'}</td>
+        <td className="px-4 py-1.5 text-dark-400 text-xs">{row.source}</td>
+        <td className="px-4 py-1.5 text-dark-400 text-xs truncate max-w-[20rem]">{row.description || '—'}</td>
+        <td className="px-4 py-1.5 text-right">
+          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs ${row.resolved ? 'text-emerald-400' : 'text-amber-400'}`}>
+            {row.resolved ? 'Yes' : 'No'}
+          </span>
+        </td>
+      </tr>
+    ))}
+  </>);
+}
+
+function SummaryView({ data, getToken }: { data: DQSummaryRow[]; getToken: () => Promise<string> }) {
+  const days = groupByDate(data);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  if (days.length === 0) {
+    return <div className="text-center text-dark-500 text-sm py-20">No data</div>;
+  }
+
+  const toggleKey = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {days.map(({ date, total: dayTotal, unresolved: dayUnresolved, issueTypes }) => (
+        <div key={date} className="rounded-xl border border-dark-700/50 overflow-hidden">
+          <div className="px-4 py-3 bg-dark-800/30 border-b border-dark-700/50 flex items-center justify-between">
+            <span className="text-sm font-medium text-dark-200">{formatDate(date)}</span>
+            <div className="flex gap-4 text-xs text-dark-400">
+              <span>{dayTotal} total</span>
+              {dayUnresolved > 0 && (
+                <span className="text-amber-400">{dayUnresolved} unresolved</span>
+              )}
+            </div>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="px-4 py-2 font-medium">Issue Type / Field</th>
+                <th className="px-4 py-2 font-medium text-right">Total</th>
+                <th className="px-4 py-2 font-medium text-right">Unresolved</th>
+                <th className="px-4 py-2 font-medium text-right">Resolved</th>
+                <th className="w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {issueTypes.map((group) => {
+                const singleField = group.fields.length === 1;
+                const rowKey = `${date}::${group.issueType}::${singleField ? (group.fields[0].field_name || '') : ''}`;
+
+                if (singleField) {
+                  const row = group.fields[0];
+                  const isOpen = expanded.has(rowKey);
+                  return (<>
+                    <tr
+                      key={rowKey}
+                      onClick={() => toggleKey(rowKey)}
+                      className="border-b border-dark-700/30 last:border-0 cursor-pointer hover:bg-dark-800/30"
+                    >
+                      <td className="px-4 py-2 text-dark-200">
+                        {group.issueType}
+                        {row.field_name && <span className="text-dark-500 ml-2">{row.field_name}</span>}
+                      </td>
+                      <td className="px-4 py-2 text-dark-300 text-right">{group.total}</td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={group.unresolved > 0 ? 'text-amber-400' : 'text-dark-500'}>{group.unresolved}</span>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className={group.total - group.unresolved > 0 ? 'text-emerald-400' : 'text-dark-500'}>{group.total - group.unresolved}</span>
+                      </td>
+                      <td className="px-2 py-2 text-dark-500">
+                        <ChevronRight size={14} className={`transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                      </td>
+                    </tr>
+                    {isOpen && <ExpandedRows date={date} issueType={group.issueType} fieldName={row.field_name} getToken={getToken} />}
+                  </>);
+                }
+
+                return (<>
+                  <tr key={`${date}::${group.issueType}::header`} className="border-b border-dark-700/30">
+                    <td className="px-4 py-2 text-dark-200 font-medium">{group.issueType}</td>
+                    <td className="px-4 py-2 text-dark-300 text-right">{group.total}</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className={group.unresolved > 0 ? 'text-amber-400' : 'text-dark-500'}>{group.unresolved}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <span className={group.total - group.unresolved > 0 ? 'text-emerald-400' : 'text-dark-500'}>{group.total - group.unresolved}</span>
+                    </td>
+                    <td></td>
+                  </tr>
+                  {group.fields.map((row) => {
+                    const fieldKey = `${date}::${group.issueType}::${row.field_name || ''}`;
+                    const isOpen = expanded.has(fieldKey);
+                    return (<>
+                      <tr
+                        key={fieldKey}
+                        onClick={() => toggleKey(fieldKey)}
+                        className="border-b border-dark-700/30 last:border-0 cursor-pointer hover:bg-dark-800/30"
+                      >
+                        <td className="pl-8 pr-4 py-2 text-dark-300">{row.field_name || '—'}</td>
+                        <td className="px-4 py-2 text-dark-300 text-right">{row.total}</td>
+                        <td className="px-4 py-2 text-right">
+                          <span className={row.unresolved > 0 ? 'text-amber-400' : 'text-dark-500'}>{row.unresolved}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className={row.total - row.unresolved > 0 ? 'text-emerald-400' : 'text-dark-500'}>{row.total - row.unresolved}</span>
+                        </td>
+                        <td className="px-2 py-2 text-dark-500">
+                          <ChevronRight size={14} className={`transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                        </td>
+                      </tr>
+                      {isOpen && <ExpandedRows date={date} issueType={group.issueType} fieldName={row.field_name} getToken={getToken} />}
+                    </>);
+                  })}
+                </>);
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDataQualityPage() {
   return (
     <AdminLayout>
@@ -191,6 +379,7 @@ export default function AdminDataQualityPage() {
 
 function AdminDataQualityContent() {
   const { getToken } = useAdminContext();
+  const [view, setView] = useState<'table' | 'summary'>('summary');
   const [items, setItems] = useState<AdminDataQualityRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -200,6 +389,7 @@ function AdminDataQualityContent() {
   const [resolvedFilter, setResolvedFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [detail, setDetail] = useState<AdminDataQualityDetail | null>(null);
+  const [summaryData, setSummaryData] = useState<DQSummaryRow[]>([]);
   const limit = 50;
 
   const fetchData = useCallback(async (p: number, s: string, o: string, rf: string) => {
@@ -219,9 +409,26 @@ function AdminDataQualityContent() {
     }
   }, [getToken]);
 
+  const fetchSummary = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const data = await getAdminDataQualitySummary(token);
+      setSummaryData(data || []);
+    } catch {
+      setSummaryData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
   useEffect(() => {
-    fetchData(1, sort, order, resolvedFilter);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (view === 'table') {
+      fetchData(1, sort, order, resolvedFilter);
+    } else {
+      fetchSummary();
+    }
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSort = (key: SortKey) => {
     const newOrder = sort === key && order === 'desc' ? 'asc' : 'desc';
@@ -258,25 +465,58 @@ function AdminDataQualityContent() {
     setDetail({ ...detail, resolved, resolution_note: note });
   };
 
+  const summaryTotal = summaryData.reduce((s, r) => s + r.total, 0);
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-dark-100">
-          Ingestion Data Quality <span className="text-dark-500 text-lg font-normal">({total})</span>
+          Ingestion Data Quality{' '}
+          <span className="text-dark-500 text-lg font-normal">
+            ({view === 'table' ? total : summaryTotal})
+          </span>
         </h1>
-        <select
-          value={resolvedFilter}
-          onChange={(e) => handleFilterChange(e.target.value)}
-          className="bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-1.5 text-sm text-dark-200 focus:outline-none focus:border-accent/50"
-        >
-          <option value="">All</option>
-          <option value="false">Unresolved</option>
-          <option value="true">Resolved</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-lg border border-dark-700/50 overflow-hidden">
+            <button
+              onClick={() => setView('summary')}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                view === 'summary'
+                  ? 'bg-dark-700/50 text-dark-100'
+                  : 'text-dark-400 hover:text-dark-200'
+              }`}
+            >
+              <BarChart3 size={14} /> Summary
+            </button>
+            <button
+              onClick={() => setView('table')}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                view === 'table'
+                  ? 'bg-dark-700/50 text-dark-100'
+                  : 'text-dark-400 hover:text-dark-200'
+              }`}
+            >
+              <Table size={14} /> Table
+            </button>
+          </div>
+          {view === 'table' && (
+            <select
+              value={resolvedFilter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              className="bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-1.5 text-sm text-dark-200 focus:outline-none focus:border-accent/50"
+            >
+              <option value="">All</option>
+              <option value="false">Unresolved</option>
+              <option value="true">Resolved</option>
+            </select>
+          )}
+        </div>
       </div>
 
-      {loading && !items.length ? (
+      {loading && !items.length && !summaryData.length ? (
         <div className="flex items-center justify-center py-20 text-dark-500 text-sm">Loading...</div>
+      ) : view === 'summary' ? (
+        <SummaryView data={summaryData} getToken={getToken} />
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-dark-700/50">

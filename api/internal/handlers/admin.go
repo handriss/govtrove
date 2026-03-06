@@ -280,32 +280,45 @@ func (h *AdminHandler) GetApiKeyUsage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func parseDQListParams(r *http.Request) (page, limit int, sort, order string, resolved *bool) {
-	page = 1
+type dqFilters struct {
+	Page         int
+	Limit        int
+	Sort         string
+	Order        string
+	Resolved     *bool
+	SnapshotDate string
+	IssueType    string
+	FieldName    string
+}
+
+func parseDQListParams(r *http.Request) dqFilters {
+	f := dqFilters{Page: 1, Limit: 50}
 	if p := r.URL.Query().Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
+			f.Page = v
 		}
 	}
-	limit = 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
-			limit = v
+			f.Limit = v
 		}
 	}
-	sort = r.URL.Query().Get("sort")
-	order = r.URL.Query().Get("order")
+	f.Sort = r.URL.Query().Get("sort")
+	f.Order = r.URL.Query().Get("order")
 	if rv := r.URL.Query().Get("resolved"); rv != "" {
 		b := rv == "true"
-		resolved = &b
+		f.Resolved = &b
 	}
-	return
+	f.SnapshotDate = r.URL.Query().Get("snapshot_date")
+	f.IssueType = r.URL.Query().Get("issue_type")
+	f.FieldName = r.URL.Query().Get("field_name")
+	return f
 }
 
 func (h *AdminHandler) ListDataQualityIssues(w http.ResponseWriter, r *http.Request) {
-	page, limit, sort, order, resolved := parseDQListParams(r)
+	f := parseDQListParams(r)
 
-	items, total, err := h.pipelineRepo.ListDataQualityIssues(r.Context(), page, limit, sort, order, resolved)
+	items, total, err := h.pipelineRepo.ListDataQualityIssues(r.Context(), f.Page, f.Limit, f.Sort, f.Order, f.Resolved, f.SnapshotDate, f.IssueType, f.FieldName)
 	if err != nil {
 		h.logger.Error("list data quality issues failed", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -316,9 +329,23 @@ func (h *AdminHandler) ListDataQualityIssues(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]any{
 		"items": items,
 		"total": total,
-		"page":  page,
-		"limit": limit,
+		"page":  f.Page,
+		"limit": f.Limit,
 	})
+}
+
+func (h *AdminHandler) DataQualitySummary(w http.ResponseWriter, r *http.Request) {
+	items, err := h.pipelineRepo.DataQualitySummary(r.Context())
+	if err != nil {
+		h.logger.Error("data quality summary failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if items == nil {
+		items = []repository.DQSummaryRow{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
 }
 
 func (h *AdminHandler) GetDataQualityDetail(w http.ResponseWriter, r *http.Request) {
@@ -365,9 +392,9 @@ func (h *AdminHandler) UpdateDataQualityResolution(w http.ResponseWriter, r *htt
 }
 
 func (h *AdminHandler) ListReconcileDQIssues(w http.ResponseWriter, r *http.Request) {
-	page, limit, sort, order, resolved := parseDQListParams(r)
+	f := parseDQListParams(r)
 
-	items, total, err := h.pipelineRepo.ListReconcileDQIssues(r.Context(), page, limit, sort, order, resolved)
+	items, total, err := h.pipelineRepo.ListReconcileDQIssues(r.Context(), f.Page, f.Limit, f.Sort, f.Order, f.Resolved, f.SnapshotDate, f.IssueType, f.FieldName)
 	if err != nil {
 		h.logger.Error("list reconcile dq issues failed", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -378,9 +405,23 @@ func (h *AdminHandler) ListReconcileDQIssues(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(map[string]any{
 		"items": items,
 		"total": total,
-		"page":  page,
-		"limit": limit,
+		"page":  f.Page,
+		"limit": f.Limit,
 	})
+}
+
+func (h *AdminHandler) ReconcileDQSummary(w http.ResponseWriter, r *http.Request) {
+	items, err := h.pipelineRepo.ReconcileDQSummary(r.Context())
+	if err != nil {
+		h.logger.Error("reconcile dq summary failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if items == nil {
+		items = []repository.DQSummaryRow{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(items)
 }
 
 func (h *AdminHandler) GetReconcileDQDetail(w http.ResponseWriter, r *http.Request) {
