@@ -10,6 +10,7 @@ import {
   Mail,
   ExternalLink,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { createAccountRequest, getEmailPreferences, updateEmailPreferences, createCheckoutSession, createPortalSession } from '../services/api';
@@ -229,45 +230,69 @@ export default function ProfilePage() {
           <h2 className="text-sm font-medium text-dark-300 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Mail size={14} strokeWidth={1.5} />
             Email Notifications
+            {plan !== 'pro' && (
+              <span className="text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded uppercase tracking-wide">Pro</span>
+            )}
           </h2>
-          <p className="text-xs text-dark-500 mb-4">Manage which emails you receive from GovTrove.</p>
-          {prefsLoading ? (
-            <div className="text-dark-500 text-sm py-4 text-center">Loading...</div>
-          ) : (
-            <div className="space-y-3">
-              <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
+          {plan !== 'pro' ? (
+            <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-5">
+              <div className="flex items-start gap-3">
+                <Lock size={16} className="text-dark-500 mt-0.5 shrink-0" />
                 <div>
-                  <h3 className="text-sm font-medium text-dark-200">Saved Search Alerts</h3>
-                  <p className="text-xs text-dark-500 mt-0.5">Get notified when new opportunities match your saved searches.</p>
+                  <p className="text-sm text-dark-300">Upgrade to Pro to receive daily email alerts when new opportunities match your saved searches.</p>
+                  <button
+                    onClick={() => handleBilling('checkout')}
+                    disabled={billingLoading}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
+                               border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
+                               transition-all duration-200 disabled:opacity-50"
+                  >
+                    {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
+                    Upgrade to Pro
+                  </button>
                 </div>
-                <button
-                  onClick={() => togglePref('search_alerts', !searchAlerts)}
-                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                    searchAlerts ? 'bg-accent' : 'bg-dark-700'
-                  }`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                    searchAlerts ? 'translate-x-5' : ''
-                  }`} />
-                </button>
-              </div>
-              <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-dark-200">Opportunity Change Alerts</h3>
-                  <p className="text-xs text-dark-500 mt-0.5">Get notified when a saved opportunity is amended or changed.</p>
-                </div>
-                <button
-                  onClick={() => togglePref('opportunity_alerts', !opportunityAlerts)}
-                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
-                    opportunityAlerts ? 'bg-accent' : 'bg-dark-700'
-                  }`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                    opportunityAlerts ? 'translate-x-5' : ''
-                  }`} />
-                </button>
               </div>
             </div>
+          ) : prefsLoading ? (
+            <div className="text-dark-500 text-sm py-4 text-center">Loading...</div>
+          ) : (
+            <>
+              <p className="text-xs text-dark-500 mb-4">Manage which emails you receive from GovTrove.</p>
+              <div className="space-y-3">
+                <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-dark-200">Saved Search Alerts</h3>
+                    <p className="text-xs text-dark-500 mt-0.5">Get notified when new opportunities match your saved searches.</p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('search_alerts', !searchAlerts)}
+                    className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                      searchAlerts ? 'bg-accent' : 'bg-dark-700'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      searchAlerts ? 'translate-x-5' : ''
+                    }`} />
+                  </button>
+                </div>
+                <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-dark-200">Opportunity Change Alerts</h3>
+                    <p className="text-xs text-dark-500 mt-0.5">Get notified when a saved opportunity is amended or changed.</p>
+                  </div>
+                  <button
+                    onClick={() => togglePref('opportunity_alerts', !opportunityAlerts)}
+                    className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${
+                      opportunityAlerts ? 'bg-accent' : 'bg-dark-700'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      opportunityAlerts ? 'translate-x-5' : ''
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

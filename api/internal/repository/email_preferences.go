@@ -71,7 +71,7 @@ func (r *EmailPreferencesRepository) Upsert(ctx context.Context, userID int, sea
 
 func (r *EmailPreferencesRepository) CreateDefaults(ctx context.Context, userID int) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO email_preferences (user_id, search_alerts, opportunity_alerts) VALUES ($1, false, false) ON CONFLICT (user_id) DO NOTHING`,
+		`INSERT INTO email_preferences (user_id, search_alerts, opportunity_alerts) VALUES ($1, true, true) ON CONFLICT (user_id) DO NOTHING`,
 		userID,
 	)
 	if err != nil {
