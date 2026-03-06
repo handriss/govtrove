@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Bookmark, X } from 'lucide-react';
+import { Clock, Bookmark, X, ChevronDown } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import QuickFilterChips from '../components/QuickFilterChips';
 import { FilterBar, SearchResults } from '../components/search';
@@ -30,7 +30,9 @@ export default function SimpleSearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
+  const [savedSearchesOpen, setSavedSearchesOpen] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const savedSearchesRef = useRef<HTMLDivElement>(null);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +51,18 @@ export default function SimpleSearchPage() {
     const stored = localStorage.getItem(PAGE_SIZE_KEY);
     return stored ? parseInt(stored, 10) : 25;
   });
+
+  // Close saved searches dropdown on click outside
+  useEffect(() => {
+    if (!savedSearchesOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (savedSearchesRef.current && !savedSearchesRef.current.contains(e.target as Node)) {
+        setSavedSearchesOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [savedSearchesOpen]);
 
   // "/" keyboard shortcut to focus search
   useEffect(() => {
@@ -273,29 +287,57 @@ export default function SimpleSearchPage() {
             onMobileFiltersOpen={() => setMobileFiltersOpen(true)}
           />
 
-          {/* Saved search pills + save button */}
+          {/* Saved searches dropdown + save button */}
           {(savedSearches.length > 0 || hasActiveFilters) && (
             <div className="flex items-center gap-2 mb-3">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 min-w-0">
-                {savedSearches.map((ss) => (
+              {savedSearches.length > 0 && (
+                <div className="relative" ref={savedSearchesRef}>
                   <button
-                    key={ss.id}
-                    onClick={() => handleSavedSearchClick(ss.filters)}
-                    className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
-                               border border-dark-700/50 bg-dark-800/30 text-dark-300
-                               hover:border-dark-600/50 hover:text-dark-100 transition-all whitespace-nowrap shrink-0"
+                    onClick={() => setSavedSearchesOpen(!savedSearchesOpen)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
+                               border transition-all whitespace-nowrap ${
+                               savedSearchesOpen
+                                 ? 'border-dark-600/50 bg-dark-800/50 text-dark-100'
+                                 : 'border-dark-700/50 bg-dark-800/30 text-dark-300 hover:border-dark-600/50 hover:text-dark-100'
+                               }`}
                   >
-                    {ss.name}
-                    <span
-                      role="button"
-                      onClick={(e) => { e.stopPropagation(); deleteSearch(ss.id); }}
-                      className="opacity-0 group-hover:opacity-100 text-dark-500 hover:text-red-400 transition-opacity"
-                    >
-                      <X size={12} />
-                    </span>
+                    <Bookmark size={12} />
+                    Saved Searches
+                    <span className="text-dark-500 tabular-nums">({savedSearches.length})</span>
+                    <ChevronDown size={12} className={`transition-transform ${savedSearchesOpen ? 'rotate-180' : ''}`} />
                   </button>
-                ))}
-              </div>
+                  {savedSearchesOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-72 bg-dark-900 border border-dark-700/50 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {savedSearches.map((ss) => (
+                          <button
+                            key={ss.id}
+                            onClick={() => { handleSavedSearchClick(ss.filters); setSavedSearchesOpen(false); }}
+                            className="group w-full flex items-center gap-2 px-3 py-2 text-left
+                                       hover:bg-dark-800/50 transition-colors"
+                          >
+                            <span className="flex-1 min-w-0 text-sm text-dark-300 group-hover:text-dark-100 truncate">
+                              {ss.name}
+                            </span>
+                            {ss.last_match_count > 0 && (
+                              <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full shrink-0">
+                                +{ss.last_match_count}
+                              </span>
+                            )}
+                            <span
+                              role="button"
+                              onClick={(e) => { e.stopPropagation(); deleteSearch(ss.id); }}
+                              className="opacity-0 group-hover:opacity-100 text-dark-600 hover:text-red-400 transition-all p-0.5 shrink-0"
+                            >
+                              <X size={12} />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {isAuthenticated && hasActiveFilters && (
                 <div className="relative shrink-0">
                   <button
