@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
-  getAdminSnapCSVRecord,
-  getAdminSnapArchivedCSVRecord,
-  getAdminSnapAPIRecord,
+  getSnapCSVRecord,
+  getSnapArchivedCSVRecord,
+  getSnapAPIRecord,
   type SnapCSVRecord,
   type SnapAPIRecord,
 } from '../services/api';
@@ -18,10 +17,10 @@ const SOURCE_LABELS: Record<SnapSource, { label: string; color: string }> = {
   api: { label: 'API', color: 'bg-blue-500/15 border-blue-500/30 text-blue-400' },
 };
 
-function formatDateTime(dateStr: string | null | undefined) {
+function formatDateTimeUTC(dateStr: string | null | undefined) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
 }
 
 function InfoRow({ label, value }: { label: string; value: string | number | boolean | null | undefined }) {
@@ -36,7 +35,6 @@ function InfoRow({ label, value }: { label: string; value: string | number | boo
 
 function DetailContent({ source }: { source: SnapSource }) {
   const { id } = useParams<{ id: string }>();
-  const { getToken } = useAdminContext();
   const [csvData, setCsvData] = useState<SnapCSVRecord | null>(null);
   const [apiData, setApiData] = useState<SnapAPIRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,16 +46,15 @@ function DetailContent({ source }: { source: SnapSource }) {
     setLoading(true);
     (async () => {
       try {
-        const token = await getToken();
         const numId = Number(id);
         if (source === 'csv') {
-          const res = await getAdminSnapCSVRecord(token, numId);
+          const res = await getSnapCSVRecord(numId);
           if (!cancelled) setCsvData(res);
         } else if (source === 'archived-csv') {
-          const res = await getAdminSnapArchivedCSVRecord(token, numId);
+          const res = await getSnapArchivedCSVRecord(numId);
           if (!cancelled) setCsvData(res);
         } else {
-          const res = await getAdminSnapAPIRecord(token, numId);
+          const res = await getSnapAPIRecord(numId);
           if (!cancelled) setApiData(res);
         }
       } catch (e) {
@@ -67,7 +64,7 @@ function DetailContent({ source }: { source: SnapSource }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, source, getToken]);
+  }, [id, source]);
 
   if (loading) {
     return <p className="text-dark-400 text-sm py-12 text-center">Loading...</p>;
@@ -77,7 +74,7 @@ function DetailContent({ source }: { source: SnapSource }) {
     return (
       <div className="py-12 text-center">
         <p className="text-red-400 text-sm">{error === '404' ? 'Record not found.' : `Error: ${error}`}</p>
-        <Link to="/admin" className="text-accent text-sm mt-2 inline-block hover:underline">Back to Admin</Link>
+        <Link to="/" className="text-accent text-sm mt-2 inline-block hover:underline">Back to search</Link>
       </div>
     );
   }
@@ -88,7 +85,7 @@ function DetailContent({ source }: { source: SnapSource }) {
     return (
       <div className="py-12 text-center">
         <p className="text-red-400 text-sm">Record not found.</p>
-        <Link to="/admin" className="text-accent text-sm mt-2 inline-block hover:underline">Back to Admin</Link>
+        <Link to="/" className="text-accent text-sm mt-2 inline-block hover:underline">Back to search</Link>
       </div>
     );
   }
@@ -102,9 +99,9 @@ function DetailContent({ source }: { source: SnapSource }) {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Link to="/admin" className="inline-flex items-center gap-1 text-sm text-dark-400 hover:text-accent transition-colors mb-4">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-dark-400 hover:text-accent transition-colors mb-4">
           <ChevronLeft size={14} />
-          Admin
+          Search
         </Link>
 
         <div className="flex items-center gap-3 mb-2">
@@ -114,7 +111,7 @@ function DetailContent({ source }: { source: SnapSource }) {
 
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-dark-400">
           <span>Notice: <code className="text-dark-300">{noticeId}</code></span>
-          <span>Snapshot: {formatDateTime(snapshotDate)}</span>
+          <span>Snapshot: {formatDateTimeUTC(snapshotDate)}</span>
         </div>
       </div>
 
@@ -124,9 +121,9 @@ function DetailContent({ source }: { source: SnapSource }) {
         <InfoRow label="Record ID" value={record.id} />
         <InfoRow label="Run ID" value={isCSV ? (record as SnapCSVRecord).run_id : (record as SnapAPIRecord).run_id} />
         <InfoRow label="Content Hash" value={isCSV ? (record as SnapCSVRecord).content_hash : (record as SnapAPIRecord).content_hash} />
-        <InfoRow label="Snapshot Date" value={formatDateTime(snapshotDate)} />
+        <InfoRow label="Snapshot Date" value={formatDateTimeUTC(snapshotDate)} />
         {isCSV && <InfoRow label="Download ID" value={(record as SnapCSVRecord).download_id} />}
-        <InfoRow label="Created At" value={formatDateTime(isCSV ? (record as SnapCSVRecord).created_at : (record as SnapAPIRecord).created_at)} />
+        <InfoRow label="Created At" value={formatDateTimeUTC(isCSV ? (record as SnapCSVRecord).created_at : (record as SnapAPIRecord).created_at)} />
       </div>
 
       {/* Parsed Fields (CSV only) */}
@@ -141,8 +138,8 @@ function DetailContent({ source }: { source: SnapSource }) {
                 <InfoRow label="Title" value={csv.title} />
                 <InfoRow label="Type" value={csv.type} />
                 <InfoRow label="Base Type" value={csv.base_type} />
-                <InfoRow label="Posted Date" value={formatDateTime(csv.posted_date)} />
-                <InfoRow label="Response Deadline" value={formatDateTime(csv.response_deadline)} />
+                <InfoRow label="Posted Date" value={formatDateTimeUTC(csv.posted_date)} />
+                <InfoRow label="Response Deadline" value={formatDateTimeUTC(csv.response_deadline)} />
                 <InfoRow label="Archive Date" value={csv.archive_date} />
                 <InfoRow label="Archive Type" value={csv.archive_type} />
                 <InfoRow label="Set-Aside Code" value={csv.set_aside_code} />
@@ -175,12 +172,13 @@ function DetailContent({ source }: { source: SnapSource }) {
   );
 }
 
-export default function AdminSnapDetailPage({ source }: { source: SnapSource }) {
+export default function SnapDetailPage({ source }: { source: SnapSource }) {
   return (
-    <AdminLayout>
-      <div className="p-6">
+    <div className="min-h-screen relative">
+      <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
+      <div className="relative z-10 max-w-4xl mx-auto px-6 pt-10 pb-10">
         <DetailContent source={source} />
       </div>
-    </AdminLayout>
+    </div>
   );
 }

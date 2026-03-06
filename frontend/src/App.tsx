@@ -19,7 +19,7 @@ const AdminPipelineRunDetailPage = lazy(() => import('./pages/AdminPipelineRunDe
 const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
 const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
 const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
-const AdminSnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
+const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -101,9 +101,9 @@ function AppRoutes() {
           <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
           <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
           <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
-          <Route path="/admin/snap/csv/:id" element={<AdminSnapDetailPage source="csv" />} />
-          <Route path="/admin/snap/archived-csv/:id" element={<AdminSnapDetailPage source="archived-csv" />} />
-          <Route path="/admin/snap/api/:id" element={<AdminSnapDetailPage source="api" />} />
+          <Route path="/snap/csv/:id" element={<SnapDetailPage source="csv" />} />
+          <Route path="/snap/archived-csv/:id" element={<SnapDetailPage source="archived-csv" />} />
+          <Route path="/snap/api/:id" element={<SnapDetailPage source="api" />} />
           {/* Standalone routes — no layout */}
           <Route path="/callback" element={<AuthCallback />} />
           <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />

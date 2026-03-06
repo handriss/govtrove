@@ -1084,26 +1084,20 @@ export interface SnapAPIRecord {
   created_at: string;
 }
 
-export async function getAdminSnapCSVRecord(token: string, id: number): Promise<SnapCSVRecord> {
-  const response = await fetch(`${API_BASE}/admin/snap/csv/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function getSnapCSVRecord(id: number): Promise<SnapCSVRecord> {
+  const response = await fetch(`${API_BASE}/snap/csv/${id}`);
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
 }
 
-export async function getAdminSnapArchivedCSVRecord(token: string, id: number): Promise<SnapCSVRecord> {
-  const response = await fetch(`${API_BASE}/admin/snap/archived-csv/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function getSnapArchivedCSVRecord(id: number): Promise<SnapCSVRecord> {
+  const response = await fetch(`${API_BASE}/snap/archived-csv/${id}`);
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
 }
 
-export async function getAdminSnapAPIRecord(token: string, id: number): Promise<SnapAPIRecord> {
-  const response = await fetch(`${API_BASE}/admin/snap/api/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function getSnapAPIRecord(id: number): Promise<SnapAPIRecord> {
+  const response = await fetch(`${API_BASE}/snap/api/${id}`);
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
 }
