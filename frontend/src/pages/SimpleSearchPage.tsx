@@ -180,7 +180,13 @@ export default function SimpleSearchPage() {
   }, [saveSearchName, fs.filters, saveCurrentSearch]);
 
   const handleSavedSearchClick = useCallback((filters: Record<string, unknown>) => {
-    fs.setFilters(filters as Partial<typeof fs.filters>);
+    const normalized = { ...filters };
+    // Legacy saved searches stored agency as `department` string — normalize to `agency` array
+    if (!normalized.agency && normalized.department) {
+      normalized.agency = [String(normalized.department)];
+      delete normalized.department;
+    }
+    fs.setFilters(normalized as Partial<typeof fs.filters>);
   }, [fs]);
 
   const showResults = hasSearched || results.length > 0;
