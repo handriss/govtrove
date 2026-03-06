@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import {
   Search, TreePine, Tag, ShieldCheck, Building2, CalendarClock,
   FileText, ToggleRight, SlidersHorizontal, ArrowUpDown, Bookmark,
-  Layers, ArrowRight, BookOpen,
+  Layers, ArrowRight, BookOpen, Star,
 } from 'lucide-react';
+import { useAppAuth } from '../contexts/AuthContext';
 
 interface GuideSection {
   id: string;
@@ -104,7 +105,14 @@ const sections: GuideSection[] = [
     icon: Bookmark,
     title: 'Saved Searches',
     description:
-      'Sign in to save filter combinations you use often. Saved searches appear as quick-access pills above your results.',
+      'Save filter combinations you use often. Saved searches appear as quick-access pills above your results so you can re-run them with one click. Saving searches is free — create an account to get started. Pro users can also enable email alerts on saved searches to get notified when new matches appear.',
+  },
+  {
+    id: 'saved-opportunities',
+    icon: Star,
+    title: 'Saved Opportunities',
+    description:
+      'Bookmark individual opportunities by clicking the star icon on any search result or detail page. Access all your saved opportunities from the Saved page in the sidebar. You can also add private notes to any saved opportunity to track your bid progress or key details.',
   },
   {
     id: 'combining',
@@ -118,6 +126,8 @@ const sections: GuideSection[] = [
 ];
 
 export default function SearchGuidePage() {
+  const { isAuthenticated, signUp } = useAppAuth();
+
   return (
     <div className="min-h-screen relative">
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
@@ -185,6 +195,24 @@ export default function SearchGuidePage() {
             );
           })}
         </div>
+
+        {/* CTA for anonymous users */}
+        {!isAuthenticated && (
+          <div className="mt-10 rounded-xl border border-accent/20 bg-accent/5 p-6 text-center">
+            <h3 className="text-base font-semibold text-dark-100 mb-2">
+              Ready to save your searches?
+            </h3>
+            <p className="text-sm text-dark-400 mb-4 max-w-md mx-auto">
+              Create a free account to bookmark opportunities, save searches, and pick up right where you left off.
+            </p>
+            <button
+              onClick={() => signUp()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-hover text-white font-medium rounded-xl transition-all duration-200 text-sm"
+            >
+              Sign Up Free
+            </button>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="mt-12 text-center">

@@ -5,6 +5,8 @@ import SearchInput from '../components/SearchInput';
 import QuickFilterChips from '../components/QuickFilterChips';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
+import SignupPromptModal, { type SignupPromptContext } from '../components/SignupPromptModal';
+import SignupNudgeBanner, { incrementAnonSearchCount } from '../components/SignupNudgeBanner';
 import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
 import { useFilterState } from '../hooks/useFilterState';
 import { useFacetCounts } from '../hooks/useFacetCounts';
@@ -27,6 +29,7 @@ export default function SimpleSearchPage() {
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
@@ -116,6 +119,7 @@ export default function SimpleSearchPage() {
     search(params);
     setHasSearched(true);
     isInitialSearch.current = false;
+    if (!isAuthenticated) incrementAnonSearchCount();
   }, [debouncedAutoSearch, searchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial search on mount if URL has filters
@@ -270,7 +274,7 @@ export default function SimpleSearchPage() {
           />
 
           {/* Saved search pills + save button */}
-          {(savedSearches.length > 0 || (isAuthenticated && hasActiveFilters)) && (
+          {(savedSearches.length > 0 || hasActiveFilters) && (
             <div className="flex items-center gap-2 mb-3">
               <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 min-w-0">
                 {savedSearches.map((ss) => (
@@ -297,8 +301,8 @@ export default function SimpleSearchPage() {
                   <button
                     onClick={() => setSaveSearchOpen(!saveSearchOpen)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs
-                               border border-dark-600/50 text-dark-400
-                               hover:border-dark-500/50 hover:text-dark-200 transition-all whitespace-nowrap"
+                               border border-accent/30 bg-accent/10 text-accent
+                               hover:bg-accent/20 transition-all whitespace-nowrap"
                     title="Save current search"
                   >
                     <Bookmark size={12} />
@@ -337,12 +341,20 @@ export default function SimpleSearchPage() {
                 </div>
               )}
               {!isAuthenticated && hasActiveFilters && (
-                <span className="text-xs text-dark-600 whitespace-nowrap shrink-0" title="Sign in to save searches">
-                  Sign in to save searches
-                </span>
+                <button
+                  onClick={() => setSignupPrompt('save-search')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs shrink-0
+                             border border-accent/30 bg-accent/10 text-accent
+                             hover:bg-accent/20 transition-all whitespace-nowrap"
+                >
+                  <Bookmark size={12} />
+                  Save Search
+                </button>
               )}
             </div>
           )}
+
+          <SignupNudgeBanner />
 
           <SearchResults
             results={results}
@@ -367,6 +379,7 @@ export default function SimpleSearchPage() {
             clearAllFilters={fs.clearAllFilters}
             error={error}
             onRetry={handleSubmit}
+            isAuthenticated={isAuthenticated}
           />
           <SearchMobileFilters
             open={mobileFiltersOpen}
@@ -381,6 +394,10 @@ export default function SimpleSearchPage() {
             total={facetTotal || total}
           />
         </div>
+      )}
+
+      {signupPrompt && (
+        <SignupPromptModal context={signupPrompt} onClose={() => setSignupPrompt(null)} />
       )}
     </div>
   );

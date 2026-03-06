@@ -8,7 +8,6 @@ import {
 } from '../services/api';
 
 const STORAGE_KEY = 'govtrove_saved_opportunities';
-const MAX_SAVED = 500;
 
 function loadFromStorage(): Set<number> {
   try {
@@ -22,12 +21,6 @@ function loadFromStorage(): Set<number> {
   }
 }
 
-function persistToStorage(ids: Set<number>) {
-  const arr = [...ids];
-  const trimmed = arr.length > MAX_SAVED ? arr.slice(arr.length - MAX_SAVED) : arr;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-}
-
 export interface UseSavedOpportunitiesReturn {
   savedIds: Set<number>;
   isSaved: (id: number) => boolean;
@@ -38,7 +31,7 @@ export interface UseSavedOpportunitiesReturn {
 
 export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
   const { isAuthenticated, getAccessToken } = useAppAuth();
-  const [savedIds, setSavedIds] = useState(loadFromStorage);
+  const [savedIds, setSavedIds] = useState<Set<number>>(() => new Set());
   const migratedRef = useRef(false);
   const fetchedRef = useRef(false);
 
@@ -47,7 +40,7 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
     if (!isAuthenticated) {
       fetchedRef.current = false;
       migratedRef.current = false;
-      setSavedIds(loadFromStorage());
+      setSavedIds(new Set());
       return;
     }
 
@@ -88,16 +81,6 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
     return () => { cancelled = true; };
   }, [isAuthenticated, getAccessToken]);
 
-  // Sync across tabs (anonymous only)
-  useEffect(() => {
-    if (isAuthenticated) return;
-    function onStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) setSavedIds(loadFromStorage());
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [isAuthenticated]);
-
   const isSaved = useCallback((id: number) => savedIds.has(id), [savedIds]);
 
   const toggleSave = useCallback((id: number) => {
@@ -111,7 +94,6 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
         getAccessToken().then((token) => {
           const fn = removing ? unsaveOpportunity : saveOpportunity;
           fn(token, id).catch(() => {
-            // Revert on failure
             setSavedIds((curr) => {
               const reverted = new Set(curr);
               if (removing) reverted.add(id);
@@ -120,8 +102,6 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
             });
           });
         });
-      } else {
-        persistToStorage(next);
       }
 
       return next;
@@ -137,8 +117,6 @@ export function useSavedOpportunities(): UseSavedOpportunitiesReturn {
         getAccessToken().then((token) => {
           bulkSaveOpportunities(token, ids).catch(() => {});
         });
-      } else {
-        persistToStorage(next);
       }
 
       return next;

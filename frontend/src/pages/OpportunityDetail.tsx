@@ -19,10 +19,14 @@ import {
   AlignLeft,
   Pilcrow,
   GitBranch,
+  Star,
 } from 'lucide-react';
 import { getOpportunity, getSolicitationHistory } from '../services/api';
 import { formatDescription } from '../utils/formatDescription';
 import SolicitationTimeline from '../components/SolicitationTimeline';
+import SignupPromptModal from '../components/SignupPromptModal';
+import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
+import { useAppAuth } from '../contexts/AuthContext';
 import type { Opportunity, SolicitationHistory } from '../types/api';
 
 const typeLabels: Record<string, string> = {
@@ -194,10 +198,13 @@ function ContactCard({
 
 export default function OpportunityDetail() {
   const { id } = useParams();
+  const { isAuthenticated } = useAppAuth();
+  const { isSaved, toggleSave } = useSavedOpportunities();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [formatted, setFormatted] = useState(() => localStorage.getItem('govtrove_format_desc') !== 'false');
   const [history, setHistory] = useState<SolicitationHistory | null>(null);
 
@@ -345,6 +352,20 @@ export default function OpportunityDetail() {
             >
               {copied ? <Check size={16} strokeWidth={1.5} /> : <Copy size={16} strokeWidth={1.5} />}
               {copied ? 'Copied' : 'Copy Link'}
+            </button>
+            <button
+              onClick={() => {
+                if (!isAuthenticated) { setShowSignupPrompt(true); return; }
+                toggleSave(opportunity.id);
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-medium ${
+                isSaved(opportunity.id)
+                  ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-400'
+                  : 'border-dark-700/50 bg-dark-800/30 text-dark-300 hover:text-dark-100 hover:border-dark-600/50 hover:bg-dark-800/50'
+              }`}
+            >
+              <Star size={16} strokeWidth={1.5} className={isSaved(opportunity.id) ? 'fill-yellow-400' : ''} />
+              {isSaved(opportunity.id) ? 'Saved' : 'Save'}
             </button>
           </div>
         </div>
@@ -561,6 +582,10 @@ export default function OpportunityDetail() {
           </div>
         </div>
       </div>
+
+      {showSignupPrompt && (
+        <SignupPromptModal context="bookmark" onClose={() => setShowSignupPrompt(false)} />
+      )}
     </div>
   );
 }
