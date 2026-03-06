@@ -496,6 +496,15 @@
             font-size: 1.0625rem;
         }
 
+        .hero-comparison {
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         /* ===== Mockup Styles ===== */
         .mockup-section {
             padding: 0 0 var(--section-padding);
@@ -1158,7 +1167,7 @@
           "name": "Is GovTrove free?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes, the core search is free with no account required. You can search, filter, and view opportunities immediately. We may introduce optional Pro features in the future."
+            "text": "Yes, the core search is completely free — no account required. You can search, filter, and view all 100,000+ opportunities immediately. Pro is available for $30/month and adds saved searches, email alerts, and daily digest notifications."
           }
         },
         {
@@ -1192,6 +1201,31 @@
             "@type": "Answer",
             "text": "No. You can search immediately without creating an account. An account is only needed if you want to save opportunities or set up email alerts."
           }
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "GovTrove",
+      "applicationCategory": "BusinessApplication",
+      "description": "Federal contract opportunity search for small businesses. Search 100,000+ SAM.gov opportunities with boolean search, smart filters, and deadline tracking.",
+      "url": "https://govtrove.com",
+      "operatingSystem": "Web",
+      "offers": [
+        {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free tier — search, filter, and view opportunities"
+        },
+        {
+          "@type": "Offer",
+          "price": "30.00",
+          "priceCurrency": "USD",
+          "description": "Pro — saved searches, email alerts, daily digests"
         }
       ]
     }
@@ -1248,6 +1282,7 @@
             <p class="hero-stats">
                 <span class="hero-stats-number">100,000+</span> active opportunities from SAM.gov, updated daily
             </p>
+            <p class="hero-comparison">GovTrove is a federal contract search platform for small businesses — search 100,000+ SAM.gov opportunities for free, or upgrade to Pro for $30/month. Enterprise alternatives like GovWin IQ and Deltek cost $6,000–$50,000/year.</p>
         </div>
     </section>
 

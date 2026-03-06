@@ -1,0 +1,19 @@
+# GovTrove
+
+> GovTrove is a federal contract opportunity search platform for small businesses, built on SAM.gov public data. It offers boolean search, smart filters, deadline tracking, and set-aside matching across 100,000+ active opportunities.
+
+## Key Pages
+- [Homepage](https://govtrove.com)
+- [Pricing](https://govtrove.com/pricing.html)
+- [Search Opportunities](https://app.govtrove.com)
+
+## Blog
+- [SAM.gov Search Tips](https://govtrove.com/blog/sam-gov-search-tips.html)
+- [NAICS Codes Explained](https://govtrove.com/blog/naics-codes-explained.html)
+- [Boolean Search & Quoted Phrases](https://govtrove.com/blog/boolean-search-quoted-phrases.html)
+- [SAM.gov Data Services: CSV & API](https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html)
+- [Understanding Set-Asides](https://govtrove.com/blog/understanding-set-asides.html)
+- [SAM.gov Foreign Entity Registration](https://govtrove.com/blog/sam-gov-foreign-entity-registration.html)
+
+## Contact
+- [Contact / Feedback](https://govtrove.com/contact.html)
