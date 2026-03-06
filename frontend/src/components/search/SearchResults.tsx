@@ -497,7 +497,7 @@ function BulkActionBar({
     <div
       role="toolbar"
       aria-label="Bulk actions for selected opportunities"
-      className="fixed bottom-0 left-0 right-0 z-50 bg-dark-900/95 border-t border-dark-700/50
+      className="fixed bottom-16 md:bottom-0 left-0 right-0 z-50 bg-dark-900/95 border-t border-dark-700/50
         backdrop-blur-sm shadow-2xl shadow-black/50 animate-in slide-in-from-bottom duration-200"
     >
       <div className="max-w-[1400px] mx-auto px-6 py-3 flex items-center justify-between gap-4">

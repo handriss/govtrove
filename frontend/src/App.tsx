@@ -7,7 +7,7 @@ import SimpleSearchPage from './pages/SimpleSearchPage';
 import NotFoundPage from './pages/NotFoundPage';
 import useUTMCapture from './hooks/useUTMCapture';
 import useTawk from './hooks/useTawk';
-import Footer from './components/Footer';
+import AppLayout from './components/AppLayout';
 
 const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage'));
 const OpportunityDetail = lazy(() => import('./pages/OpportunityDetail'));
@@ -19,6 +19,7 @@ const AdminPipelineRunDetailPage = lazy(() => import('./pages/AdminPipelineRunDe
 const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
 const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
 const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
+const AdminSnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -84,25 +85,32 @@ function AppRoutes() {
     <ErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
         <Routes>
-          <Route path="/" element={<SimpleSearchPage />} />
-          <Route path="/whats-new" element={<WhatsNewPage />} />
-          <Route path="/opportunity/:id" element={<OpportunityDetail />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/saved" element={<SavedPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          {/* App routes with sidebar/tab bar layout */}
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<SimpleSearchPage />} />
+            <Route path="/whats-new" element={<WhatsNewPage />} />
+            <Route path="/opportunity/:id" element={<OpportunityDetail />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/saved" element={<SavedPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+          {/* Admin routes — keep AdminLayout */}
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/pipeline/:id" element={<AdminPipelineRunDetailPage />} />
           <Route path="/admin/data-quality" element={<AdminDataQualityPage />} />
           <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
           <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
+          <Route path="/admin/snap/csv/:id" element={<AdminSnapDetailPage source="csv" />} />
+          <Route path="/admin/snap/archived-csv/:id" element={<AdminSnapDetailPage source="archived-csv" />} />
+          <Route path="/admin/snap/api/:id" element={<AdminSnapDetailPage source="api" />} />
+          {/* Standalone routes — no layout */}
           <Route path="/callback" element={<AuthCallback />} />
           <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
           <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
           <Route path="/contact" element={<ExternalRedirect to="https://govtrove.com/contact.html" />} />
-          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
-      <Footer />
     </ErrorBoundary>
   );
 }

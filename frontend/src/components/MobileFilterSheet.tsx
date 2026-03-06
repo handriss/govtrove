@@ -89,7 +89,7 @@ export default function MobileFilterSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-40
+        className="md:hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-40
                    flex items-center gap-2 px-5 py-3 rounded-full
                    bg-dark-800 border border-dark-700/50 shadow-2xl shadow-black/50
                    text-sm text-dark-200 active:bg-dark-700 transition-colors"

@@ -281,22 +281,14 @@ export default function OpportunityDetail() {
       {/* Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
 
-      {/* Header */}
-      <header className="relative z-20 border-b border-dark-800/50 bg-dark-950/80 backdrop-blur-md sticky top-0">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-5">
-          <Link
-            to="/"
-            className="p-2 -ml-2 text-dark-400 hover:text-dark-100 rounded-lg hover:bg-dark-800/50 transition-all duration-200"
-          >
-            <ArrowLeft size={20} strokeWidth={1.5} />
-          </Link>
-          <Link to="/" className="text-xl font-semibold tracking-tight text-dark-50">
-            GovTrove
-          </Link>
-        </div>
-      </header>
-
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6"
+        >
+          <ArrowLeft size={14} strokeWidth={1.5} />
+          Back to results
+        </Link>
         {/* Title Banner */}
         <div className="mb-8">
           {/* Status & Type Badges */}
