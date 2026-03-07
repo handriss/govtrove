@@ -187,6 +187,196 @@ resource "aws_cloudwatch_log_group" "lambda_pipeline" {
   }
 }
 
+# --- Dashboard ---
+
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "${var.project_name}-dashboard"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      # Row 1: API Health
+      {
+        type   = "metric"
+        x      = 0
+        y      = 0
+        width  = 8
+        height = 6
+        properties = {
+          title  = "API Request Count"
+          region = var.aws_region
+          period = 300
+          stat   = "Sum"
+          metrics = [
+            ["AWS/AppRunner", "RequestCount", "ServiceName", aws_apprunner_service.api.service_name, "ServiceId", aws_apprunner_service.api.service_id]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 0
+        width  = 8
+        height = 6
+        properties = {
+          title  = "API Error Rates"
+          region = var.aws_region
+          period = 300
+          stat   = "Sum"
+          metrics = [
+            ["AWS/AppRunner", "4xxStatusResponses", "ServiceName", aws_apprunner_service.api.service_name, "ServiceId", aws_apprunner_service.api.service_id, { label = "4xx" }],
+            ["AWS/AppRunner", "5xxStatusResponses", "ServiceName", aws_apprunner_service.api.service_name, "ServiceId", aws_apprunner_service.api.service_id, { label = "5xx" }]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 0
+        width  = 8
+        height = 6
+        properties = {
+          title  = "Active Instances"
+          region = var.aws_region
+          period = 300
+          stat   = "Average"
+          metrics = [
+            ["AWS/AppRunner", "ActiveInstances", "ServiceName", aws_apprunner_service.api.service_name, "ServiceId", aws_apprunner_service.api.service_id]
+          ]
+        }
+      },
+
+      # Row 2: Pipeline Health
+      {
+        type   = "metric"
+        x      = 0
+        y      = 6
+        width  = 8
+        height = 6
+        properties = {
+          title  = "Pipeline Executions"
+          region = var.aws_region
+          period = 300
+          stat   = "Sum"
+          metrics = [
+            ["AWS/States", "ExecutionsSucceeded", "StateMachineArn", aws_sfn_state_machine.pipeline.arn, { label = "Succeeded" }],
+            ["AWS/States", "ExecutionsFailed", "StateMachineArn", aws_sfn_state_machine.pipeline.arn, { label = "Failed", color = "#d62728" }]
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 8
+        y      = 6
+        width  = 8
+        height = 6
+        properties = {
+          title  = "Pipeline Execution Time"
+          region = var.aws_region
+          period = 300
+          stat   = "Average"
+          metrics = [
+            ["AWS/States", "ExecutionTime", "StateMachineArn", aws_sfn_state_machine.pipeline.arn]
+          ]
+          yAxis = { left = { label = "ms" } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 6
+        width  = 8
+        height = 6
+        properties = {
+          title  = "DLQ Messages"
+          region = var.aws_region
+          period = 300
+          stat   = "Maximum"
+          view   = "singleValue"
+          metrics = [
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "${var.project_name}-pipeline-dlq"]
+          ]
+        }
+      },
+
+      # Row 3: Lambda Performance
+      {
+        type   = "metric"
+        x      = 0
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Lambda Duration"
+          region = var.aws_region
+          period = 300
+          stat   = "Average"
+          metrics = [
+            for fn in local.lambda_functions : [
+              "AWS/Lambda", "Duration", "FunctionName", "${var.project_name}-${fn}", { label = fn }
+            ]
+          ]
+          yAxis = { left = { label = "ms" } }
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Lambda Errors"
+          region = var.aws_region
+          period = 300
+          stat   = "Sum"
+          metrics = [
+            for fn in local.lambda_functions : [
+              "AWS/Lambda", "Errors", "FunctionName", "${var.project_name}-${fn}", { label = fn }
+            ]
+          ]
+        }
+      },
+
+      # Row 4: Alarms & Cost
+      {
+        type   = "alarm"
+        x      = 0
+        y      = 18
+        width  = 12
+        height = 4
+        properties = {
+          title  = "Alarm Status"
+          alarms = [
+            aws_cloudwatch_metric_alarm.pipeline_failures.arn,
+            aws_cloudwatch_metric_alarm.api_5xx.arn,
+            aws_cloudwatch_metric_alarm.api_4xx.arn,
+            aws_cloudwatch_metric_alarm.api_request_spike.arn,
+            aws_cloudwatch_metric_alarm.billing_30.arn,
+            aws_cloudwatch_metric_alarm.billing_50.arn,
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 18
+        width  = 12
+        height = 4
+        properties = {
+          title  = "Estimated Charges (USD)"
+          region = "us-east-1"
+          period = 21600
+          stat   = "Maximum"
+          view   = "singleValue"
+          metrics = [
+            ["AWS/Billing", "EstimatedCharges", "Currency", "USD"]
+          ]
+        }
+      }
+    ]
+  })
+}
+
 # --- Cost Anomaly Detection ---
 
 resource "aws_ce_anomaly_monitor" "cost" {
