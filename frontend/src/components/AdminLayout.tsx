@@ -39,6 +39,7 @@ const navGroups: NavGroup[] = [
       { label: 'Users', icon: Users, path: '/admin' },
       { label: 'Notifications', icon: Bell, path: '/admin', tab: 'notifications' },
       { label: 'Searches', icon: Search, path: '/admin', tab: 'searches' },
+      { label: 'MCP Usage', icon: Plug, path: '/admin', tab: 'mcp-usage' },
     ],
   },
   {
@@ -56,7 +57,6 @@ const navGroups: NavGroup[] = [
       { label: 'API Keys', icon: Key, path: '/admin', tab: 'api-keys' },
       { label: 'SAM.gov Requests', icon: Globe, path: '/admin', tab: 'samgov-requests' },
       { label: 'Usage Chart', icon: BarChart3, path: '/admin', tab: 'usage' },
-      { label: 'MCP Usage', icon: Plug, path: '/admin', tab: 'mcp-usage' },
     ],
   },
   {
