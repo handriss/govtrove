@@ -853,6 +853,81 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/schema", (_req, res) => {
+  res.json({
+    name: "govtrove",
+    version: "0.2.0",
+    resources: [
+      {
+        uri: "govtrove://guide",
+        name: "guide",
+        description: "Introduction to federal contracting, SAM.gov, opportunity lifecycle, set-aside programs, NAICS codes, and tips for small businesses",
+      },
+      {
+        uri: "govtrove://set-aside-codes",
+        name: "set-aside-codes",
+        description: "Complete list of small business set-aside codes with descriptions and eligibility requirements",
+        data: SET_ASIDE_CODES,
+      },
+      {
+        uri: "govtrove://notice-types",
+        name: "notice-types",
+        description: "Explanation of each federal contract notice type — lifecycle stage, whether you can bid, and recommended action",
+        data: NOTICE_TYPES,
+      },
+    ],
+    prompts: [
+      {
+        name: "daily-briefing",
+        title: "Daily Briefing",
+        description: "Get a summary of federal contract opportunities posted in the last 24 hours",
+        arguments: [
+          { name: "keywords", type: "string", required: false, description: "Keywords to filter by" },
+          { name: "naics_code", type: "string", required: false, description: "NAICS code to filter by" },
+          { name: "set_aside", type: "string", required: false, description: "Set-aside type (code or plain English)" },
+          { name: "state", type: "string", required: false, description: "Two-letter state code" },
+        ],
+      },
+      {
+        name: "opportunity-analysis",
+        title: "Opportunity Analysis",
+        description: "Get a detailed plain-English analysis of a specific federal contract opportunity",
+        arguments: [
+          { name: "id", type: "string", required: true, description: "Opportunity ID or notice ID" },
+        ],
+      },
+    ],
+    tools: [
+      {
+        name: "search_opportunities",
+        title: "Search Federal Contract Opportunities",
+        description: "Search federal contract opportunities from SAM.gov with filters",
+        parameters: {
+          keywords: { type: "string", required: false, description: "Free text search (supports quotes for exact phrases)" },
+          naics_code: { type: "string", required: false, description: "6-digit NAICS code" },
+          set_aside: { type: "string", required: false, description: "Set-aside code or plain English (e.g. 'small business', 'SBA', '8a', 'hubzone')" },
+          department: { type: "string", required: false, description: "Department/agency name (partial match)" },
+          state: { type: "string", required: false, description: "Two-letter state code" },
+          type: { type: "string", required: false, description: "Notice type filter" },
+          posted_days_ago: { type: "number", required: false, description: "Only opportunities posted within N days" },
+          deadline_within_days: { type: "number", required: false, description: "Only opportunities with deadlines within N days" },
+          limit: { type: "number", required: false, description: "Results to return (default 10, max 25)" },
+          offset: { type: "number", required: false, description: "Pagination offset" },
+        },
+      },
+      {
+        name: "get_opportunity",
+        title: "Get Opportunity Details",
+        description: "Fetch full details for a single opportunity by ID or notice ID",
+        parameters: {
+          id: { type: "string", required: true, description: "Opportunity ID (numeric) or notice_id (alphanumeric)" },
+        },
+      },
+    ],
+    set_aside_aliases: SET_ASIDE_ALIASES,
+  });
+});
+
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
 app.post(
