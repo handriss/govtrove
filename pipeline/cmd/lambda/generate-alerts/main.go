@@ -345,12 +345,11 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 		return false, fmt.Errorf("count total: %w", err)
 	}
 
-	now := time.Now()
 	_, err := h.Pool.Exec(ctx, `
 		UPDATE saved_searches
-		SET last_checked_at = $2, last_match_count = $3, total_result_count = $4
+		SET last_match_count = $2, total_result_count = $3
 		WHERE id = $1
-	`, s.ID, now, matchCount, totalCount)
+	`, s.ID, matchCount, totalCount)
 	if err != nil {
 		return false, fmt.Errorf("update search: %w", err)
 	}
@@ -638,11 +637,7 @@ func (h *Handler) detectAmendments(ctx context.Context) (int, error) {
 		amendments = append(amendments, a)
 	}
 
-	count := 0
-	for _, a := range amendments {
-		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, a.SavedOppID)
-		count++
-	}
+	count := len(amendments)
 
 	return count, nil
 }
@@ -710,7 +705,6 @@ func (h *Handler) detectInPlaceChanges(ctx context.Context) (int, error) {
 			}
 		}
 
-		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, r.SavedOppID)
 		count++
 	}
 
