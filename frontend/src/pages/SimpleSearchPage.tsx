@@ -15,7 +15,9 @@ import { useSavedSearches } from '../hooks/useSavedSearches';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
+import { usePostHog } from '@posthog/react';
 import { getFacetCounts } from '../services/api';
+import { trackSearch, trackSavedSearchCreated } from '../lib/analytics';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
 
@@ -25,6 +27,7 @@ export default function SimpleSearchPage() {
   const { isAuthenticated, getAccessToken } = useAppAuth();
   const authOptions = useMemo(() => ({ getAccessToken }), [getAccessToken]);
   const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch(authOptions);
+  const posthog = usePostHog();
   const saved = useSavedOpportunities();
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
@@ -111,6 +114,17 @@ export default function SimpleSearchPage() {
     );
   }, [fs.filters]);
 
+  // Track search events in PostHog after results arrive
+  const lastTrackedRef = useRef('');
+  useEffect(() => {
+    if (!hasSearched || loading || total === undefined) return;
+    const key = JSON.stringify(fs.toSearchParams()) + ':' + total;
+    if (key === lastTrackedRef.current) return;
+    lastTrackedRef.current = key;
+    const params = fs.toSearchParams();
+    trackSearch(posthog, params.q || '', { ...params }, total);
+  }, [hasSearched, loading, total]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reset results when all filters are cleared
   useEffect(() => {
     if (!hasActiveFilters && hasSearched) {
@@ -170,6 +184,7 @@ export default function SimpleSearchPage() {
     try {
       const { sort, sortDir, page: _page, ...filterData } = fs.filters;
       await saveCurrentSearch(saveSearchName.trim(), filterData);
+      trackSavedSearchCreated(posthog, filterData);
       setSaveSearchOpen(false);
       setSaveSearchName('');
     } catch {

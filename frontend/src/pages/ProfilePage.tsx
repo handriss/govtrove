@@ -13,7 +13,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
+import { usePostHog } from '@posthog/react';
 import { createAccountRequest, getEmailPreferences, updateEmailPreferences, createCheckoutSession, createPortalSession } from '../services/api';
+import { trackUpgradeClicked } from '../lib/analytics';
 
 function formatMemberSince(dateStr: string) {
   const d = new Date(dateStr);
@@ -27,6 +29,7 @@ function formatDate(dateStr: string) {
 
 export default function ProfilePage() {
   const { user, govtroveUser, isLoading, isAuthenticated, getAccessToken } = useAppAuth();
+  const posthog = usePostHog();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -212,7 +215,7 @@ export default function ProfilePage() {
             <div>
               <p className="text-dark-100 font-medium text-lg mb-3">Free</p>
               <button
-                onClick={() => handleBilling('checkout')}
+                onClick={() => { trackUpgradeClicked(posthog, 'profile_plan_card'); handleBilling('checkout'); }}
                 disabled={billingLoading}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
                            border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
@@ -241,7 +244,7 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-sm text-dark-300">Upgrade to Pro to receive daily email alerts when new opportunities match your saved searches.</p>
                   <button
-                    onClick={() => handleBilling('checkout')}
+                    onClick={() => { trackUpgradeClicked(posthog, 'email_notifications'); handleBilling('checkout'); }}
                     disabled={billingLoading}
                     className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
                                border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20

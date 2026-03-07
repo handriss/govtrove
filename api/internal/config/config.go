@@ -24,6 +24,8 @@ type Config struct {
 	StripeWebhookSecret  string `envconfig:"STRIPE_WEBHOOK_SECRET"`
 	StripePriceMonthly   string `envconfig:"STRIPE_PRICE_MONTHLY"`
 	StripePromoCouponID  string `envconfig:"STRIPE_PROMO_COUPON_ID"`
+	PosthogKey           string `envconfig:"POSTHOG_KEY"`
+	PosthogHost          string `envconfig:"POSTHOG_HOST" default:"https://us.i.posthog.com"`
 }
 
 func Load() (*Config, error) {

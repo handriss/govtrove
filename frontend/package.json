@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@posthog/react": "^1.8.2",
     "@sentry/react": "^10.39.0",
     "@workos-inc/authkit-react": "^0.16.0",
     "lucide-react": "^0.469.0",
+    "posthog-js": "^1.359.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^6.20.0",

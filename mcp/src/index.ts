@@ -13,6 +13,8 @@ const AUTHKIT_DOMAIN =
 const MCP_RESOURCE_URL =
   process.env.MCP_RESOURCE_URL || "http://localhost:3000";
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const POSTHOG_KEY = process.env.POSTHOG_KEY || "";
+const POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
 
 const FREE_DAILY_LIMIT = 5;
 const PRO_DAILY_LIMIT = 500;
@@ -233,6 +235,27 @@ async function logUsage(
   );
 }
 
+function capturePosthogEvent(
+  distinctId: string,
+  event: string,
+  properties: Record<string, unknown>
+): void {
+  if (!POSTHOG_KEY || !distinctId) return;
+  const payload = {
+    api_key: POSTHOG_KEY,
+    event,
+    distinct_id: distinctId,
+    properties: { ...properties, client: "mcp" },
+    timestamp: new Date().toISOString(),
+  };
+  fetch(`${POSTHOG_HOST}/i/v0/e/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(3000),
+  }).catch(() => {});
+}
+
 function rateLimitError(plan: string): object {
   const limit = plan === "pro" ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
   const message =
@@ -318,6 +341,10 @@ async function withUsageTracking(
     if (user) {
       logUsage(user.id, toolName, latencyMs, user.email ?? null, requestParams, resultCount).catch((e) => {
         console.error("Failed to log usage:", e);
+      });
+      capturePosthogEvent(user.workosId, `mcp_${toolName}`, {
+        ...(requestParams || {}),
+        result_count: resultCount,
       });
     }
 
@@ -977,7 +1004,7 @@ app.get(
   async (req: AuthenticatedRequest, res) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId || !transports[sessionId]) {
-      res.status(400).json({ error: "Invalid or missing session ID." });
+      res.status(404).end();
       return;
     }
     await transports[sessionId].handleRequest(req, res);
@@ -990,7 +1017,7 @@ app.delete(
   async (req: AuthenticatedRequest, res) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     if (!sessionId || !transports[sessionId]) {
-      res.status(400).json({ error: "Invalid or missing session ID." });
+      res.status(404).end();
       return;
     }
     await transports[sessionId].handleRequest(req, res);
