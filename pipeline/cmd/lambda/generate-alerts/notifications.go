@@ -96,6 +96,7 @@ func (h *Handler) writeSearchNotifications(ctx context.Context) (int, error) {
 			}
 
 			if matchCount == 0 {
+				h.Pool.Exec(ctx, `UPDATE saved_searches SET last_checked_at = NOW() WHERE id = $1`, s.ID)
 				continue
 			}
 
@@ -153,6 +154,7 @@ func (h *Handler) writeSearchNotifications(ctx context.Context) (int, error) {
 			}
 
 			totalNotifs++
+			h.Pool.Exec(ctx, `UPDATE saved_searches SET last_checked_at = NOW() WHERE id = $1`, s.ID)
 		}
 
 		offset += batchSize
@@ -231,6 +233,7 @@ func (h *Handler) writeOpportunityNotifications(ctx context.Context) (int, error
 			continue
 		}
 		totalNotifs++
+		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, a.SavedOppID)
 	}
 
 	// In-place changes — diff curr vs prev version
@@ -325,6 +328,7 @@ func (h *Handler) writeOpportunityNotifications(ctx context.Context) (int, error
 			continue
 		}
 		totalNotifs++
+		h.Pool.Exec(ctx, `UPDATE saved_opportunities SET last_notified_at = NOW() WHERE id = $1`, savedOppID)
 	}
 
 	return totalNotifs, nil

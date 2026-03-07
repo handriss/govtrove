@@ -43,7 +43,7 @@ Saved Search Matches
 <tr>
 <td style="padding:12px 16px;">
 <p style="margin:0 0 4px 0;font-size:14px;font-weight:600;color:#111827;">
-{{.MatchCount}} new {{if eq .MatchCount 1}}match{{else}}matches{{end}}{{if .SearchName}} for "{{.SearchName}}"{{end}}
+{{.MatchCount}} new {{if eq .MatchCount 1}}match{{else}}matches{{end}}{{if .SearchName}} for "{{.SearchName}}"{{end}}{{if gt .TotalResultCount 0}} <span style="font-weight:400;color:#6b7280;">({{.TotalResultCount}} total results)</span>{{end}}
 </p>
 {{range .TopOpportunities}}
 <p style="margin:4px 0 0 0;font-size:13px;">

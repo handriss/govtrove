@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -51,6 +52,7 @@ func NewEmailSender(apiKey, from, baseURL, unsubSecret string, pool *pgxpool.Poo
 
 type searchAlertData struct {
 	MatchCount       int
+	TotalResultCount int
 	SearchName       string
 	SearchURL        string
 	TopOpportunities []oppLink
@@ -89,13 +91,17 @@ func (e *EmailSender) SendDigest(ctx context.Context, userID int, toEmail, first
 	}
 
 	for _, n := range searchNotifs {
-		sa, err := e.buildSearchAlert(n)
+		sa, err := e.buildSearchAlert(ctx, n)
 		if err != nil {
 			e.logger.Warn("skip search notification", "id", n.ID, "error", err)
 			continue
 		}
 		data.SearchAlerts = append(data.SearchAlerts, sa)
 	}
+
+	sort.Slice(data.SearchAlerts, func(i, j int) bool {
+		return data.SearchAlerts[i].MatchCount < data.SearchAlerts[j].MatchCount
+	})
 
 	for _, n := range oppNotifs {
 		oa, err := e.buildOppAlert(n)
@@ -126,7 +132,7 @@ func (e *EmailSender) SendDigest(ctx context.Context, userID int, toEmail, first
 	return nil
 }
 
-func (e *EmailSender) buildSearchAlert(n notificationRow) (searchAlertData, error) {
+func (e *EmailSender) buildSearchAlert(ctx context.Context, n notificationRow) (searchAlertData, error) {
 	var details struct {
 		SearchName    string          `json:"search_name"`
 		SearchID      int             `json:"search_id"`
@@ -158,6 +164,10 @@ func (e *EmailSender) buildSearchAlert(n notificationRow) (searchAlertData, erro
 		MatchCount: matchCount,
 		SearchName: details.SearchName,
 		SearchURL:  searchURL,
+	}
+
+	if details.SearchID > 0 && e.pool != nil {
+		_ = e.pool.QueryRow(ctx, `SELECT COALESCE(total_result_count, 0) FROM saved_searches WHERE id = $1`, details.SearchID).Scan(&sa.TotalResultCount)
 	}
 
 	limit := 3
@@ -276,24 +286,26 @@ func (e *EmailSender) buildSearchURL(filters map[string]any) string {
 }
 
 func (e *EmailSender) buildSubject(searches []searchAlertData, opps []oppAlertData) string {
-	totalMatches := 0
-	for _, s := range searches {
-		totalMatches += s.MatchCount
-	}
-
 	switch {
 	case len(searches) == 1 && len(opps) == 0:
 		return fmt.Sprintf("%d new match%s for \"%s\"",
 			searches[0].MatchCount, plural(searches[0].MatchCount), searches[0].SearchName)
 	case len(searches) > 1 && len(opps) == 0:
-		return fmt.Sprintf("%d new matches across %d saved searches", totalMatches, len(searches))
+		return fmt.Sprintf("New matches across %d saved searches", len(searches))
 	case len(searches) == 0 && len(opps) == 1:
 		return fmt.Sprintf("Update: %s", truncate(opps[0].OpportunityTitle, 60))
 	case len(searches) == 0 && len(opps) > 1:
 		return fmt.Sprintf("%d updates to your saved opportunities", len(opps))
+	case len(searches) > 0 && len(opps) > 0:
+		searchPart := fmt.Sprintf("New matches across %d search%s", len(searches), plural(len(searches)))
+		if len(searches) == 1 {
+			searchPart = fmt.Sprintf("%d new match%s for \"%s\"",
+				searches[0].MatchCount, plural(searches[0].MatchCount), searches[0].SearchName)
+		}
+		return fmt.Sprintf("%s + %d opportunity update%s",
+			searchPart, len(opps), pluralS(len(opps)))
 	default:
-		return fmt.Sprintf("%d new match%s + %d opportunity update%s",
-			totalMatches, plural(totalMatches), len(opps), pluralS(len(opps)))
+		return "Your GovTrove update"
 	}
 }
 
