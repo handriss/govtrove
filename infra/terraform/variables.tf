@@ -187,3 +187,16 @@ variable "domain_name" {
   type        = string
   default     = ""
 }
+
+variable "posthog_key" {
+  description = "PostHog project API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "posthog_host" {
+  description = "PostHog API host"
+  type        = string
+  default     = "https://us.i.posthog.com"
+}

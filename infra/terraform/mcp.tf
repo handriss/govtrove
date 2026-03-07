@@ -64,10 +64,13 @@ resource "aws_iam_role_policy" "mcp_secrets" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = [
-          aws_secretsmanager_secret.workos_client_id.arn,
-          aws_secretsmanager_secret.database_url.arn,
-        ]
+        Resource = concat(
+          [
+            aws_secretsmanager_secret.workos_client_id.arn,
+            aws_secretsmanager_secret.database_url.arn,
+          ],
+          var.posthog_key != "" ? [aws_secretsmanager_secret.posthog_key[0].arn] : [],
+        )
       }
     ]
   })
@@ -101,16 +104,19 @@ resource "aws_apprunner_service" "mcp" {
       image_configuration {
         port = "3000"
 
-        runtime_environment_secrets = {
+        runtime_environment_secrets = merge({
           WORKOS_CLIENT_ID = aws_secretsmanager_secret.workos_client_id.arn
           DATABASE_URL     = aws_secretsmanager_secret.database_url.arn
-        }
+        },
+          var.posthog_key != "" ? { POSTHOG_KEY = aws_secretsmanager_secret.posthog_key[0].arn } : {},
+        )
 
         runtime_environment_variables = {
           PORT             = "3000"
           NODE_ENV         = "production"
           MCP_RESOURCE_URL = "https://mcp.${var.domain_name}"
           AUTHKIT_DOMAIN   = var.authkit_domain
+          POSTHOG_HOST     = var.posthog_host
         }
       }
     }

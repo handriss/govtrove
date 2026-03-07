@@ -27,6 +27,8 @@ import SolicitationTimeline from '../components/SolicitationTimeline';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
 import { useAppAuth } from '../contexts/AuthContext';
+import { usePostHog } from '@posthog/react';
+import { trackOpportunityViewed, trackOpportunitySaved, trackOpportunityUnsaved } from '../lib/analytics';
 import type { Opportunity, SolicitationHistory } from '../types/api';
 
 const typeLabels: Record<string, string> = {
@@ -199,6 +201,7 @@ function ContactCard({
 export default function OpportunityDetail() {
   const { id } = useParams();
   const { isAuthenticated } = useAppAuth();
+  const posthog = usePostHog();
   const { isSaved, toggleSave } = useSavedOpportunities();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -215,10 +218,13 @@ export default function OpportunityDetail() {
     setError(null);
 
     getOpportunity(parseInt(id))
-      .then(setOpportunity)
+      .then((opp) => {
+        setOpportunity(opp);
+        trackOpportunityViewed(posthog, opp);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (opportunity?.solicitation_number) {
@@ -356,6 +362,8 @@ export default function OpportunityDetail() {
             <button
               onClick={() => {
                 if (!isAuthenticated) { setShowSignupPrompt(true); return; }
+                if (isSaved(opportunity.id)) trackOpportunityUnsaved(posthog, opportunity.id);
+                else trackOpportunitySaved(posthog, opportunity.id);
                 toggleSave(opportunity.id);
               }}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-medium ${

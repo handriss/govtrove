@@ -28,6 +28,7 @@ import (
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
+	"github.com/handriss/govtrove/api/internal/analytics"
 )
 
 func main() {
@@ -105,6 +106,11 @@ func main() {
 			snsClient = sns.NewFromConfig(awsCfg)
 			logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
 		}
+	}
+
+	if cfg.PosthogKey != "" {
+		analytics.Init(cfg.PosthogKey, cfg.PosthogHost, logger)
+		logger.Info("PostHog analytics initialized")
 	}
 
 	var emailSvc *email.Service

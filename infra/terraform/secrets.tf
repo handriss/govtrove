@@ -81,3 +81,15 @@ resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
   secret_id     = aws_secretsmanager_secret.stripe_webhook_secret[0].id
   secret_string = var.stripe_webhook_secret
 }
+
+resource "aws_secretsmanager_secret" "posthog_key" {
+  count       = var.posthog_key != "" ? 1 : 0
+  name        = "${var.project_name}/posthog-key"
+  description = "PostHog project API key"
+}
+
+resource "aws_secretsmanager_secret_version" "posthog_key" {
+  count         = var.posthog_key != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.posthog_key[0].id
+  secret_string = var.posthog_key
+}

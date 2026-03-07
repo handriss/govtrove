@@ -1,6 +1,8 @@
 import { createContext, useContext, useCallback, useEffect, useState, useRef, type ReactNode } from 'react';
 import { useAuth } from '@workos-inc/authkit-react';
+import { usePostHog } from '@posthog/react';
 import { syncUser, getMe, AUTH_ERROR_EVENT, type GovTroveUser } from '../services/api';
+import { trackSignIn, trackSignUp } from '../lib/analytics';
 
 interface AuthContextValue {
   user: ReturnType<typeof useAuth>['user'];
@@ -17,6 +19,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  const posthog = usePostHog();
   const [govtroveUser, setGovtroveUser] = useState<GovTroveUser | null>(null);
   const [syncing, setSyncing] = useState(false);
   const syncedForUser = useRef<string | null>(null);
@@ -44,12 +47,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           first_name: auth.user!.firstName ?? '',
           last_name: auth.user!.lastName ?? '',
         });
-        if (!cancelled) setGovtroveUser(synced);
+        if (!cancelled) {
+          setGovtroveUser(synced);
+          posthog?.identify(auth.user!.id, {
+            email: auth.user!.email,
+            name: `${auth.user!.firstName ?? ''} ${auth.user!.lastName ?? ''}`.trim(),
+            plan: synced.plan,
+            created_at: synced.created_at,
+          });
+          const isNew = Date.now() - new Date(synced.created_at).getTime() < 60_000;
+          if (isNew) trackSignUp(posthog); else trackSignIn(posthog);
+        }
       } catch {
         try {
           const token = await auth.getAccessToken();
           const me = await getMe(token);
-          if (!cancelled) setGovtroveUser(me);
+          if (!cancelled) {
+            setGovtroveUser(me);
+            posthog?.identify(auth.user!.id, {
+              email: auth.user!.email,
+              name: `${auth.user!.firstName ?? ''} ${auth.user!.lastName ?? ''}`.trim(),
+              plan: me.plan,
+              created_at: me.created_at,
+            });
+          }
         } catch {
           // Failed to sync — user can still use the app
         }
@@ -62,8 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [auth.user?.id]);
 
   const signOut = useCallback(() => {
+    posthog?.reset();
     auth.signOut({ returnTo: window.location.origin });
-  }, [auth.signOut]);
+  }, [auth.signOut, posthog]);
 
   const handleAuthError = useCallback(() => {
     setGovtroveUser(null);

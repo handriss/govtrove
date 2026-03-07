@@ -150,6 +150,7 @@ resource "aws_apprunner_service" "api" {
         },
           var.stripe_secret_key != "" ? { STRIPE_SECRET_KEY = aws_secretsmanager_secret.stripe_secret_key[0].arn } : {},
           var.stripe_webhook_secret != "" ? { STRIPE_WEBHOOK_SECRET = aws_secretsmanager_secret.stripe_webhook_secret[0].arn } : {},
+          var.posthog_key != "" ? { POSTHOG_KEY = aws_secretsmanager_secret.posthog_key[0].arn } : {},
         )
 
         runtime_environment_variables = {
@@ -165,6 +166,7 @@ resource "aws_apprunner_service" "api" {
           SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
           STRIPE_PRICE_MONTHLY    = var.stripe_price_monthly
           STRIPE_PROMO_COUPON_ID  = var.stripe_promo_coupon_id
+          POSTHOG_HOST            = var.posthog_host
         }
       }
     }
