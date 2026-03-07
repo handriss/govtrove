@@ -63,7 +63,7 @@ Being clever about circumventing restrictions is not the same as finding a compl
 - **App name**: GovTrove
 - **Stack**: Go backend, React frontend, Neon PostgreSQL, AWS (Fargate, EventBridge, S3, CloudFront), Terraform
 - **Data source**: SAM.gov public API (contract opportunities)
-- **Business model**: Freemium SaaS ($9/mo or $79/year paid tier)
+- **Business model**: Freemium SaaS ($30/mo or $79/year paid tier)
 - **Target users**: Small businesses pursuing DoD contracts
 - **Data volume**: ~500-2,000 new opportunities/day, ~100K/year
 
