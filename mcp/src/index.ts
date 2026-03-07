@@ -31,6 +31,167 @@ const WWW_AUTHENTICATE_HEADER = [
   `resource_metadata="${MCP_RESOURCE_URL}/.well-known/oauth-protected-resource"`,
 ].join(", ");
 
+// ── Reference data ───────────────────────────────────────────────────
+
+const SET_ASIDE_CODES: Record<string, { name: string; qualifies: string }> = {
+  SBA:      { name: "Total Small Business Set-Aside", qualifies: "Any small business meeting SBA size standards for the NAICS code" },
+  SBP:      { name: "Partial Small Business Set-Aside", qualifies: "Small businesses for specific line items only" },
+  "8A":     { name: "8(a) Competitive", qualifies: "Firms certified under SBA's 8(a) Business Development program" },
+  "8AN":    { name: "8(a) Sole Source", qualifies: "Single 8(a) certified firm (non-competitive)" },
+  HZC:      { name: "HUBZone Competitive", qualifies: "HUBZone certified small businesses" },
+  HZS:      { name: "HUBZone Sole Source", qualifies: "Single HUBZone certified firm (non-competitive)" },
+  SDVOSBC:  { name: "Service-Disabled Veteran-Owned Small Business (SDVOSB) Competitive", qualifies: "SDVOSB certified firms" },
+  SDVOSBS:  { name: "SDVOSB Sole Source", qualifies: "Single SDVOSB certified firm (non-competitive)" },
+  WOSB:     { name: "Women-Owned Small Business (WOSB)", qualifies: "Women-owned small businesses in underrepresented industries" },
+  WOSBSS:   { name: "WOSB Sole Source", qualifies: "Single WOSB certified firm (non-competitive)" },
+  EDWOSB:   { name: "Economically Disadvantaged WOSB (EDWOSB)", qualifies: "Economically disadvantaged women-owned small businesses" },
+  EDWOSBSS: { name: "EDWOSB Sole Source", qualifies: "Single EDWOSB certified firm (non-competitive)" },
+  VSA:      { name: "Veteran-Owned Small Business (VOSB) Set-Aside", qualifies: "Veteran-owned small businesses" },
+  VSS:      { name: "VOSB Sole Source", qualifies: "Single veteran-owned small business (non-competitive)" },
+  ESB:      { name: "Emerging Small Business", qualifies: "Small businesses in early growth stage within designated industries" },
+  BICiv:    { name: "Buy Indian - Civilian", qualifies: "Indian-owned economic enterprises under Buy Indian Act (civilian agencies)" },
+  LAS:      { name: "Local Area Set-Aside", qualifies: "Small businesses in a specific local geographic area" },
+  IEE:      { name: "Indian Economic Enterprise (IEE)", qualifies: "Indian-owned economic enterprises (DoI programs)" },
+  ISBEE:    { name: "Indian Small Business Economic Enterprise (ISBEE)", qualifies: "Indian-owned small business economic enterprises" },
+};
+
+const SET_ASIDE_ALIASES: Record<string, string> = {
+  "small business": "SBA",
+  "total small business": "SBA",
+  sb: "SBA",
+  "partial small business": "SBP",
+  "8(a)": "8A",
+  "8a": "8A",
+  "8(a) sole source": "8AN",
+  hubzone: "HZC",
+  "hubzone sole source": "HZS",
+  sdvosb: "SDVOSBC",
+  "service-disabled veteran": "SDVOSBC",
+  "service disabled veteran": "SDVOSBC",
+  "sdvosb sole source": "SDVOSBS",
+  wosb: "WOSB",
+  "women-owned": "WOSB",
+  "women owned": "WOSB",
+  "wosb sole source": "WOSBSS",
+  edwosb: "EDWOSB",
+  "edwosb sole source": "EDWOSBSS",
+  veteran: "VSA",
+  "veteran-owned": "VSA",
+  "veteran owned": "VSA",
+  vosb: "VSA",
+  "vosb sole source": "VSS",
+};
+
+function resolveSetAside(input: string): string | null {
+  if (SET_ASIDE_CODES[input]) return input;
+  const lower = input.toLowerCase().trim();
+  if (SET_ASIDE_ALIASES[lower]) return SET_ASIDE_ALIASES[lower];
+  // Check if it's a code with wrong case
+  const upper = input.toUpperCase();
+  if (SET_ASIDE_CODES[upper]) return upper;
+  return null;
+}
+
+const NOTICE_TYPES: Record<string, { lifecycle: string; canBid: boolean; action: string }> = {
+  "Presolicitation": {
+    lifecycle: "Early notice that a solicitation is coming. The agency is signaling intent to solicit.",
+    canBid: false,
+    action: "Monitor and prepare. Get the solicitation documents when they're released. Use this time to research the requirement and build your team.",
+  },
+  "Sources Sought": {
+    lifecycle: "Market research phase. The agency is gauging industry interest and capabilities before writing a solicitation.",
+    canBid: false,
+    action: "RESPOND. This is your chance to shape the requirement. Submit a capabilities statement showing why your company is qualified. This is not a bid — it's a conversation starter.",
+  },
+  "Solicitation": {
+    lifecycle: "The formal request for proposals/quotes. This is the actual bidding opportunity.",
+    canBid: true,
+    action: "Submit a proposal or quote by the response deadline. Read the solicitation carefully, note all evaluation criteria, and follow formatting instructions exactly.",
+  },
+  "Combined Synopsis/Solicitation": {
+    lifecycle: "A combined notice and solicitation in one document. Common for simplified acquisitions under $250K.",
+    canBid: true,
+    action: "Submit a quote by the response deadline. These are typically simpler procurements with shorter turnaround times.",
+  },
+  "Award Notice": {
+    lifecycle: "The contract has been awarded. Shows who won and for how much (when available).",
+    canBid: false,
+    action: "Review who won and for what amount. Useful for competitive intelligence and understanding pricing in your market. If you lost, you can request a debrief.",
+  },
+  "Justification and Approval (J&A)": {
+    lifecycle: "Public notice justifying a non-competitive (sole source) award. Required when competition is limited.",
+    canBid: false,
+    action: "Review to understand why competition was limited. If you believe you could compete, contact the contracting officer before the J&A is finalized.",
+  },
+  "Special Notice": {
+    lifecycle: "Informational notice. Not a solicitation — could be upcoming events, policy changes, or industry days.",
+    canBid: false,
+    action: "Read for awareness. Industry days and conferences listed here are valuable networking opportunities.",
+  },
+  "Intent to Bundle": {
+    lifecycle: "Notice that the agency plans to bundle multiple requirements into a single contract, which may reduce small business opportunities.",
+    canBid: false,
+    action: "Review and comment if the bundling would unfairly exclude small businesses. Contact the SBA PCR (Procurement Center Representative) if concerned.",
+  },
+  "Sale of Surplus Property": {
+    lifecycle: "Government surplus property available for purchase.",
+    canBid: true,
+    action: "Review items and submit a bid if interested in purchasing surplus government property.",
+  },
+};
+
+const GUIDE_TEXT = `# GovTrove — Federal Contract Opportunities Guide
+
+## What is GovTrove?
+GovTrove helps small businesses find and track federal contract opportunities from SAM.gov (the U.S. government's official procurement website). Data is sourced from SAM.gov's public API and updated multiple times daily.
+
+Source: https://sam.gov/content/opportunities
+
+## What is a Federal Contract Opportunity?
+When the U.S. government needs to buy goods or services, agencies post "opportunities" (also called notices or solicitations) on SAM.gov. Companies compete for these contracts by submitting proposals.
+
+The federal government is the world's largest buyer — over $700 billion/year in contracts. By law, a percentage must go to small businesses.
+
+## Opportunity Lifecycle
+Opportunities progress through stages:
+
+1. **Sources Sought / RFI** — Market research. The agency asks "who can do this?" Respond to shape the requirement.
+2. **Presolicitation** — Heads up that a solicitation is coming soon. Prepare your team.
+3. **Solicitation / Combined Synopsis** — The actual bidding opportunity. Submit your proposal by the deadline.
+4. **Award Notice** — The contract has been awarded. See who won and for how much.
+
+Not all opportunities go through every stage. Some skip straight to solicitation.
+
+## Set-Aside Programs
+The government reserves certain contracts for specific types of small businesses. These "set-asides" reduce competition and give qualified firms a better chance at winning. Read the govtrove://set-aside-codes resource for the full list.
+
+Key programs:
+- **Total Small Business (SBA)** — Open to any small business meeting size standards
+- **8(a)** — For disadvantaged small businesses in the SBA's 8(a) development program
+- **HUBZone** — For businesses in Historically Underutilized Business Zones
+- **SDVOSB** — For service-disabled veteran-owned small businesses
+- **WOSB** — For women-owned small businesses in underrepresented industries
+
+Source: https://www.sba.gov/federal-contracting/contracting-assistance-programs
+
+## NAICS Codes
+Every opportunity has a NAICS (North American Industry Classification System) code that describes what industry the work falls under. Your business's size standard (whether you're "small") is determined by the NAICS code on each opportunity.
+
+Example: 541512 = Computer Systems Design Services (small if < $34M annual revenue)
+
+Source: https://www.census.gov/naics/
+
+## Response Deadlines
+The response deadline is when proposals must be submitted. Missing it by even one minute means automatic rejection — no exceptions. Plan to submit at least 24 hours early.
+
+## Key Tips
+- **Start with Sources Sought** — Responding to these is free, low-risk, and shapes future solicitations in your favor
+- **Filter by set-aside** — If you have certifications (8a, HUBZone, SDVOSB, WOSB), filter for those set-asides to find less competitive opportunities
+- **Watch the NAICS code** — Make sure you're small under that NAICS code's size standard
+- **Track response deadlines** — Set reminders. Late proposals are always rejected
+- **Read the full solicitation** — The description on SAM.gov is just a summary. Download and read the actual solicitation documents
+`;
+
 // ── User context ────────────────────────────────────────────────────
 
 interface GovTroveUser {
@@ -150,28 +311,187 @@ async function withUsageTracking(
   }
 
   const start = Date.now();
-  const { response, resultCount } = await fn();
-  const latencyMs = Date.now() - start;
+  try {
+    const { response, resultCount } = await fn();
+    const latencyMs = Date.now() - start;
 
-  if (user) {
-    logUsage(user.id, toolName, latencyMs, user.email ?? null, requestParams, resultCount).catch(() => {});
+    if (user) {
+      logUsage(user.id, toolName, latencyMs, user.email ?? null, requestParams, resultCount).catch((e) => {
+        console.error("Failed to log usage:", e);
+      });
+    }
+
+    return response;
+  } catch (err) {
+    console.error(`Tool ${toolName} error:`, err);
+    throw err;
   }
-
-  return response;
 }
 
 function createMcpServer(sessionId: string): McpServer {
   const server = new McpServer({
     name: "govtrove",
-    version: "0.1.0",
+    version: "0.2.0",
   });
+
+  // ── Resources ───────────────────────────────────────────────────
+
+  server.registerResource(
+    "guide",
+    "govtrove://guide",
+    {
+      description: "Introduction to federal contracting, SAM.gov, opportunity lifecycle, set-aside programs, NAICS codes, and tips for small businesses",
+    },
+    () => ({
+      contents: [{ uri: "govtrove://guide", text: GUIDE_TEXT, mimeType: "text/markdown" }],
+    })
+  );
+
+  server.registerResource(
+    "set-aside-codes",
+    "govtrove://set-aside-codes",
+    {
+      description: "Complete list of small business set-aside codes with descriptions and eligibility requirements",
+    },
+    () => {
+      const lines = [
+        "# Set-Aside Codes",
+        "",
+        "Set-asides reserve contracts for specific types of small businesses. Use the code in the `set_aside` parameter when searching.",
+        "",
+        "Source: https://www.sba.gov/federal-contracting/contracting-assistance-programs",
+        "",
+        "| Code | Name | Who Qualifies |",
+        "|------|------|---------------|",
+      ];
+      for (const [code, info] of Object.entries(SET_ASIDE_CODES)) {
+        lines.push(`| ${code} | ${info.name} | ${info.qualifies} |`);
+      }
+      lines.push("");
+      lines.push("## Common Aliases");
+      lines.push("You can also use plain English when searching — the tool will resolve these automatically:");
+      lines.push("- \"small business\" → SBA");
+      lines.push("- \"8(a)\" or \"8a\" → 8A");
+      lines.push("- \"hubzone\" → HZC");
+      lines.push("- \"sdvosb\" or \"service-disabled veteran\" → SDVOSBC");
+      lines.push("- \"wosb\" or \"women-owned\" → WOSB");
+      lines.push("- \"veteran\" or \"veteran-owned\" → VSA");
+      return {
+        contents: [{ uri: "govtrove://set-aside-codes", text: lines.join("\n"), mimeType: "text/markdown" }],
+      };
+    }
+  );
+
+  server.registerResource(
+    "notice-types",
+    "govtrove://notice-types",
+    {
+      description: "Explanation of each federal contract notice type — what it means, where it sits in the procurement lifecycle, and what action to take",
+    },
+    () => {
+      const lines = [
+        "# Federal Contract Notice Types",
+        "",
+        "Source: https://sam.gov/content/opportunities",
+        "",
+      ];
+      for (const [type, info] of Object.entries(NOTICE_TYPES)) {
+        lines.push(`## ${type}`);
+        lines.push(`**Lifecycle:** ${info.lifecycle}`);
+        lines.push(`**Can you bid?** ${info.canBid ? "Yes" : "No"}`);
+        lines.push(`**Action:** ${info.action}`);
+        lines.push("");
+      }
+      return {
+        contents: [{ uri: "govtrove://notice-types", text: lines.join("\n"), mimeType: "text/markdown" }],
+      };
+    }
+  );
+
+  // ── Prompts ─────────────────────────────────────────────────────
+
+  server.registerPrompt(
+    "daily-briefing",
+    {
+      title: "Daily Briefing",
+      description: "Get a summary of federal contract opportunities posted in the last 24 hours",
+      argsSchema: {
+        keywords: z.string().optional().describe("Keywords to filter by (e.g. 'cybersecurity', 'IT support')"),
+        naics_code: z.string().optional().describe("NAICS code to filter by (e.g. '541512')"),
+        set_aside: z.string().optional().describe("Set-aside type (e.g. 'small business', 'SBA', '8a', 'hubzone')"),
+        state: z.string().optional().describe("Two-letter state code (e.g. 'VA', 'CA')"),
+      },
+    },
+    (args) => {
+      const filters: string[] = [];
+      if (args.keywords) filters.push(`keywords: "${args.keywords}"`);
+      if (args.naics_code) filters.push(`NAICS code: ${args.naics_code}`);
+      if (args.set_aside) filters.push(`set-aside: ${args.set_aside}`);
+      if (args.state) filters.push(`state: ${args.state}`);
+      const filterText = filters.length > 0 ? filters.join(", ") : "no specific filters";
+
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `Search for federal contract opportunities posted in the last 1 day with these filters: ${filterText}.
+
+Present results as a daily briefing:
+1. Total count of new opportunities matching the filters
+2. Group results by department — show department name and count
+3. For each opportunity show: title, department, set-aside type, response deadline, and a link
+4. Highlight any with response deadlines within the next 7 days as URGENT
+5. If there are more than 10 results, show the top 10 most relevant and mention the total count
+6. If there are no results, suggest broadening the filters`,
+            },
+          },
+        ],
+      };
+    }
+  );
+
+  server.registerPrompt(
+    "opportunity-analysis",
+    {
+      title: "Opportunity Analysis",
+      description: "Get a detailed plain-English analysis of a specific federal contract opportunity",
+      argsSchema: {
+        id: z.string().describe("The opportunity ID (numeric) or notice ID from a previous search"),
+      },
+    },
+    (args) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Get full details for opportunity ${args.id}.
+
+Provide a plain-English analysis:
+1. **What they're buying** — Summarize the description in 2-3 sentences that a non-expert can understand
+2. **Who can bid** — Set-aside restrictions and what certifications are needed. Mention the NAICS code and what industry it covers
+3. **Key dates** — Posted date, response deadline, and how many days remain. Flag if deadline is within 7 days
+4. **Estimated value** — Award amount if available, or note if not disclosed
+5. **Place of performance** — Where the work will be done
+6. **Contacts** — Contracting officer name, email, and phone
+7. **Red flags** — Note any concerns: very tight deadline, vague requirements, or signs of an incumbent-friendly solicitation
+8. **Links** — SAM.gov page and GovTrove page for full details and documents`,
+          },
+        },
+      ],
+    })
+  );
+
+  // ── Tools ───────────────────────────────────────────────────────
 
   server.registerTool(
     "search_opportunities",
     {
       title: "Search Federal Contract Opportunities",
       description:
-        "Search federal contract opportunities from SAM.gov. Use when the user wants to find contracts, solicitations, RFPs, or procurement notices. Supports filtering by keywords, NAICS codes, set-aside types, agencies, deadlines, and more.",
+        "Search federal contract opportunities from SAM.gov. Returns matching opportunities with key details. Read the govtrove://set-aside-codes resource for valid set-aside codes, and govtrove://notice-types for notice type explanations.",
       inputSchema: {
         keywords: z
           .string()
@@ -186,24 +506,12 @@ function createMcpServer(sessionId: string): McpServer {
           .optional()
           .describe("6-digit NAICS code (e.g. 541512 for Computer Systems Design)"),
         set_aside: z
-          .enum([
-            "SBA",
-            "SBP",
-            "8A",
-            "8AN",
-            "HZC",
-            "HZS",
-            "SDVOSBC",
-            "SDVOSBS",
-            "WOSB",
-            "WOSBSS",
-            "EDWOSB",
-            "EDWOSBSS",
-            "VSA",
-            "VSB",
-          ])
+          .string()
+          .max(50)
           .optional()
-          .describe("Small business set-aside code"),
+          .describe(
+            'Set-aside filter. Use a code (SBA, 8A, HZC, SDVOSBC, WOSB, etc.) or plain English ("small business", "hubzone", "8(a)", "women-owned", "veteran"). See govtrove://set-aside-codes for the full list.'
+          ),
         department: z
           .string()
           .max(200)
@@ -217,19 +525,12 @@ function createMcpServer(sessionId: string): McpServer {
           .optional()
           .describe("Two-letter state code for place of performance (e.g. VA, CA)"),
         type: z
-          .enum([
-            "Solicitation",
-            "Presolicitation",
-            "Combined Synopsis/Solicitation",
-            "Sources Sought",
-            "Special Notice",
-            "Award Notice",
-            "Justification and Approval (J&A)",
-            "Sale of Surplus Property",
-            "Intent to Bundle",
-          ])
+          .string()
+          .max(50)
           .optional()
-          .describe("Notice type filter"),
+          .describe(
+            'Notice type: "Solicitation", "Presolicitation", "Combined Synopsis/Solicitation", "Sources Sought", "Special Notice", "Award Notice", "Justification and Approval (J&A)", "Sale of Surplus Property", "Intent to Bundle". See govtrove://notice-types for explanations.'
+          ),
         posted_days_ago: z
           .number()
           .int()
@@ -281,8 +582,23 @@ function createMcpServer(sessionId: string): McpServer {
         }
 
         if (params.set_aside) {
+          const resolved = resolveSetAside(params.set_aside);
+          if (!resolved) {
+            const validCodes = Object.entries(SET_ASIDE_CODES)
+              .map(([code, info]) => `${code} (${info.name})`)
+              .join(", ");
+            return {
+              response: {
+                content: [{
+                  type: "text" as const,
+                  text: `Unknown set-aside "${params.set_aside}". Valid codes: ${validCodes}. You can also use plain English like "small business", "hubzone", "8(a)", "sdvosb", "women-owned", or "veteran".`,
+                }],
+              },
+              resultCount: 0,
+            };
+          }
           conditions.push(`set_aside_code = $${paramIdx}`);
-          values.push(params.set_aside);
+          values.push(resolved);
           paramIdx++;
         }
 
