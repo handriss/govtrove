@@ -863,7 +863,7 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
     { value: '30d', label: '30d' },
   ];
 
-  function buildReplayUrl(ev: AdminSearchEvent): string {
+  function buildSearchParams(ev: AdminSearchEvent): URLSearchParams {
     const params = new URLSearchParams();
     if (ev.query) params.set('q', ev.query);
     if (ev.filters) {
@@ -876,7 +876,15 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
       } catch { /* ignore */ }
     }
     if (ev.sort_by) params.set('sort', ev.sort_by);
-    return `https://api.govtrove.com/api/opportunities?${params}`;
+    return params;
+  }
+
+  function buildApiUrl(ev: AdminSearchEvent): string {
+    return `https://api.govtrove.com/api/opportunities?${buildSearchParams(ev)}`;
+  }
+
+  function buildAppUrl(ev: AdminSearchEvent): string {
+    return `/?${buildSearchParams(ev)}`;
   }
 
   function truncateFilters(filters: string | null) {
@@ -1029,6 +1037,7 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
                   <th className="px-4 py-3 font-medium w-20">Duration</th>
                   <th className="px-4 py-3 font-medium w-32">User ID</th>
                   <th className="px-4 py-3 font-medium w-12"></th>
+                  <th className="px-4 py-3 font-medium w-12"></th>
                 </tr>
               </thead>
               <tbody>
@@ -1047,8 +1056,13 @@ function SearchAnalyticsTab({ getToken }: { getToken: () => Promise<string> }) {
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-dark-400 truncate max-w-[8rem]">{ev.user_id ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <a href={buildReplayUrl(ev)} target="_blank" rel="noopener noreferrer" className="text-dark-500 hover:text-accent transition-colors" title="Replay search">
+                        <a href={buildApiUrl(ev)} target="_blank" rel="noopener noreferrer" className="text-dark-500 hover:text-accent transition-colors" title="Raw API response">
                           <ExternalLink size={14} />
+                        </a>
+                      </td>
+                      <td className="px-4 py-3">
+                        <a href={buildAppUrl(ev)} target="_blank" rel="noopener noreferrer" className="text-dark-500 hover:text-accent transition-colors" title="Open in app">
+                          <Search size={14} />
                         </a>
                       </td>
                     </tr>
@@ -1476,8 +1490,6 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
                 <th className="px-4 py-3 font-medium w-28">Type</th>
                 <th className="px-4 py-3 font-medium">Subject</th>
                 <th className="px-4 py-3 font-medium w-24">Status</th>
-                <th className="px-4 py-3 font-medium w-36">Opened</th>
-                <th className="px-4 py-3 font-medium w-36">Clicked</th>
                 <th className="px-4 py-3 font-medium w-24">Action</th>
               </tr>
             </thead>
@@ -1489,8 +1501,6 @@ function SentEmailsTab({ getToken }: { getToken: () => Promise<string> }) {
                   <td className="px-4 py-3 text-dark-300 text-xs">{e.email_type}</td>
                   <td className="px-4 py-3 text-dark-200 text-xs max-w-xs truncate">{e.subject}</td>
                   <td className="px-4 py-3">{statusBadge(e.status)}</td>
-                  <td className="px-4 py-3 text-dark-400 text-xs">{e.opened_at ? formatDateTime(e.opened_at) : '—'}</td>
-                  <td className="px-4 py-3 text-dark-400 text-xs">{e.clicked_at ? formatDateTime(e.clicked_at) : '—'}</td>
                   <td className="px-4 py-3">
                     {resendingId === e.id ? (
                       <div className="flex items-center gap-1">

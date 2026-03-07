@@ -8,6 +8,7 @@ import (
 
 	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/repository"
+	"github.com/handriss/govtrove/api/internal/analytics"
 )
 
 type WebhookHandler struct {
@@ -36,6 +37,22 @@ type resendWebhookEvent struct {
 	Data struct {
 		EmailID string `json:"email_id"`
 	} `json:"data"`
+}
+
+func (h *WebhookHandler) captureEmailEvent(resendID, posthogEvent string, extra map[string]any) {
+	ctx := h.sentEmailsRepo.Background()
+	distinctID, emailType, _ := h.sentEmailsRepo.GetUserAndTypeByResendID(ctx, resendID)
+	if distinctID == "" {
+		return
+	}
+	props := map[string]any{
+		"email_type": emailType,
+		"email_id":   resendID,
+	}
+	for k, v := range extra {
+		props[k] = v
+	}
+	analytics.CaptureEvent(distinctID, posthogEvent, props)
 }
 
 func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +93,7 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 		if err := h.sentEmailsRepo.UpdateStatusByResendID(ctx, resendID, "delivered"); err != nil {
 			h.logger.Error("failed to update email status", "resend_id", resendID, "error", err)
 		}
+		h.captureEmailEvent(resendID, "email_delivered", nil)
 
 	case "email.bounced":
 		if err := h.sentEmailsRepo.UpdateStatusByResendID(ctx, resendID, "bounced"); err != nil {
@@ -87,6 +105,7 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 				h.logger.Error("failed to unsubscribe bounced user", "user_id", *userID, "error", err)
 			}
 		}
+		h.captureEmailEvent(resendID, "email_bounced", nil)
 
 	case "email.complained":
 		if err := h.sentEmailsRepo.UpdateStatusByResendID(ctx, resendID, "complained"); err != nil {
@@ -98,16 +117,7 @@ func (h *WebhookHandler) HandleResend(w http.ResponseWriter, r *http.Request) {
 				h.logger.Error("failed to unsubscribe complaining user", "user_id", *userID, "error", err)
 			}
 		}
-
-	case "email.opened":
-		if err := h.sentEmailsRepo.SetOpenedByResendID(ctx, resendID); err != nil {
-			h.logger.Error("failed to set email opened", "resend_id", resendID, "error", err)
-		}
-
-	case "email.clicked":
-		if err := h.sentEmailsRepo.SetClickedByResendID(ctx, resendID); err != nil {
-			h.logger.Error("failed to set email clicked", "resend_id", resendID, "error", err)
-		}
+		h.captureEmailEvent(resendID, "email_complained", nil)
 
 	default:
 		h.logger.Debug("unhandled webhook event type", "type", event.Type)
