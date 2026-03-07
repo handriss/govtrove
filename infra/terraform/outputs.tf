@@ -133,6 +133,39 @@ output "sentry_frontend_dsn" {
   value       = var.sentry_frontend_dsn
 }
 
+# MCP outputs
+output "ecr_mcp_repository_url" {
+  description = "ECR repository URL for MCP service"
+  value       = aws_ecr_repository.mcp.repository_url
+}
+
+output "mcp_service_url" {
+  description = "App Runner service URL for MCP"
+  value       = aws_apprunner_service.mcp.service_url
+}
+
+output "mcp_service_arn" {
+  description = "App Runner service ARN for MCP (for deployments)"
+  value       = aws_apprunner_service.mcp.arn
+}
+
+output "mcp_custom_domain_records" {
+  description = "CNAME records to add in Cloudflare for MCP custom domain validation"
+  value = var.domain_name != "" ? {
+    for record in aws_apprunner_custom_domain_association.mcp[0].certificate_validation_records : record.name => {
+      type  = "CNAME"
+      name  = record.name
+      value = record.value
+      note  = "Add in Cloudflare with proxy OFF (DNS only)"
+    }
+  } : {}
+}
+
+output "mcp_custom_domain_target" {
+  description = "CNAME target for mcp.<domain> — add this in Cloudflare after validation"
+  value       = var.domain_name != "" ? aws_apprunner_custom_domain_association.mcp[0].dns_target : ""
+}
+
 output "ses_dkim_tokens" {
   description = "DKIM CNAME records to add to DNS: {token}._domainkey.govtrove.com -> {token}.dkim.amazonses.com"
   value       = var.domain_name != "" ? aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens : []

@@ -1,9 +1,10 @@
 .PHONY: help dev-up dev-up-d dev-down dev-clean dev dev-stop \
 	install-migrate migrate-up migrate-down migrate-neon migrate-create \
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
+	mcp-install mcp-dev mcp-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
 	test test-e2e lambda-build \
-	ecr-login deploy-frontend minify-landing deploy-landing deploy-api deploy-pipeline deploy-all \
+	ecr-login deploy-frontend minify-landing deploy-landing deploy-api deploy-mcp deploy-pipeline deploy-all \
 	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
 	tf-init tf-plan tf-apply tf-output tf-destroy tf-fmt tf-validate \
@@ -264,6 +265,19 @@ api-docker-build:
 	docker build --platform linux/amd64 -t govtrove-api:latest ./api
 
 # ============================================================================
+# MCP Server
+# ============================================================================
+
+mcp-install:
+	cd mcp && npm install
+
+mcp-dev:
+	cd mcp && npm run dev
+
+mcp-docker-build:
+	docker build --platform linux/amd64 -t govtrove-mcp:latest ./mcp
+
+# ============================================================================
 # Frontend
 # ============================================================================
 
@@ -364,6 +378,16 @@ deploy-api: api-docker-build ecr-login
 	echo "Triggering App Runner deployment..." && \
 	aws apprunner start-deployment --service-arn $$ARN --profile $(AWS_PROFILE) --region $(AWS_REGION) && \
 	echo "API deployment triggered! Check status with 'make status'"
+
+deploy-mcp: mcp-docker-build ecr-login
+	@echo "Deploying MCP server to App Runner..."
+	@ECR_URL=$$(cd infra/terraform && terraform output -raw ecr_mcp_repository_url) && \
+	ARN=$$(cd infra/terraform && terraform output -raw mcp_service_arn) && \
+	docker tag govtrove-mcp:latest $$ECR_URL:latest && \
+	docker push $$ECR_URL:latest && \
+	echo "Triggering App Runner deployment..." && \
+	aws apprunner start-deployment --service-arn $$ARN --profile $(AWS_PROFILE) --region $(AWS_REGION) && \
+	echo "MCP deployment triggered! Check status with 'make status'"
 
 deploy-pipeline: lambda-build
 	@echo "Deploying pipeline Lambda functions..."
