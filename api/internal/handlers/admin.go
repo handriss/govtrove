@@ -253,6 +253,30 @@ func (h *AdminHandler) ListSearchEvents(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (h *AdminHandler) ListMcpUsage(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+
+	events, total, err := h.pipelineRepo.ListMcpUsage(r.Context(), page, 50)
+	if err != nil {
+		h.logger.Error("list mcp usage failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"events": events,
+		"total":  total,
+		"page":   page,
+		"limit":  50,
+	})
+}
+
 func (h *AdminHandler) GetApiKeyUsage(w http.ResponseWriter, r *http.Request) {
 	keyHash := r.URL.Query().Get("key_hash")
 	if keyHash == "" {

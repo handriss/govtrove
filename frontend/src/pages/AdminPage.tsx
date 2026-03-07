@@ -9,11 +9,12 @@ import {
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
   getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
+  getAdminMcpUsage,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
-  type AdminPromoCode,
+  type AdminPromoCode, type McpUsageEvent,
 } from '../services/api';
 import type { Notification } from '../types/api';
 import { useAppAuth } from '../contexts/AuthContext';
@@ -1744,7 +1745,112 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes';
+function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [events, setEvents] = useState<McpUsageEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const limit = 50;
+
+  const fetchData = useCallback(async (p: number) => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await getAdminMcpUsage(token, p);
+      setEvents(res.events || []);
+      setTotal(res.total);
+      setPage(p);
+    } catch {
+      setEvents([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { fetchData(1); }, [fetchData]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  function formatParams(params: string | null): string {
+    if (!params) return '—';
+    try {
+      const parsed = JSON.parse(params);
+      const parts: string[] = [];
+      for (const [k, v] of Object.entries(parsed)) {
+        if (v == null || v === '') continue;
+        parts.push(`${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
+      }
+      return parts.length > 0 ? parts.join(', ') : '—';
+    } catch {
+      return params.slice(0, 80);
+    }
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-dark-200">MCP Tool Usage</h2>
+        <span className="text-sm text-dark-400">{total} total calls</span>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-dark-400" size={24} /></div>
+      ) : events.length === 0 ? (
+        <p className="text-dark-400 text-center py-12">No MCP usage yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="pb-3 pr-4 font-medium">User</th>
+                <th className="pb-3 pr-4 font-medium">Tool</th>
+                <th className="pb-3 pr-4 font-medium">Parameters</th>
+                <th className="pb-3 pr-4 font-medium text-right">Results</th>
+                <th className="pb-3 pr-4 font-medium text-right">Latency</th>
+                <th className="pb-3 font-medium">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((ev) => (
+                <tr key={ev.id} className="border-b border-dark-700/30 hover:bg-dark-800/30">
+                  <td className="py-2.5 pr-4 text-dark-300">{ev.user_email || '—'}</td>
+                  <td className="py-2.5 pr-4">
+                    <span className="px-2 py-0.5 rounded bg-accent/10 text-accent text-xs font-medium">{ev.tool_name}</span>
+                  </td>
+                  <td className="py-2.5 pr-4 text-dark-400 max-w-xs truncate" title={ev.request_params || undefined}>
+                    {formatParams(ev.request_params)}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right text-dark-300">{ev.result_count ?? '—'}</td>
+                  <td className="py-2.5 pr-4 text-right text-dark-400">{ev.latency_ms != null ? `${ev.latency_ms}ms` : '—'}</td>
+                  <td className="py-2.5 text-dark-400">{formatDateTime(ev.called_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <span className="text-sm text-dark-400">Page {page} of {totalPages}</span>
+          <div className="flex gap-2">
+            <button onClick={() => fetchData(page - 1)} disabled={page <= 1}
+              className="p-2 rounded-lg border border-dark-700/50 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronLeft size={16} />
+            </button>
+            <button onClick={() => fetchData(page + 1)} disabled={page >= totalPages}
+              className="p-2 rounded-lg border border-dark-700/50 text-dark-400 hover:text-dark-200 disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'mcp-usage';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -1772,6 +1878,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'email-prefs' && <EmailPrefsTab getToken={getToken} />}
       {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
       {activeTab === 'promo-codes' && <PromoCodesTab users={users} getToken={getToken} />}
+      {activeTab === 'mcp-usage' && <McpUsageTab getToken={getToken} />}
     </div>
   );
 }
