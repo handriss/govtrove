@@ -174,6 +174,13 @@ variable "stripe_promo_coupon_id" {
   default     = ""
 }
 
+# WorkOS AuthKit
+variable "authkit_domain" {
+  description = "WorkOS AuthKit domain (e.g. https://xxx.authkit.app)"
+  type        = string
+  default     = "https://timely-midnight-01-staging.authkit.app"
+}
+
 # Domain (optional, for future custom domain support)
 variable "domain_name" {
   description = "Custom domain name for the application (optional)"
