@@ -604,6 +604,36 @@ export async function getAdminSearchEvents(
   return response.json();
 }
 
+// --- MCP Usage ---
+
+export interface McpUsageEvent {
+  id: number;
+  user_email: string | null;
+  tool_name: string;
+  request_params: string | null;
+  result_count: number | null;
+  latency_ms: number | null;
+  called_at: string;
+}
+
+export interface AdminMcpUsageResponse {
+  events: McpUsageEvent[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getAdminMcpUsage(
+  token: string,
+  page = 1,
+): Promise<AdminMcpUsageResponse> {
+  const response = await fetch(`${API_BASE}/admin/mcp-usage?page=${page}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 // --- Analytics ---
 
 export interface SearchTermStat {

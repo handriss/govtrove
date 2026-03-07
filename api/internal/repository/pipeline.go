@@ -140,6 +140,16 @@ type PipelineExecutionRow struct {
 	Steps       []PipelineStepRow `json:"steps"`
 }
 
+type McpUsageRow struct {
+	ID            int     `json:"id"`
+	UserEmail     *string `json:"user_email"`
+	ToolName      string  `json:"tool_name"`
+	RequestParams *string `json:"request_params"`
+	ResultCount   *int    `json:"result_count"`
+	LatencyMs     *int    `json:"latency_ms"`
+	CalledAt      string  `json:"called_at"`
+}
+
 type SearchEventRow struct {
 	ID           int     `json:"id"`
 	Query        *string `json:"query"`
@@ -296,6 +306,38 @@ func (r *PipelineRepository) ListSearchEvents(ctx context.Context, page, limit i
 			return nil, 0, err
 		}
 		ev.CreatedAt = createdAt.Format(time.RFC3339)
+		events = append(events, ev)
+	}
+	return events, total, rows.Err()
+}
+
+func (r *PipelineRepository) ListMcpUsage(ctx context.Context, page, limit int) ([]McpUsageRow, int, error) {
+	var total int
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM mcp_usage`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, user_email, tool_name, request_params::text, result_count, latency_ms, called_at
+		FROM mcp_usage
+		ORDER BY called_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var events []McpUsageRow
+	for rows.Next() {
+		var ev McpUsageRow
+		var calledAt time.Time
+		if err := rows.Scan(&ev.ID, &ev.UserEmail, &ev.ToolName, &ev.RequestParams,
+			&ev.ResultCount, &ev.LatencyMs, &calledAt); err != nil {
+			return nil, 0, err
+		}
+		ev.CalledAt = calledAt.Format(time.RFC3339)
 		events = append(events, ev)
 	}
 	return events, total, rows.Err()
