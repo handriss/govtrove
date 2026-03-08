@@ -49,6 +49,8 @@ export interface Opportunity {
   ui_link?: string;
   resource_links?: string[];
   data_source?: string;
+  snap_csv_id?: number;
+  snap_api_id?: number;
   primary_contact_title?: string;
   primary_contact_fullname?: string;
   primary_contact_email?: string;
@@ -155,12 +157,16 @@ export interface SolicitationHistoryItem {
   base_type?: string;
   posted_date?: string;
   response_deadline?: string;
+  archive_date?: string;
   award_date?: string;
   award_amount?: number;
   awardee_name?: string;
+  set_aside_code?: string;
   active: boolean;
   is_current: boolean;
   version: number;
+  contact_name?: string;
+  resource_count: number;
   changes?: FieldChange[];
 }
 

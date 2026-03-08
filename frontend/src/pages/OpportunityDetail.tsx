@@ -580,7 +580,21 @@ export default function OpportunityDetail() {
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-dark-500">
             <div className="flex items-center gap-4">
               <span>
-                Source: <span className="text-dark-400">{opportunity.data_source || 'SAM.gov'}</span>
+                Source:{' '}
+                {opportunity.snap_csv_id ? (
+                  <Link to={`/snap/csv/${opportunity.snap_csv_id}`} className="text-dark-400 hover:text-accent transition-colors">csv</Link>
+                ) : opportunity.data_source?.includes('csv') ? (
+                  <span className="text-dark-400">csv</span>
+                ) : null}
+                {opportunity.data_source?.includes('csv') && opportunity.data_source?.includes('api') && (
+                  <span className="text-dark-400"> + </span>
+                )}
+                {opportunity.snap_api_id ? (
+                  <Link to={`/snap/api/${opportunity.snap_api_id}`} className="text-dark-400 hover:text-accent transition-colors">api</Link>
+                ) : opportunity.data_source?.includes('api') ? (
+                  <span className="text-dark-400">api</span>
+                ) : null}
+                {!opportunity.data_source && <span className="text-dark-400">SAM.gov</span>}
               </span>
               <span>
                 Last Updated: <span className="text-dark-400">{formatDate(opportunity.updated_at)}</span>

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -394,9 +395,11 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 			primary_contact_phone, primary_contact_fax,
 			secondary_contact_title, secondary_contact_fullname, secondary_contact_email,
 			secondary_contact_phone, secondary_contact_fax,
-			created_at, updated_at
-		FROM opportunities
-		WHERE id = $1
+			created_at, updated_at,
+			(SELECT id FROM pipeline.snap_csv WHERE notice_id = o.notice_id ORDER BY snapshot_date DESC LIMIT 1),
+			(SELECT id FROM pipeline.snap_api WHERE notice_id = o.notice_id ORDER BY snapshot_date DESC LIMIT 1)
+		FROM opportunities o
+		WHERE o.id = $1
 	`
 
 	var opp models.Opportunity
@@ -446,6 +449,8 @@ func (r *OpportunityRepository) GetByID(ctx context.Context, id int) (*models.Op
 		&opp.SecondaryContactFax,
 		&opp.CreatedAt,
 		&opp.UpdatedAt,
+		&opp.SnapCSVID,
+		&opp.SnapAPIID,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil
@@ -528,7 +533,10 @@ func (r *OpportunityRepository) GetSolicitationHistory(ctx context.Context, oppo
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, notice_id, title, type, base_type, posted_date, response_deadline,
-		       award_date, award_amount, awardee_name, active, version
+		       archive_date, award_date, award_amount, awardee_name, set_aside_code,
+		       active, version, primary_contact_fullname,
+		       COALESCE(jsonb_array_length(resource_links), 0),
+		       LEFT(description, 500)
 		FROM opportunities
 		WHERE solicitation_number = $1
 		ORDER BY posted_date ASC NULLS LAST, version ASC
@@ -545,8 +553,9 @@ func (r *OpportunityRepository) GetSolicitationHistory(ctx context.Context, oppo
 		err := rows.Scan(
 			&item.ID, &item.NoticeID, &item.Title, &item.Type, &item.BaseType,
 			&item.PostedDate, &item.ResponseDeadline,
-			&item.AwardDate, &item.AwardAmount, &item.AwardeeName, &item.Active,
-			&item.Version,
+			&item.ArchiveDate, &item.AwardDate, &item.AwardAmount, &item.AwardeeName,
+			&item.SetAsideCode, &item.Active, &item.Version,
+			&item.ContactName, &item.ResourceCount, &item.Description,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning notice row: %w", err)
@@ -560,12 +569,113 @@ func (r *OpportunityRepository) GetSolicitationHistory(ctx context.Context, oppo
 		return nil, fmt.Errorf("iterating notice rows: %w", err)
 	}
 
+	computeHistoryChanges(items)
+
 	return &models.SolicitationHistory{
 		SolicitationNumber: *solNum,
 		TotalNotices:       totalNotices,
 		Notices:            items,
 		Truncated:          totalNotices > 50,
 	}, nil
+}
+
+func computeHistoryChanges(items []models.SolicitationHistoryItem) {
+	for i := 1; i < len(items); i++ {
+		prev := &items[i-1]
+		curr := &items[i]
+		var changes []models.FieldChange
+
+		if curr.NoticeID != prev.NoticeID && curr.Version == 1 {
+			changes = append(changes, models.FieldChange{FieldName: "New notice"})
+		}
+
+		if curr.Title != prev.Title {
+			old := prev.Title
+			changes = append(changes, models.FieldChange{FieldName: "Title", OldValue: &old, NewValue: &curr.Title})
+		}
+
+		if ptrStr(curr.Type) != ptrStr(prev.Type) {
+			changes = append(changes, models.FieldChange{FieldName: "Type", OldValue: prev.Type, NewValue: curr.Type})
+		}
+
+		if ptrStr(curr.SetAsideCode) != ptrStr(prev.SetAsideCode) {
+			changes = append(changes, models.FieldChange{FieldName: "Set-aside", OldValue: prev.SetAsideCode, NewValue: curr.SetAsideCode})
+		}
+
+		if fmtTime(curr.ResponseDeadline) != fmtTime(prev.ResponseDeadline) {
+			old, new := fmtTime(prev.ResponseDeadline), fmtTime(curr.ResponseDeadline)
+			changes = append(changes, models.FieldChange{FieldName: "Deadline", OldValue: nilIfEmpty(old), NewValue: nilIfEmpty(new)})
+		}
+
+		if fmtTime(curr.ArchiveDate) != fmtTime(prev.ArchiveDate) {
+			old, new := fmtTime(prev.ArchiveDate), fmtTime(curr.ArchiveDate)
+			changes = append(changes, models.FieldChange{FieldName: "Archive date", OldValue: nilIfEmpty(old), NewValue: nilIfEmpty(new)})
+		}
+
+		if curr.Active != prev.Active {
+			if curr.Active {
+				v := "Reactivated"
+				changes = append(changes, models.FieldChange{FieldName: v})
+			} else {
+				v := "Deactivated"
+				changes = append(changes, models.FieldChange{FieldName: v})
+			}
+		}
+
+		if ptrStr(curr.AwardeeName) != ptrStr(prev.AwardeeName) && curr.AwardeeName != nil {
+			changes = append(changes, models.FieldChange{FieldName: "Awardee", OldValue: prev.AwardeeName, NewValue: curr.AwardeeName})
+		}
+
+		if fmtFloat(curr.AwardAmount) != fmtFloat(prev.AwardAmount) && curr.AwardAmount != nil {
+			old, new := fmtFloat(prev.AwardAmount), fmtFloat(curr.AwardAmount)
+			changes = append(changes, models.FieldChange{FieldName: "Award", OldValue: nilIfEmpty(old), NewValue: nilIfEmpty(new)})
+		}
+
+		if ptrStr(curr.ContactName) != ptrStr(prev.ContactName) {
+			changes = append(changes, models.FieldChange{FieldName: "Contact", OldValue: prev.ContactName, NewValue: curr.ContactName})
+		}
+
+		if curr.ResourceCount != prev.ResourceCount {
+			old := fmt.Sprintf("%d", prev.ResourceCount)
+			new := fmt.Sprintf("%d", curr.ResourceCount)
+			changes = append(changes, models.FieldChange{FieldName: "Attachments", OldValue: &old, NewValue: &new})
+		}
+
+		if ptrStr(curr.Description) != ptrStr(prev.Description) {
+			changes = append(changes, models.FieldChange{FieldName: "Description"})
+		}
+
+		curr.Changes = changes
+		items[i] = *curr
+	}
+}
+
+func ptrStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func fmtTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02")
+}
+
+func fmtFloat(f *float64) string {
+	if f == nil {
+		return ""
+	}
+	return fmt.Sprintf("%.2f", *f)
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (r *OpportunityRepository) getFacet(ctx context.Context, params models.SearchParams, exclude, selectCol, labelCol string, limit int) ([]models.FacetValue, error) {
