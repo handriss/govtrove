@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { SolicitationHistory, SolicitationHistoryItem } from '../types/api';
+import type { SolicitationHistory, SolicitationHistoryItem, FieldChange } from '../types/api';
 
 const typeLabels: Record<string, string> = {
   o: 'Solicitation',
@@ -58,78 +58,46 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function detectVersionChanges(prev: SolicitationHistoryItem, curr: SolicitationHistoryItem): string[] {
-  const changes: string[] = [];
-  if (prev.title !== curr.title) changes.push('Title updated');
-  if (prev.type !== curr.type) {
-    const oldLabel = prev.type ? typeLabels[prev.type] || prev.type : null;
-    const newLabel = curr.type ? typeLabels[curr.type] || curr.type : null;
-    if (oldLabel && newLabel) changes.push(`${oldLabel} \u2192 ${newLabel}`);
-    else changes.push('Type changed');
-  }
-  if (prev.response_deadline !== curr.response_deadline) {
-    const formatted = formatDate(curr.response_deadline);
-    changes.push(formatted ? `Deadline: ${formatted}` : 'Deadline updated');
-  }
-  if (prev.award_amount !== curr.award_amount && curr.award_amount) {
-    changes.push(`Award: ${formatCurrency(curr.award_amount)}`);
-  }
-  if (prev.awardee_name !== curr.awardee_name && curr.awardee_name) {
-    changes.push(`Awardee: ${curr.awardee_name}`);
-  }
-  if (!prev.active && curr.active) changes.push('Reactivated');
-  if (prev.active && !curr.active) changes.push('Deactivated');
-  return changes;
-}
+function formatChangeLabel(change: FieldChange): string {
+  const { field_name, old_value, new_value } = change;
 
-interface TimelineGroup {
-  noticeId: string;
-  items: SolicitationHistoryItem[];
-}
-
-function groupByNoticeId(notices: SolicitationHistoryItem[]): TimelineGroup[] {
-  const groups: TimelineGroup[] = [];
-  let current: TimelineGroup | null = null;
-  for (const item of notices) {
-    if (!current || current.noticeId !== item.notice_id) {
-      current = { noticeId: item.notice_id, items: [item] };
-      groups.push(current);
-    } else {
-      current.items.push(item);
-    }
+  // Status changes are self-describing
+  if (field_name === 'Reactivated' || field_name === 'Deactivated' || field_name === 'New notice' || field_name === 'Description') {
+    return field_name === 'Description' ? 'Description updated' : field_name;
   }
-  return groups;
+
+  if (!old_value && new_value) return `${field_name}: ${new_value}`;
+  if (old_value && !new_value) return `${field_name} removed`;
+  if (old_value && new_value) return `${field_name}: ${old_value} → ${new_value}`;
+  return field_name;
 }
 
 function NoticeCard({
   item,
   isLast,
   isUpdate,
-  prevItem,
 }: {
   item: SolicitationHistoryItem;
   isLast: boolean;
-  isUpdate?: boolean;
-  prevItem?: SolicitationHistoryItem;
+  isUpdate: boolean;
 }) {
   const typeCode = item.type || '';
   const typeLabel = typeLabels[typeCode] || item.base_type || 'Notice';
   const badgeColor = typeColors[typeCode] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   const dot = dotColors[typeCode] || 'bg-gray-400';
   const postedDate = formatDate(item.posted_date);
-
-  const changes = isUpdate && prevItem
-    ? detectVersionChanges(prevItem, item)
-    : [];
+  const changes = item.changes || [];
 
   const content = (
     <div
       className={`rounded-lg p-3 transition-colors duration-150 ${
         item.is_current
           ? 'bg-accent/5 border border-accent/30 ring-1 ring-accent/20'
-          : isUpdate
-            ? 'bg-dark-800/10 border border-dashed border-dark-700/40 hover:border-dark-600/50'
-            : 'bg-dark-800/20 border border-dark-800/40 hover:border-dark-700/50'
+          : !item.active
+            ? 'bg-dark-800/10 border border-dark-800/30 opacity-50'
+            : isUpdate
+              ? 'bg-dark-800/10 border border-dashed border-dark-700/40 hover:border-dark-600/50'
+              : 'bg-dark-800/20 border border-dark-800/40 hover:border-dark-700/50'
       }`}
     >
       <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -168,12 +136,12 @@ function NoticeCard({
 
       {changes.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {changes.map((label, i) => (
+          {changes.map((change, i) => (
             <span
               key={i}
               className="inline-flex px-2 py-0.5 text-[11px] rounded-full bg-dark-700/40 text-dark-400 border border-dark-700/30"
             >
-              {label}
+              {formatChangeLabel(change)}
             </span>
           ))}
         </div>
@@ -183,19 +151,19 @@ function NoticeCard({
 
   return (
     <div className="relative flex gap-4">
-      {/* Timeline line + dot */}
       <div className="flex flex-col items-center w-3 flex-shrink-0">
         <div className={`rounded-full mt-4 flex-shrink-0 ${
           isUpdate
             ? 'w-1.5 h-1.5 bg-dark-600'
-            : item.is_current
-              ? 'w-2.5 h-2.5 ring-2 ring-accent/40 ' + dot
-              : 'w-2.5 h-2.5 ' + dot
+            : !item.active
+              ? 'w-2.5 h-2.5 bg-dark-600'
+              : item.is_current
+                ? 'w-2.5 h-2.5 ring-2 ring-accent/40 ' + dot
+                : 'w-2.5 h-2.5 ' + dot
         }`} />
         {!isLast && <div className="w-px flex-1 bg-dark-700/50 mt-1" />}
       </div>
 
-      {/* Card */}
       <div className="flex-1 pb-3">
         {item.is_current ? (
           content
@@ -215,28 +183,21 @@ export default function SolicitationTimeline({
   history: SolicitationHistory;
   currentId: number;
 }) {
-  const groups = groupByNoticeId(history.notices);
-  const totalEntries = history.notices.length;
-  let entryIndex = 0;
+  const notices = history.notices;
 
   return (
     <div>
-      {groups.map((group) =>
-        group.items.map((item, itemIdx) => {
-          const isUpdate = itemIdx > 0;
-          const prevItem = itemIdx > 0 ? group.items[itemIdx - 1] : undefined;
-          const isLast = ++entryIndex === totalEntries;
-          return (
-            <NoticeCard
-              key={item.id}
-              item={item}
-              isLast={isLast}
-              isUpdate={isUpdate}
-              prevItem={prevItem}
-            />
-          );
-        })
-      )}
+      {notices.map((item, idx) => {
+        const isUpdate = idx > 0 && item.notice_id === notices[idx - 1].notice_id;
+        return (
+          <NoticeCard
+            key={item.id}
+            item={item}
+            isLast={idx === notices.length - 1}
+            isUpdate={isUpdate}
+          />
+        );
+      })}
 
       {history.truncated && (
         <p className="text-xs text-dark-500 mt-3 pl-7">

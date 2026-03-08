@@ -37,6 +37,8 @@ type Opportunity struct {
 	UILink                  *string    `json:"ui_link,omitempty"`
 	ResourceLinks           []string   `json:"resource_links,omitempty"`
 	DataSource              *string    `json:"data_source,omitempty"`
+	SnapCSVID               *int64     `json:"snap_csv_id,omitempty"`
+	SnapAPIID               *int64     `json:"snap_api_id,omitempty"`
 	PrimaryContactTitle     *string    `json:"primary_contact_title,omitempty"`
 	PrimaryContactFullname  *string    `json:"primary_contact_fullname,omitempty"`
 	PrimaryContactEmail     *string    `json:"primary_contact_email,omitempty"`
@@ -131,12 +133,17 @@ type SolicitationHistoryItem struct {
 	BaseType         *string       `json:"base_type,omitempty"`
 	PostedDate       *time.Time    `json:"posted_date,omitempty"`
 	ResponseDeadline *time.Time    `json:"response_deadline,omitempty"`
+	ArchiveDate      *time.Time    `json:"archive_date,omitempty"`
 	AwardDate        *time.Time    `json:"award_date,omitempty"`
 	AwardAmount      *float64      `json:"award_amount,omitempty"`
 	AwardeeName      *string       `json:"awardee_name,omitempty"`
+	SetAsideCode     *string       `json:"set_aside_code,omitempty"`
 	Active           bool          `json:"active"`
 	IsCurrent        bool          `json:"is_current"`
 	Version          int           `json:"version"`
+	ContactName      *string       `json:"contact_name,omitempty"`
+	ResourceCount    int           `json:"resource_count"`
+	Description      *string       `json:"-"`
 	Changes          []FieldChange `json:"changes,omitempty"`
 }
 
