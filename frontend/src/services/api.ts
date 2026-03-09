@@ -37,7 +37,9 @@ export async function searchOpportunities(params: SearchParams = {}, token?: str
   if (params.type) searchParams.set('type', params.type);
   if (params.set_aside) searchParams.set('set_aside', params.set_aside);
   if (params.naics) searchParams.set('naics', params.naics);
+  if (params.naics_prefixes) searchParams.set('naics_prefixes', params.naics_prefixes);
   if (params.psc) searchParams.set('psc', params.psc);
+  if (params.psc_prefixes) searchParams.set('psc_prefixes', params.psc_prefixes);
   if (params.state) searchParams.set('state', params.state);
   if (params.naics_prefix) searchParams.set('naics_prefix', params.naics_prefix);
   if (params.department) searchParams.set('department', params.department);

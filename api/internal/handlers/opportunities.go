@@ -378,10 +378,18 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 
 	params.NAICSPrefix = truncate(q.Get("naics_prefix"), 10)
 
+	if np := q.Get("naics_prefixes"); np != "" {
+		params.NAICSPrefixes = capSlice(strings.Split(np, ","), 10)
+	}
+
 	if pscStr := q.Get("psc"); pscStr != "" {
 		params.PSCCodes = capSlice(strings.Split(pscStr, ","), 50)
 	}
 	params.PSCPrefix = truncate(q.Get("psc_prefix"), 10)
+
+	if pp := q.Get("psc_prefixes"); pp != "" {
+		params.PSCPrefixes = capSlice(strings.Split(pp, ","), 10)
+	}
 
 	params.Department = truncate(q.Get("department"), 200)
 

@@ -109,8 +109,10 @@ export interface SearchParams {
   set_aside?: string;
   naics?: string;
   naics_prefix?: string;
+  naics_prefixes?: string;
   psc?: string;
   psc_prefix?: string;
+  psc_prefixes?: string;
   state?: string;
   department?: string;
   agency?: string;

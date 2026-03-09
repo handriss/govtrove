@@ -1,9 +1,11 @@
-import { useReducer, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useReducer, useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { expandToLeafCodes } from '../components/filters/naicsTree';
-import { expandPscToLeafCodes } from '../components/filters/pscTree';
+import { expandToLeafCodes, naicsDataReady, NODE_BY_CODE as NAICS_NODES } from '../components/filters/naicsTree';
+import { expandPscToLeafCodes, pscDataReady } from '../components/filters/pscTree';
 import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
 import type { SearchParams } from '../types/api';
+
+const treeDataReady = Promise.all([naicsDataReady, pscDataReady]);
 
 export interface FilterState {
   keyword: string;
@@ -231,6 +233,7 @@ export interface UseFilterStateReturn {
   clearAllFilters: () => void;
   setFilters: (partial: Partial<FilterState>) => void;
   filterCount: number;
+  dataReady: boolean;
   toSearchParams: () => SearchParams;
   toFacetParams: () => SearchParams;
 }
@@ -240,6 +243,11 @@ export function useFilterState(): UseFilterStateReturn {
   const [filters, dispatch] = useReducer(reducer, searchParams, parseStateFromURL);
   const skipURLSync = useRef(false);
   const initialized = useRef(false);
+  const [dataReady, setDataReady] = useState(false);
+
+  useEffect(() => {
+    treeDataReady.then(() => setDataReady(true));
+  }, []);
 
   // On mount, mark initialized after first render
   useEffect(() => {
@@ -327,7 +335,26 @@ export function useFilterState(): UseFilterStateReturn {
     if (filters.keyword) p.q = filters.keyword;
     if (filters.noticeType.length) p.type = filters.noticeType.join(',');
     if (filters.setAside.length) p.set_aside = filters.setAside.join(',');
-    if (filters.naics.length) p.naics = expandToLeafCodes(filters.naics).join(',');
+    if (filters.naics.length) {
+      const prefixes: string[] = [];
+      const leafCodes: string[] = [];
+      for (const code of filters.naics) {
+        const node = NAICS_NODES.get(code);
+        if (node && node.leafCodes.length > 50) {
+          // Sector-level: send as prefix query (e.g. "31-33" → prefixes "31","32","33")
+          if (code.includes('-')) {
+            const [start, end] = code.split('-').map(Number);
+            for (let i = start; i <= end; i++) prefixes.push(String(i));
+          } else {
+            prefixes.push(code);
+          }
+        } else {
+          leafCodes.push(...expandToLeafCodes([code]));
+        }
+      }
+      if (leafCodes.length) p.naics = leafCodes.join(',');
+      if (prefixes.length) p.naics_prefixes = prefixes.join(',');
+    }
     if (filters.psc.length) p.psc = expandPscToLeafCodes(filters.psc).join(',');
     if (filters.state) p.state = filters.state;
     if (filters.agency.length) p.agency = filters.agency.join(',');
@@ -371,6 +398,7 @@ export function useFilterState(): UseFilterStateReturn {
     clearAllFilters,
     setFilters,
     filterCount,
+    dataReady,
     toSearchParams,
     toFacetParams,
   };
