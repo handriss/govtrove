@@ -118,6 +118,37 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 	}, nil
 }
 
+// buildCodeOrPrefixConditions builds an OR condition combining exact codes, a single prefix, and multiple prefixes.
+func buildCodeOrPrefixConditions(codes []string, prefix string, prefixes []string, column string, argNum *int, args *[]any) string {
+	var parts []string
+
+	if len(codes) > 0 {
+		parts = append(parts, fmt.Sprintf("%s = ANY($%d)", column, *argNum))
+		*args = append(*args, codes)
+		*argNum++
+	}
+
+	if prefix != "" {
+		parts = append(parts, fmt.Sprintf("%s LIKE $%d", column, *argNum))
+		*args = append(*args, prefix+"%")
+		*argNum++
+	}
+
+	for _, p := range prefixes {
+		parts = append(parts, fmt.Sprintf("%s LIKE $%d", column, *argNum))
+		*args = append(*args, p+"%")
+		*argNum++
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return "(" + strings.Join(parts, " OR ") + ")"
+}
+
 // buildFilterConditions builds WHERE conditions from search params.
 // exclude skips one dimension so facet counts aren't self-filtered:
 // "set_aside", "type", "department", "naics", "state"
@@ -211,28 +242,18 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
-	if len(params.NAICSCodes) > 0 && exclude != "naics" {
-		conditions = append(conditions, fmt.Sprintf("naics_code = ANY($%d)", argNum))
-		args = append(args, params.NAICSCodes)
-		argNum++
+	if exclude != "naics" {
+		naicsConds := buildCodeOrPrefixConditions(params.NAICSCodes, params.NAICSPrefix, params.NAICSPrefixes, "naics_code", &argNum, &args)
+		if naicsConds != "" {
+			conditions = append(conditions, naicsConds)
+		}
 	}
 
-	if params.NAICSPrefix != "" && exclude != "naics" {
-		conditions = append(conditions, fmt.Sprintf("naics_code LIKE $%d", argNum))
-		args = append(args, params.NAICSPrefix+"%")
-		argNum++
-	}
-
-	if len(params.PSCCodes) > 0 && exclude != "psc" {
-		conditions = append(conditions, fmt.Sprintf("classification_code = ANY($%d)", argNum))
-		args = append(args, params.PSCCodes)
-		argNum++
-	}
-
-	if params.PSCPrefix != "" && exclude != "psc" {
-		conditions = append(conditions, fmt.Sprintf("classification_code LIKE $%d", argNum))
-		args = append(args, params.PSCPrefix+"%")
-		argNum++
+	if exclude != "psc" {
+		pscConds := buildCodeOrPrefixConditions(params.PSCCodes, params.PSCPrefix, params.PSCPrefixes, "classification_code", &argNum, &args)
+		if pscConds != "" {
+			conditions = append(conditions, pscConds)
+		}
 	}
 
 	if params.Department != "" && exclude != "department" && exclude != "agency" {

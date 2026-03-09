@@ -82,11 +82,13 @@ export default function SimpleSearchPage() {
   }, []);
 
   // Non-keyword search params — auto-search fires when these change
+  // Wait for NAICS/PSC tree data so range codes like "31-33" expand to leaf codes
   const autoSearchKey = useMemo(() => {
+    if (!fs.dataReady) return '';
     const p = fs.toSearchParams();
     delete p.q;
     return JSON.stringify(p);
-  }, [fs.toSearchParams]);
+  }, [fs.toSearchParams, fs.dataReady]);
   const debouncedAutoSearch = useDebounce(autoSearchKey, 300);
 
   // Explicit search trigger (Enter key, chip clicks)
@@ -150,9 +152,9 @@ export default function SimpleSearchPage() {
     if (!isAuthenticated) incrementAnonSearchCount();
   }, [debouncedAutoSearch, searchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initial search on mount if URL has filters
+  // Initial search on mount if URL has filters (wait for tree data to be ready)
   useEffect(() => {
-    if (!isInitialSearch.current) return;
+    if (!isInitialSearch.current || !fs.dataReady) return;
     if (hasActiveFilters) {
       const params = fs.toSearchParams();
       params.limit = pageSize;
@@ -161,7 +163,7 @@ export default function SimpleSearchPage() {
       setHasSearched(true);
     }
     isInitialSearch.current = false;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fs.dataReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(() => {
     if (hasActiveFilters) triggerSearch();

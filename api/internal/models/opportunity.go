@@ -74,10 +74,12 @@ type SearchParams struct {
 	Query        string
 	Types        []string
 	SetAsides    []string
-	NAICSCodes   []string
-	NAICSPrefix  string
-	PSCCodes     []string
-	PSCPrefix    string
+	NAICSCodes    []string
+	NAICSPrefix   string
+	NAICSPrefixes []string
+	PSCCodes      []string
+	PSCPrefix     string
+	PSCPrefixes   []string
 	States       []string
 	Department   string
 	AgencyPaths  []string
