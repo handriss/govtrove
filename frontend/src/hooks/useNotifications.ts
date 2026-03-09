@@ -9,6 +9,12 @@ import {
   deleteNotification as deleteNotificationAPI,
 } from '../services/api';
 
+const NOTIFICATIONS_CHANGED = 'govtrove:notifications-changed';
+
+export function notifyNotificationsChanged() {
+  window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
+}
+
 export function useNotificationsCount() {
   const { isAuthenticated, getAccessToken } = useAppAuth();
   const [count, setCount] = useState<NotificationCount>({ unread: 0, total: 0 });
@@ -38,10 +44,12 @@ export function useNotificationsCount() {
       if (document.visibilityState === 'visible') fetchCount();
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener(NOTIFICATIONS_CHANGED, fetchCount);
 
     return () => {
       clearInterval(intervalRef.current);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, fetchCount);
     };
   }, [isAuthenticated, fetchCount]);
 
@@ -92,6 +100,7 @@ export function useNotifications() {
     try {
       const token = await getAccessToken();
       await markNotificationReadAPI(token, id);
+      notifyNotificationsChanged();
     } catch {
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: false } : n)));
     }
@@ -102,6 +111,7 @@ export function useNotifications() {
     try {
       const token = await getAccessToken();
       await markAllReadAPI(token);
+      notifyNotificationsChanged();
     } catch {
       fetchNotifications(1, filter === 'unread', false);
     }
@@ -113,6 +123,7 @@ export function useNotifications() {
     try {
       const token = await getAccessToken();
       await deleteNotificationAPI(token, id);
+      notifyNotificationsChanged();
     } catch {
       fetchNotifications(1, filter === 'unread', false);
     }
