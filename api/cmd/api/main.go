@@ -160,6 +160,7 @@ func main() {
 	emailPrefsRepo := repository.NewEmailPreferencesRepository(pool)
 	sentEmailsRepo := repository.NewSentEmailsRepository(pool)
 	promoRepo := repository.NewPromoCodeRepository(pool)
+	inviteLinkRepo := repository.NewInviteLinkRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
 
 	appURL := "https://app.govtrove.com"
@@ -172,8 +173,8 @@ func main() {
 	if cfg.StripeSecretKey != "" {
 		stripeClient = stripe.NewClient(cfg.StripeSecretKey)
 		stripeHandler = handlers.NewStripeHandler(
-			userRepo, promoRepo, stripeClient, cfg.StripeWebhookSecret,
-			cfg.StripePriceMonthly, appURL, logger,
+			userRepo, promoRepo, inviteLinkRepo, stripeClient, cfg.StripeWebhookSecret,
+			cfg.StripePriceMonthly, appURL, snsClient, cfg.SNSTopicARN, logger,
 		)
 		logger.Info("Stripe billing configured")
 	}
@@ -184,7 +185,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -332,6 +333,11 @@ func main() {
 				r.Get("/promo-codes", adminHandler.ListPromoCodes)
 				r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
 				r.Delete("/promo-codes/{id}", adminHandler.RevokePromoCode)
+				r.Post("/invite-links", adminHandler.CreateInviteLink)
+				r.Get("/invite-links", adminHandler.ListInviteLinks)
+				r.Get("/invite-links/{id}", adminHandler.GetInviteLinkDetail)
+				r.Put("/invite-links/{id}", adminHandler.UpdateInviteLink)
+				r.Delete("/invite-links/{id}", adminHandler.DeactivateInviteLink)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
 				r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)

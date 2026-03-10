@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/webhook"
 
@@ -17,32 +19,41 @@ import (
 )
 
 type StripeHandler struct {
-	userRepo      *repository.UserRepository
-	promoRepo     *repository.PromoCodeRepository
-	sc            *stripe.Client
-	webhookSecret string
-	priceMonthly  string
-	appURL        string
-	logger        *slog.Logger
+	userRepo       *repository.UserRepository
+	promoRepo      *repository.PromoCodeRepository
+	inviteLinkRepo *repository.InviteLinkRepository
+	sc             *stripe.Client
+	webhookSecret  string
+	priceMonthly   string
+	appURL         string
+	snsClient      *sns.Client
+	snsTopicARN    string
+	logger         *slog.Logger
 }
 
 func NewStripeHandler(
 	userRepo *repository.UserRepository,
 	promoRepo *repository.PromoCodeRepository,
+	inviteLinkRepo *repository.InviteLinkRepository,
 	sc *stripe.Client,
 	webhookSecret string,
 	priceMonthly string,
 	appURL string,
+	snsClient *sns.Client,
+	snsTopicARN string,
 	logger *slog.Logger,
 ) *StripeHandler {
 	return &StripeHandler{
-		userRepo:      userRepo,
-		promoRepo:     promoRepo,
-		sc:            sc,
-		webhookSecret: webhookSecret,
-		priceMonthly:  priceMonthly,
-		appURL:        appURL,
-		logger:        logger,
+		userRepo:       userRepo,
+		promoRepo:      promoRepo,
+		inviteLinkRepo: inviteLinkRepo,
+		sc:             sc,
+		webhookSecret:  webhookSecret,
+		priceMonthly:   priceMonthly,
+		appURL:         appURL,
+		snsClient:      snsClient,
+		snsTopicARN:    snsTopicARN,
+		logger:         logger,
 	}
 }
 
@@ -113,19 +124,42 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		promo, promoErr := h.promoRepo.GetByCode(r.Context(), body.PromoCode)
 		if promoErr != nil {
 			h.logger.Error("promo code lookup failed", "error", promoErr)
-		} else if promo == nil {
-			http.Error(w, "invalid promo code", http.StatusBadRequest)
-			return
-		} else if promo.RedeemedBy != nil {
-			http.Error(w, "promo code already used", http.StatusBadRequest)
-			return
-		} else if promo.ExpiresAt != nil && promo.ExpiresAt.Before(time.Now()) {
-			http.Error(w, "promo code expired", http.StatusBadRequest)
-			return
-		} else {
+		} else if promo != nil {
+			if promo.RedeemedBy != nil {
+				http.Error(w, "promo code already used", http.StatusBadRequest)
+				return
+			}
+			if promo.ExpiresAt != nil && promo.ExpiresAt.Before(time.Now()) {
+				http.Error(w, "promo code expired", http.StatusBadRequest)
+				return
+			}
 			params.Discounts = []*stripe.CheckoutSessionCreateDiscountParams{
 				{PromotionCode: stripe.String(promo.StripePromoID)},
 			}
+		} else if h.inviteLinkRepo != nil {
+			invite, invErr := h.inviteLinkRepo.GetByCode(r.Context(), body.PromoCode)
+			if invErr != nil {
+				h.logger.Error("invite link lookup failed", "error", invErr)
+			} else if invite == nil {
+				http.Error(w, "invalid promo code", http.StatusBadRequest)
+				return
+			} else if invite.DeactivatedAt != nil {
+				http.Error(w, "invite link deactivated", http.StatusBadRequest)
+				return
+			} else if invite.ExpiresAt != nil && invite.ExpiresAt.Before(time.Now()) {
+				http.Error(w, "invite link expired", http.StatusBadRequest)
+				return
+			} else if invite.MaxRedemptions > 0 && invite.RedemptionCount >= invite.MaxRedemptions {
+				http.Error(w, "invite link max redemptions reached", http.StatusBadRequest)
+				return
+			} else {
+				params.Discounts = []*stripe.CheckoutSessionCreateDiscountParams{
+					{PromotionCode: stripe.String(invite.StripePromoID)},
+				}
+			}
+		} else {
+			http.Error(w, "invalid promo code", http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -134,6 +168,10 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		h.logger.Error("checkout session create failed", "error", err)
 		http.Error(w, "failed to create checkout session", http.StatusInternalServerError)
 		return
+	}
+
+	if h.snsClient != nil && h.snsTopicARN != "" {
+		go h.sendCheckoutNotification(user.Email, user.FirstName+" "+user.LastName, body.PromoCode)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -267,19 +305,55 @@ func (h *StripeHandler) trackPromoRedemption(ctx context.Context, sessionID stri
 			continue
 		}
 		promoID := d.PromotionCode.ID
+
+		// Check promo_codes first
 		row, err := h.promoRepo.GetByStripePromoID(ctx, promoID)
 		if err != nil {
 			h.logger.Error("promo lookup failed in webhook", "stripe_promo_id", promoID, "error", err)
 			continue
 		}
-		if row == nil {
+		if row != nil {
+			if err := h.promoRepo.MarkRedeemed(ctx, row.ID, userID); err != nil {
+				h.logger.Error("failed to mark promo redeemed", "promo_id", row.ID, "error", err)
+			} else {
+				h.logger.Info("promo code redeemed", "promo_id", row.ID, "code", row.Code, "user_id", userID)
+			}
 			continue
 		}
-		if err := h.promoRepo.MarkRedeemed(ctx, row.ID, userID); err != nil {
-			h.logger.Error("failed to mark promo redeemed", "promo_id", row.ID, "error", err)
-		} else {
-			h.logger.Info("promo code redeemed", "promo_id", row.ID, "code", row.Code, "user_id", userID)
+
+		// Check invite_links
+		if h.inviteLinkRepo != nil {
+			invite, invErr := h.inviteLinkRepo.GetByStripePromoID(ctx, promoID)
+			if invErr != nil {
+				h.logger.Error("invite link lookup failed in webhook", "stripe_promo_id", promoID, "error", invErr)
+				continue
+			}
+			if invite != nil {
+				if err := h.inviteLinkRepo.AddRedemption(ctx, invite.ID, userID); err != nil {
+					h.logger.Error("failed to add invite link redemption", "invite_link_id", invite.ID, "error", err)
+				} else {
+					h.logger.Info("invite link redeemed", "invite_link_id", invite.ID, "code", invite.Code, "user_id", userID)
+				}
+			}
 		}
+	}
+}
+
+func (h *StripeHandler) sendCheckoutNotification(email, name, promoCode string) {
+	promoInfo := "none"
+	if promoCode != "" {
+		promoInfo = promoCode
+	}
+	body := fmt.Sprintf("Checkout started:\n\nEmail: %s\nName: %s\nPromo Code: %s\nTime: %s",
+		email, name, promoInfo, time.Now().UTC().Format(time.RFC3339))
+
+	_, err := h.snsClient.Publish(context.Background(), &sns.PublishInput{
+		TopicArn: aws.String(h.snsTopicARN),
+		Subject:  aws.String("GovTrove: Checkout Started"),
+		Message:  aws.String(body),
+	})
+	if err != nil {
+		h.logger.Error("failed to send checkout notification", "error", err)
 	}
 }
 

@@ -29,6 +29,7 @@ type AdminHandler struct {
 	emailPrefsRepo   *repository.EmailPreferencesRepository
 	sentEmailsRepo   *repository.SentEmailsRepository
 	promoRepo        *repository.PromoCodeRepository
+	inviteLinkRepo   *repository.InviteLinkRepository
 	emailSvc         *email.Service
 	sc               *stripe.Client
 	promoCouponID    string
@@ -44,6 +45,7 @@ func NewAdminHandler(
 	emailPrefsRepo *repository.EmailPreferencesRepository,
 	sentEmailsRepo *repository.SentEmailsRepository,
 	promoRepo *repository.PromoCodeRepository,
+	inviteLinkRepo *repository.InviteLinkRepository,
 	emailSvc *email.Service,
 	sc *stripe.Client,
 	promoCouponID string,
@@ -58,6 +60,7 @@ func NewAdminHandler(
 		emailPrefsRepo:   emailPrefsRepo,
 		sentEmailsRepo:   sentEmailsRepo,
 		promoRepo:        promoRepo,
+		inviteLinkRepo:   inviteLinkRepo,
 		emailSvc:         emailSvc,
 		sc:               sc,
 		promoCouponID:    promoCouponID,
@@ -1078,6 +1081,226 @@ func (h *AdminHandler) GetSnapAPIRecord(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(record)
+}
+
+func (h *AdminHandler) CreateInviteLink(w http.ResponseWriter, r *http.Request) {
+	if h.sc == nil || h.promoCouponID == "" {
+		http.Error(w, "billing not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	var body struct {
+		CampaignName   string `json:"campaign_name"`
+		Code           string `json:"code"`
+		MaxRedemptions int    `json:"max_redemptions"`
+		ExpiresInDays  int    `json:"expires_in_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if body.CampaignName == "" {
+		http.Error(w, "campaign_name is required", http.StatusBadRequest)
+		return
+	}
+
+	asciiOnly := regexp.MustCompile(`[^a-zA-Z0-9]`)
+	code := body.Code
+	if code == "" {
+		randBytes := make([]byte, 2)
+		rand.Read(randBytes)
+		suffix := strings.ToUpper(hex.EncodeToString(randBytes))
+		campaignSlug := strings.ToUpper(asciiOnly.ReplaceAllString(body.CampaignName, ""))
+		if len(campaignSlug) > 20 {
+			campaignSlug = campaignSlug[:20]
+		}
+		if campaignSlug == "" {
+			campaignSlug = "LINK"
+		}
+		code = fmt.Sprintf("GOVTROVE-%s-%s", campaignSlug, suffix)
+	}
+
+	// Check uniqueness across both tables
+	existing, err := h.promoRepo.GetByCode(r.Context(), code)
+	if err != nil {
+		h.logger.Error("promo code lookup failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		http.Error(w, "code already exists in promo_codes", http.StatusConflict)
+		return
+	}
+	existingInvite, err := h.inviteLinkRepo.GetByCode(r.Context(), code)
+	if err != nil {
+		h.logger.Error("invite link code lookup failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if existingInvite != nil {
+		http.Error(w, "code already exists in invite_links", http.StatusConflict)
+		return
+	}
+
+	promoParams := &stripe.PromotionCodeCreateParams{
+		Coupon: stripe.String(h.promoCouponID),
+		Code:   stripe.String(code),
+	}
+	if body.MaxRedemptions > 0 {
+		promoParams.MaxRedemptions = stripe.Int64(int64(body.MaxRedemptions))
+	}
+
+	var expiresAt *time.Time
+	if body.ExpiresInDays > 0 {
+		t := time.Now().Add(time.Duration(body.ExpiresInDays) * 24 * time.Hour)
+		expiresAt = &t
+		promoParams.ExpiresAt = stripe.Int64(t.Unix())
+	}
+
+	stripePromo, err := h.sc.V1PromotionCodes.Create(r.Context(), promoParams)
+	if err != nil {
+		h.logger.Error("stripe promotion code create failed", "error", err)
+		http.Error(w, "failed to create promotion code", http.StatusInternalServerError)
+		return
+	}
+
+	id, err := h.inviteLinkRepo.Create(r.Context(), stripePromo.Code, stripePromo.ID, body.CampaignName, body.MaxRedemptions, expiresAt)
+	if err != nil {
+		h.logger.Error("failed to save invite link", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	inviteURL := fmt.Sprintf("%s/profile?promo=%s&utm_campaign=%s&utm_source=invite&utm_medium=link",
+		h.appURL, stripePromo.Code, stripePromo.Code)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":         id,
+		"code":       stripePromo.Code,
+		"invite_url": inviteURL,
+	})
+}
+
+func (h *AdminHandler) ListInviteLinks(w http.ResponseWriter, r *http.Request) {
+	links, err := h.inviteLinkRepo.List(r.Context())
+	if err != nil {
+		h.logger.Error("list invite links failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if links == nil {
+		links = []repository.InviteLinkRow{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(links)
+}
+
+func (h *AdminHandler) GetInviteLinkDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	link, err := h.inviteLinkRepo.GetByID(r.Context(), id)
+	if err != nil || link == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	redemptions, err := h.inviteLinkRepo.GetRedemptions(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get invite link redemptions failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if redemptions == nil {
+		redemptions = []repository.InviteLinkRedemptionRow{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"link":        link,
+		"redemptions": redemptions,
+	})
+}
+
+func (h *AdminHandler) UpdateInviteLink(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		MaxRedemptions int `json:"max_redemptions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	link, err := h.inviteLinkRepo.GetByID(r.Context(), id)
+	if err != nil || link == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if h.sc != nil {
+		updateParams := &stripe.PromotionCodeUpdateParams{}
+		// Stripe doesn't allow updating max_redemptions on promotion codes directly,
+		// but we track it ourselves for validation
+		_, _ = h.sc.V1PromotionCodes.Update(r.Context(), link.StripePromoID, updateParams)
+	}
+
+	if err := h.inviteLinkRepo.UpdateMaxRedemptions(r.Context(), id, body.MaxRedemptions); err != nil {
+		h.logger.Error("update invite link failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) DeactivateInviteLink(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	link, err := h.inviteLinkRepo.GetByID(r.Context(), id)
+	if err != nil || link == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if link.DeactivatedAt != nil {
+		http.Error(w, "already deactivated", http.StatusConflict)
+		return
+	}
+
+	if h.sc != nil {
+		_, err = h.sc.V1PromotionCodes.Update(r.Context(), link.StripePromoID, &stripe.PromotionCodeUpdateParams{
+			Active: stripe.Bool(false),
+		})
+		if err != nil {
+			h.logger.Error("stripe promo deactivate failed", "error", err)
+			http.Error(w, "failed to deactivate in Stripe", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := h.inviteLinkRepo.Deactivate(r.Context(), id); err != nil {
+		h.logger.Error("deactivate invite link failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("invite link deactivated", "id", id, "code", link.Code)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AdminHandler) deleteWorkOSUser(workosID string) error {
