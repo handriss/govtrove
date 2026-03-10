@@ -40,6 +40,15 @@ export default function ProfilePage() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showUpgraded, setShowUpgraded] = useState(false);
+  const [promoError, setPromoError] = useState('');
+
+  const promoCode = searchParams.get('promo') || sessionStorage.getItem('govtrove_promo_code') || undefined;
+
+  useEffect(() => {
+    if (promoCode && isAuthenticated) {
+      sessionStorage.removeItem('govtrove_promo_code');
+    }
+  }, [promoCode, isAuthenticated]);
 
   useEffect(() => {
     if (searchParams.get('upgraded') === '1') {
@@ -118,16 +127,6 @@ export default function ProfilePage() {
       setErrorMsg(e instanceof Error ? e.message : 'Something went wrong');
     }
   }
-
-  const promoCode = searchParams.get('promo') || sessionStorage.getItem('govtrove_promo_code') || undefined;
-  const [promoError, setPromoError] = useState('');
-
-  // Clear saved promo once we've consumed it on an authenticated profile page
-  useEffect(() => {
-    if (promoCode && isAuthenticated) {
-      sessionStorage.removeItem('govtrove_promo_code');
-    }
-  }, [promoCode, isAuthenticated]);
 
   async function handleBilling(action: 'checkout' | 'portal') {
     setBillingLoading(true);
