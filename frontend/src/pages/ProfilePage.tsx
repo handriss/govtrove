@@ -89,6 +89,9 @@ export default function ProfilePage() {
   }
 
   if (!isAuthenticated || !user) {
+    if (searchParams.get('promo')) {
+      sessionStorage.setItem('govtrove_auth_return', window.location.pathname + window.location.search);
+    }
     return <Navigate to="/" replace />;
   }
 
