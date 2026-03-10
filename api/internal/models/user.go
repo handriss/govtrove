@@ -9,6 +9,7 @@ type User struct {
 	FirstName string    `json:"first_name"`
 	LastName  string    `json:"last_name"`
 	Plan               string     `json:"plan"`
+	FreeForever        bool       `json:"free_forever"`
 	StripeCustomerID   *string    `json:"-"`
 	SubscriptionID     *string    `json:"-"`
 	SubscriptionStatus *string    `json:"subscription_status,omitempty"`

@@ -74,6 +74,7 @@ type adminUserResponse struct {
 	LastName        string `json:"last_name"`
 	Plan            string `json:"plan"`
 	IsAdmin         bool   `json:"is_admin"`
+	FreeForever     bool   `json:"free_forever"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
 	PendingExport   bool   `json:"pending_export"`
@@ -97,6 +98,7 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			LastName:        u.LastName,
 			Plan:            u.Plan,
 			IsAdmin:         u.IsAdmin,
+			FreeForever:     u.FreeForever,
 			CreatedAt:       u.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			UpdatedAt:       u.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 			PendingExport:   u.PendingExport,
@@ -106,6 +108,30 @@ func (h *AdminHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(out)
+}
+
+func (h *AdminHandler) SetFreeForever(w http.ResponseWriter, r *http.Request) {
+	userID, err := strconv.Atoi(chi.URLParam(r, "userId"))
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		FreeForever bool `json:"free_forever"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.userRepo.SetFreeForever(r.Context(), userID, body.FreeForever); err != nil {
+		h.logger.Error("set free_forever failed", "user_id", userID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AdminHandler) ListNotifications(w http.ResponseWriter, r *http.Request) {
@@ -752,8 +778,8 @@ func (h *AdminHandler) CreatePromoCode(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
-	if user.Plan == "pro" {
-		http.Error(w, "user is already pro", http.StatusConflict)
+	if user.Plan == "pro" || user.FreeForever {
+		http.Error(w, "user already has pro access", http.StatusConflict)
 		return
 	}
 

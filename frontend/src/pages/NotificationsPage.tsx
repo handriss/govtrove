@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2 } from 'lucide-react';
+import { Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2, Mail } from 'lucide-react';
 import type { OpportunityListItem, Notification } from '../types/api';
 import { useNotifications } from '../hooks/useNotifications';
+import { useAppAuth } from '../contexts/AuthContext';
 
 // --- Local utils (duplicated from OpportunityCard to avoid coupling) ---
 
@@ -557,6 +558,8 @@ function CollapsibleSection<T extends NotificationItem>({
 // --- Page ---
 
 export default function NotificationsPage() {
+  const { govtroveUser } = useAppAuth();
+  const hasPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
   const { notifications: rawNotifications, loading, hasMore, markRead, markAllRead, remove, loadMore } = useNotifications();
 
   const items: NotificationItem[] = rawNotifications
@@ -589,6 +592,26 @@ export default function NotificationsPage() {
             </button>
           )}
         </div>
+
+        {govtroveUser && !hasPro && (
+          <div className="mb-6 rounded-xl bg-accent/5 border border-accent/20 px-5 py-4 flex items-start gap-3">
+            <Mail size={18} className="text-accent mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm text-dark-200 font-medium">Get these updates in your inbox</p>
+              <p className="text-xs text-dark-400 mt-1">
+                Pro members receive a daily email digest when new opportunities match their saved searches or when saved opportunities change.
+              </p>
+              <Link
+                to="/settings"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
+                           border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
+                           transition-all duration-200"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          </div>
+        )}
 
         {loading && items.length === 0 ? (
           <div className="flex justify-center py-16">

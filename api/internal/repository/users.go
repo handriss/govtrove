@@ -12,14 +12,14 @@ import (
 	"github.com/handriss/govtrove/api/internal/models"
 )
 
-const userColumns = `id, workos_id, email, first_name, last_name, plan, stripe_customer_id,
+const userColumns = `id, workos_id, email, first_name, last_name, plan, free_forever, stripe_customer_id,
 	subscription_id, subscription_status, cancel_at_period_end, current_period_end,
 	created_at, updated_at`
 
 func scanUser(row pgx.Row, u *models.User) error {
 	return row.Scan(
 		&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName,
-		&u.Plan, &u.StripeCustomerID,
+		&u.Plan, &u.FreeForever, &u.StripeCustomerID,
 		&u.SubscriptionID, &u.SubscriptionStatus, &u.CancelAtPeriodEnd, &u.CurrentPeriodEnd,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
@@ -60,7 +60,7 @@ func (r *UserRepository) Upsert(ctx context.Context, input *models.UpsertUserInp
 		input.LastName,
 	).Scan(
 		&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName,
-		&u.Plan, &u.StripeCustomerID,
+		&u.Plan, &u.FreeForever, &u.StripeCustomerID,
 		&u.SubscriptionID, &u.SubscriptionStatus, &u.CancelAtPeriodEnd, &u.CurrentPeriodEnd,
 		&u.CreatedAt, &u.UpdatedAt, &isNew,
 	)
@@ -115,6 +115,7 @@ type AdminUserRow struct {
 	LastName        string
 	Plan            string
 	IsAdmin         bool
+	FreeForever     bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	PendingExport   bool
@@ -123,7 +124,7 @@ type AdminUserRow struct {
 
 func (r *UserRepository) ListUsers(ctx context.Context) ([]AdminUserRow, error) {
 	query := `
-		SELECT u.id, u.email, u.first_name, u.last_name, u.plan, u.is_admin, u.created_at, u.updated_at,
+		SELECT u.id, u.email, u.first_name, u.last_name, u.plan, u.is_admin, u.free_forever, u.created_at, u.updated_at,
 			EXISTS(SELECT 1 FROM account_requests ar WHERE ar.user_id = u.id AND ar.request_type = 'data_export' AND ar.status = 'pending') AS pending_export,
 			EXISTS(SELECT 1 FROM account_requests ar WHERE ar.user_id = u.id AND ar.request_type = 'account_deletion' AND ar.status = 'pending') AS pending_deletion
 		FROM users u ORDER BY u.created_at DESC
@@ -138,7 +139,7 @@ func (r *UserRepository) ListUsers(ctx context.Context) ([]AdminUserRow, error) 
 	var users []AdminUserRow
 	for rows.Next() {
 		var u AdminUserRow
-		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Plan, &u.IsAdmin, &u.CreatedAt, &u.UpdatedAt, &u.PendingExport, &u.PendingDeletion); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.Plan, &u.IsAdmin, &u.FreeForever, &u.CreatedAt, &u.UpdatedAt, &u.PendingExport, &u.PendingDeletion); err != nil {
 			return nil, fmt.Errorf("scanning user: %w", err)
 		}
 		users = append(users, u)
@@ -165,7 +166,7 @@ func (r *UserRepository) ExportUserData(ctx context.Context, userID int, userEma
 
 	if err := queryJSON(&exp.User, `
 		SELECT row_to_json(u) FROM (
-			SELECT id, email, first_name, last_name, plan, created_at, updated_at
+			SELECT id, email, first_name, last_name, plan, free_forever, created_at, updated_at
 			FROM users WHERE id = $1
 		) u`, userID); err != nil {
 		return nil, fmt.Errorf("exporting user: %w", err)
@@ -290,6 +291,17 @@ func (r *UserRepository) UpdateSubscription(ctx context.Context, userID int, pla
 	)
 	if err != nil {
 		return fmt.Errorf("updating subscription: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepository) SetFreeForever(ctx context.Context, userID int, freeForever bool) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE users SET free_forever = $1, updated_at = NOW() WHERE id = $2`,
+		freeForever, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("setting free_forever: %w", err)
 	}
 	return nil
 }

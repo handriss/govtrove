@@ -24,7 +24,7 @@ const PAGE_SIZE_KEY = 'govtrove_page_size';
 export default function SimpleSearchPage() {
   const fs = useFilterState();
   const { facets, total: facetTotal, isLoading: facetsLoading } = useFacetCounts(fs.toFacetParams());
-  const { isAuthenticated, getAccessToken } = useAppAuth();
+  const { isAuthenticated, getAccessToken, govtroveUser } = useAppAuth();
   const authOptions = useMemo(() => ({ getAccessToken }), [getAccessToken]);
   const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch(authOptions);
   const posthog = usePostHog();
@@ -38,6 +38,7 @@ export default function SimpleSearchPage() {
   const savedSearchesRef = useRef<HTMLDivElement>(null);
   const [saveSearchName, setSaveSearchName] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
+  const [showProTip, setShowProTip] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialSearch = useRef(true);
   const lastSearchedRef = useRef('');
@@ -189,6 +190,11 @@ export default function SimpleSearchPage() {
       trackSavedSearchCreated(posthog, filterData);
       setSaveSearchOpen(false);
       setSaveSearchName('');
+      const hasPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
+      if (!hasPro) {
+        setShowProTip(true);
+        setTimeout(() => setShowProTip(false), 6000);
+      }
     } catch {
       // ignore
     } finally {
@@ -420,6 +426,17 @@ export default function SimpleSearchPage() {
           )}
 
           <SignupNudgeBanner />
+
+          {showProTip && (
+            <div className="mb-4 rounded-xl bg-accent/5 border border-accent/20 px-4 py-3 flex items-center justify-between gap-3 animate-in fade-in">
+              <p className="text-xs text-dark-300">
+                Search saved! <Link to="/settings" className="text-accent hover:underline">Upgrade to Pro</Link> to get email alerts when new matches appear.
+              </p>
+              <button onClick={() => setShowProTip(false)} className="text-dark-500 hover:text-dark-300 shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           <SearchResults
             results={results}

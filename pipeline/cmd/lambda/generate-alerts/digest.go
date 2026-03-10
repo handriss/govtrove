@@ -42,16 +42,16 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 	sent := 0
 	for userID, notifs := range byUser {
 		var email, firstName, plan string
-		var searchAlerts, oppAlerts, isAdmin bool
+		var searchAlerts, oppAlerts, isAdmin, freeForever bool
 		var unsubscribedAt *time.Time
 
 		err := h.Pool.QueryRow(ctx, `
-			SELECT u.email, COALESCE(u.first_name, ''), u.is_admin, COALESCE(u.plan, 'free'),
+			SELECT u.email, COALESCE(u.first_name, ''), u.is_admin, u.free_forever, COALESCE(u.plan, 'free'),
 				COALESCE(ep.search_alerts, true), COALESCE(ep.opportunity_alerts, true), ep.unsubscribed_at
 			FROM users u
 			LEFT JOIN email_preferences ep ON ep.user_id = u.id
 			WHERE u.id = $1
-		`, userID).Scan(&email, &firstName, &isAdmin, &plan, &searchAlerts, &oppAlerts, &unsubscribedAt)
+		`, userID).Scan(&email, &firstName, &isAdmin, &freeForever, &plan, &searchAlerts, &oppAlerts, &unsubscribedAt)
 		if err != nil {
 			h.Logger.Warn("skip user: can't fetch email/prefs", "user_id", userID, "error", err)
 			continue
@@ -61,7 +61,7 @@ func (h *Handler) sendDigestEmails(ctx context.Context) (int, error) {
 			continue
 		}
 
-		if plan != "pro" && !isAdmin {
+		if plan != "pro" && !isAdmin && !freeForever {
 			continue
 		}
 
