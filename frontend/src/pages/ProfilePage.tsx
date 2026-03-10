@@ -89,9 +89,6 @@ export default function ProfilePage() {
   }
 
   if (!isAuthenticated || !user) {
-    if (searchParams.get('promo')) {
-      sessionStorage.setItem('govtrove_auth_return', window.location.pathname + window.location.search);
-    }
     return <Navigate to="/" replace />;
   }
 
@@ -122,18 +119,31 @@ export default function ProfilePage() {
     }
   }
 
-  const promoCode = searchParams.get('promo') || undefined;
+  const promoCode = searchParams.get('promo') || sessionStorage.getItem('govtrove_promo_code') || undefined;
+  const [promoError, setPromoError] = useState('');
+
+  // Clear saved promo once we've consumed it on an authenticated profile page
+  useEffect(() => {
+    if (promoCode && isAuthenticated) {
+      sessionStorage.removeItem('govtrove_promo_code');
+    }
+  }, [promoCode, isAuthenticated]);
 
   async function handleBilling(action: 'checkout' | 'portal') {
     setBillingLoading(true);
+    setPromoError('');
     try {
       const token = await getAccessToken();
       const { url } = action === 'checkout'
         ? await createCheckoutSession(token, promoCode)
         : await createPortalSession(token);
       window.location.href = url;
-    } catch {
+    } catch (e) {
       setBillingLoading(false);
+      if (promoCode && action === 'checkout') {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        setPromoError(msg);
+      }
     }
   }
 
@@ -174,6 +184,17 @@ export default function ProfilePage() {
               {billingLoading ? <Loader2 size={16} className="animate-spin" /> : null}
               Activate Pro Account
             </button>
+            {promoError && (
+              <div className="mt-4">
+                <p className="text-sm text-red-400 mb-2">This invite code is no longer valid: {promoError}</p>
+                <button
+                  onClick={() => { searchParams.delete('promo'); setSearchParams(searchParams, { replace: true }); setPromoError(''); }}
+                  className="text-xs text-dark-400 hover:text-dark-200 underline transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
           </div>
         )}
 

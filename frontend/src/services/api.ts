@@ -207,7 +207,11 @@ export async function createCheckoutSession(token: string, promoCode?: string): 
     headers,
     body,
   });
-  if (!response.ok) { checkAuth(response); throw new Error(`Checkout failed: ${response.statusText}`); }
+  if (!response.ok) {
+    checkAuth(response);
+    const text = await response.text();
+    throw new Error(text.trim() || `Checkout failed: ${response.statusText}`);
+  }
   return response.json();
 }
 
