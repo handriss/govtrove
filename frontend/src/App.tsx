@@ -45,10 +45,9 @@ function AuthCallback() {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-dark-500 text-sm">Signing in...</div>;
   }
-  const returnTo = sessionStorage.getItem('govtrove_auth_return');
-  if (returnTo) {
-    sessionStorage.removeItem('govtrove_auth_return');
-    return <Navigate to={returnTo} replace />;
+  const promo = sessionStorage.getItem('govtrove_promo_code');
+  if (promo) {
+    return <Navigate to={`/profile?promo=${encodeURIComponent(promo)}`} replace />;
   }
   return <Navigate to="/" replace />;
 }
@@ -89,6 +88,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 function AppRoutes() {
   useUTMCapture();
   useTawk();
+
+  // Persist promo code across auth redirects
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const promo = params.get('promo');
+    if (promo) {
+      sessionStorage.setItem('govtrove_promo_code', promo);
+    }
+  }, []);
 
   return (
     <ErrorBoundary>
