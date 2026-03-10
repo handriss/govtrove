@@ -96,8 +96,9 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 	}
 
 	params := &stripe.CheckoutSessionCreateParams{
-		Customer: stripe.String(customerID),
-		Mode:     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		Customer:                  stripe.String(customerID),
+		Mode:                     stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		BillingAddressCollection: stripe.String(string(stripe.CheckoutSessionBillingAddressCollectionRequired)),
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 			{
 				Price:    stripe.String(h.priceMonthly),
