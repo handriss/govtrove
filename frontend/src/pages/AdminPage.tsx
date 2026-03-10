@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink, Copy, Send as SendIcon } from 'lucide-react';
+import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink, Copy, Send as SendIcon, Edit3, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
@@ -9,12 +9,14 @@ import {
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
   getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
+  getAdminInviteLinks, adminCreateInviteLink, getAdminInviteLinkDetail, adminUpdateInviteLink, adminDeactivateInviteLink,
   getAdminMcpUsage, adminSetFreeForever,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
   type AdminPromoCode, type McpUsageEvent,
+  type AdminInviteLink, type AdminInviteLinkRedemption,
 } from '../services/api';
 import type { Notification } from '../types/api';
 import { useAppAuth } from '../contexts/AuthContext';
@@ -1783,6 +1785,294 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   );
 }
 
+function InviteLinksTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [links, setLinks] = useState<AdminInviteLink[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [campaignName, setCampaignName] = useState('');
+  const [customCode, setCustomCode] = useState('');
+  const [maxRedemptions, setMaxRedemptions] = useState(50);
+  const [expiresInDays, setExpiresInDays] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<number | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [redemptions, setRedemptions] = useState<AdminInviteLinkRedemption[]>([]);
+  const [redemptionsLoading, setRedemptionsLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editMax, setEditMax] = useState(0);
+
+  const loadLinks = useCallback(async () => {
+    try {
+      const token = await getToken();
+      setLinks(await getAdminInviteLinks(token));
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [getToken]);
+
+  useEffect(() => { loadLinks(); }, [loadLinks]);
+
+  async function handleCreate() {
+    if (!campaignName) return;
+    setGenerating(true);
+    setError('');
+    try {
+      const token = await getToken();
+      await adminCreateInviteLink(token, {
+        campaign_name: campaignName,
+        code: customCode || undefined,
+        max_redemptions: maxRedemptions,
+        expires_in_days: expiresInDays || undefined,
+      });
+      setCampaignName('');
+      setCustomCode('');
+      await loadLinks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create invite link');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleCopy(link: AdminInviteLink) {
+    const url = `${window.location.origin}/profile?promo=${link.code}&utm_campaign=${link.code}&utm_source=invite&utm_medium=link`;
+    navigator.clipboard.writeText(url);
+    setCopied(link.id);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function handleExpand(id: number) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    setRedemptionsLoading(true);
+    try {
+      const token = await getToken();
+      const detail = await getAdminInviteLinkDetail(token, id);
+      setRedemptions(detail.redemptions);
+    } catch {
+      setRedemptions([]);
+    } finally {
+      setRedemptionsLoading(false);
+    }
+  }
+
+  async function handleDeactivate(id: number) {
+    if (!confirm('Deactivate this invite link? New users will no longer be able to use it.')) return;
+    setDeactivatingId(id);
+    try {
+      const token = await getToken();
+      await adminDeactivateInviteLink(token, id);
+      await loadLinks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to deactivate');
+    } finally {
+      setDeactivatingId(null);
+    }
+  }
+
+  async function handleSaveMax(id: number) {
+    try {
+      const token = await getToken();
+      await adminUpdateInviteLink(token, id, { max_redemptions: editMax });
+      setEditingId(null);
+      await loadLinks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update');
+    }
+  }
+
+  function statusBadge(link: AdminInviteLink) {
+    if (link.deactivated_at) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Deactivated</span>;
+    }
+    if (link.expires_at && new Date(link.expires_at) < new Date()) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Expired</span>;
+    }
+    if (link.max_redemptions > 0 && link.redemption_count >= link.max_redemptions) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Full</span>;
+    }
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">Active</span>;
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">Invite Links</h2>
+
+      <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 mb-6">
+        <h3 className="text-sm font-medium text-dark-300 mb-3">Create New Invite Link</h3>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Campaign Name</label>
+            <input
+              type="text"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="e.g. APEX Conference"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[200px]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Custom Code (optional)</label>
+            <input
+              type="text"
+              value={customCode}
+              onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+              placeholder="GOVTROVE-APEX-2026"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[200px]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Max Redemptions</label>
+            <input
+              type="number"
+              value={maxRedemptions}
+              onChange={(e) => setMaxRedemptions(Number(e.target.value))}
+              min={0}
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Expires in (days)</label>
+            <input
+              type="number"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(Number(e.target.value))}
+              min={0}
+              placeholder="0 = never"
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <button
+            onClick={handleCreate}
+            disabled={!campaignName || generating}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-dark-950 hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {generating ? 'Creating...' : 'Create Link'}
+          </button>
+        </div>
+        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      </div>
+
+      {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
+
+      {!loading && links.length === 0 && (
+        <p className="text-dark-500 text-sm py-8 text-center">No invite links yet.</p>
+      )}
+
+      {!loading && links.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="px-4 py-3 font-medium">Campaign</th>
+                <th className="px-4 py-3 font-medium">Code</th>
+                <th className="px-4 py-3 font-medium">Redemptions</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium">Expires</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((link) => (
+                <>
+                  <tr
+                    key={link.id}
+                    className={`border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 cursor-pointer ${expandedId === link.id ? 'bg-dark-800/20' : ''}`}
+                    onClick={() => handleExpand(link.id)}
+                  >
+                    <td className="px-4 py-3 text-dark-200">{link.campaign_name}</td>
+                    <td className="px-4 py-3 text-dark-100 text-xs font-mono">{link.code}</td>
+                    <td className="px-4 py-3 text-dark-300">
+                      {editingId === link.id ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-dark-400">{link.redemption_count} /</span>
+                          <input
+                            type="number"
+                            value={editMax}
+                            onChange={(e) => setEditMax(Number(e.target.value))}
+                            min={0}
+                            className="w-16 px-1 py-0.5 text-xs bg-dark-800 border border-dark-600 rounded text-dark-100"
+                            autoFocus
+                          />
+                          <button onClick={() => handleSaveMax(link.id)} className="text-green-400 hover:text-green-300 text-xs">Save</button>
+                          <button onClick={() => setEditingId(null)} className="text-dark-500 hover:text-dark-300"><X size={12} /></button>
+                        </div>
+                      ) : (
+                        <span>
+                          {link.redemption_count} / {link.max_redemptions || '∞'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">{statusBadge(link)}</td>
+                    <td className="px-4 py-3 text-dark-400 text-xs">{formatDate(link.created_at)}</td>
+                    <td className="px-4 py-3 text-dark-400 text-xs">{link.expires_at ? formatDate(link.expires_at) : '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {!link.deactivated_at && (
+                          <>
+                            <button
+                              onClick={() => handleCopy(link)}
+                              title="Copy invite URL"
+                              className="p-1 text-dark-400 hover:text-accent transition-colors"
+                            >
+                              {copied === link.id ? <span className="text-xs text-green-400">Copied</span> : <Copy size={14} />}
+                            </button>
+                            <button
+                              onClick={() => { setEditingId(link.id); setEditMax(link.max_redemptions); }}
+                              title="Edit max redemptions"
+                              className="p-1 text-dark-400 hover:text-accent transition-colors"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeactivate(link.id)}
+                              disabled={deactivatingId === link.id}
+                              title="Deactivate link"
+                              className="p-1 text-dark-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                            >
+                              {deactivatingId === link.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedId === link.id && (
+                    <tr key={`${link.id}-detail`} className="border-b border-dark-700/30">
+                      <td colSpan={7} className="px-8 py-4 bg-dark-900/30">
+                        <h4 className="text-sm font-medium text-dark-300 mb-2">Redemptions</h4>
+                        {redemptionsLoading ? (
+                          <p className="text-dark-400 text-xs">Loading...</p>
+                        ) : redemptions.length === 0 ? (
+                          <p className="text-dark-500 text-xs">No redemptions yet.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {redemptions.map((r) => (
+                              <div key={r.user_id} className="flex items-center gap-4 text-xs text-dark-300">
+                                <span className="text-dark-200">{r.email}</span>
+                                <span className="text-dark-500">{r.name}</span>
+                                <span className="text-dark-400">{formatDateTime(r.redeemed_at)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
   const [events, setEvents] = useState<McpUsageEvent[]>([]);
   const [total, setTotal] = useState(0);
@@ -1888,7 +2178,7 @@ function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'mcp-usage';
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'mcp-usage';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -1916,6 +2206,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'email-prefs' && <EmailPrefsTab getToken={getToken} />}
       {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
       {activeTab === 'promo-codes' && <PromoCodesTab users={users} getToken={getToken} />}
+      {activeTab === 'invite-links' && <InviteLinksTab getToken={getToken} />}
       {activeTab === 'mcp-usage' && <McpUsageTab getToken={getToken} />}
     </div>
   );

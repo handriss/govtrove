@@ -1195,3 +1195,88 @@ export async function adminRevokePromoCode(token: string, promoId: number): Prom
     throw new Error(text || `${response.status}`);
   }
 }
+
+// --- Invite Links ---
+
+export interface AdminInviteLink {
+  id: number;
+  code: string;
+  stripe_promo_id: string;
+  campaign_name: string;
+  max_redemptions: number;
+  redemption_count: number;
+  expires_at: string | null;
+  created_at: string;
+  deactivated_at: string | null;
+}
+
+export interface AdminInviteLinkRedemption {
+  user_id: number;
+  email: string;
+  name: string;
+  redeemed_at: string;
+}
+
+export interface AdminInviteLinkDetail {
+  link: AdminInviteLink;
+  redemptions: AdminInviteLinkRedemption[];
+}
+
+export async function getAdminInviteLinks(token: string): Promise<AdminInviteLink[]> {
+  const response = await fetch(`${API_BASE}/admin/invite-links`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminCreateInviteLink(
+  token: string,
+  data: { campaign_name: string; code?: string; max_redemptions: number; expires_in_days?: number },
+): Promise<{ id: number; code: string; invite_url: string }> {
+  const response = await fetch(`${API_BASE}/admin/invite-links`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminInviteLinkDetail(
+  token: string,
+  id: number,
+): Promise<AdminInviteLinkDetail> {
+  const response = await fetch(`${API_BASE}/admin/invite-links/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminUpdateInviteLink(
+  token: string,
+  id: number,
+  data: { max_redemptions: number },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/invite-links/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+}
+
+export async function adminDeactivateInviteLink(token: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/invite-links/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+}
