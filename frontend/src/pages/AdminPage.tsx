@@ -9,7 +9,7 @@ import {
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
   getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
-  getAdminMcpUsage,
+  getAdminMcpUsage, adminSetFreeForever,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
@@ -44,11 +44,25 @@ function NotificationTypeIcon({ type }: { type: string }) {
   }
 }
 
-function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getToken: () => Promise<string>; onUserDeleted: (userId: number) => void }) {
+function UsersTab({ users, getToken, onUserDeleted, onUserUpdated }: { users: AdminUser[]; getToken: () => Promise<string>; onUserDeleted: (userId: number) => void; onUserUpdated: (userId: number, updates: Partial<AdminUser>) => void }) {
   const [exportingId, setExportingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [togglingFFId, setTogglingFFId] = useState<number | null>(null);
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<AdminUser | null>(null);
   const [confirmText, setConfirmText] = useState('');
+
+  const handleToggleFreeForever = async (user: AdminUser) => {
+    setTogglingFFId(user.id);
+    try {
+      const token = await getToken();
+      await adminSetFreeForever(token, user.id, !user.free_forever);
+      onUserUpdated(user.id, { free_forever: !user.free_forever });
+    } catch (e) {
+      alert(`Failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setTogglingFFId(null);
+    }
+  };
 
   const handleExport = async (user: AdminUser) => {
     setExportingId(user.id);
@@ -98,6 +112,7 @@ function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getT
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Plan</th>
               <th className="px-4 py-3 font-medium">Admin</th>
+              <th className="px-4 py-3 font-medium">Free Forever</th>
               <th className="px-4 py-3 font-medium">Joined</th>
               <th className="px-4 py-3 font-medium">Requests</th>
               <th className="px-4 py-3 font-medium">Export</th>
@@ -125,6 +140,19 @@ function UsersTab({ users, getToken, onUserDeleted }: { users: AdminUser[]; getT
                       Admin
                     </span>
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => handleToggleFreeForever(u)}
+                    disabled={togglingFFId === u.id}
+                    className={`relative w-8 h-4 rounded-full transition-colors duration-200 ${
+                      u.free_forever ? 'bg-accent' : 'bg-dark-700'
+                    } disabled:opacity-50`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
+                      u.free_forever ? 'translate-x-4' : ''
+                    }`} />
+                  </button>
                 </td>
                 <td className="px-4 py-3 text-dark-400">{formatDate(u.created_at)}</td>
                 <td className="px-4 py-3">
@@ -1559,7 +1587,7 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<number | null>(null);
 
-  const freeUsers = users.filter(u => u.plan !== 'pro');
+  const freeUsers = users.filter(u => u.plan !== 'pro' && !u.free_forever);
 
   const loadCodes = useCallback(async () => {
     try {
@@ -1878,7 +1906,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
-      {activeTab === 'users' && <UsersTab users={users} getToken={getToken} onUserDeleted={(id) => setUsers(prev => prev.filter(u => u.id !== id))} />}
+      {activeTab === 'users' && <UsersTab users={users} getToken={getToken} onUserDeleted={(id) => setUsers(prev => prev.filter(u => u.id !== id))} onUserUpdated={(id, updates) => setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u))} />}
       {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getToken} />}
       {activeTab === 'api-keys' && <ApiKeysTab getToken={getToken} />}
       {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getToken} />}

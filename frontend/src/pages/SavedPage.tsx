@@ -68,7 +68,7 @@ function deadlineColor(deadline?: string): string {
 
 export default function SavedPage() {
   const { isAuthenticated, getAccessToken, govtroveUser } = useAppAuth();
-  const isPro = govtroveUser?.plan === 'pro';
+  const isPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
   const saved = useSavedOpportunities();
   const { savedSearches, loading: searchesLoading, deleteSearch, toggleAlert, renameSearch } = useSavedSearches();
   const navigate = useNavigate();

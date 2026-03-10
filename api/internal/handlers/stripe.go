@@ -59,7 +59,7 @@ func (h *StripeHandler) CreateCheckoutSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if user.Plan == "pro" {
+	if user.Plan == "pro" && !user.FreeForever {
 		http.Error(w, "already subscribed", http.StatusConflict)
 		return
 	}

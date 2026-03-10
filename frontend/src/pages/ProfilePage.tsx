@@ -96,6 +96,8 @@ export default function ProfilePage() {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'User';
   const memberSince = govtroveUser?.created_at ? formatMemberSince(govtroveUser.created_at) : null;
   const plan = govtroveUser?.plan || 'free';
+  const freeForever = govtroveUser?.free_forever ?? false;
+  const hasPro = plan === 'pro' || freeForever;
   const subStatus = govtroveUser?.subscription_status;
   const cancelAtPeriodEnd = govtroveUser?.cancel_at_period_end ?? false;
   const periodEnd = govtroveUser?.current_period_end;
@@ -155,7 +157,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {promoCode && plan !== 'pro' && (
+        {promoCode && !hasPro && (
           <div className="mb-6 rounded-xl bg-accent/10 border-2 border-accent/30 p-6 text-center">
             <p className="text-lg font-semibold text-dark-50 mb-2">You've been invited to GovTrove Pro!</p>
             <p className="text-sm text-dark-400 mb-5">Click below to activate your free Pro account. No credit card required.</p>
@@ -179,11 +181,13 @@ export default function ProfilePage() {
             Plan
           </div>
 
-          {plan === 'pro' ? (
+          {hasPro ? (
             <div>
-              <p className="text-dark-100 font-medium text-lg mb-1">Pro</p>
+              <p className="text-dark-100 font-medium text-lg mb-1">
+                Pro{freeForever && plan !== 'pro' && <span className="text-sm text-dark-400 font-normal ml-2">(complimentary)</span>}
+              </p>
 
-              {isPastDue && (
+              {plan === 'pro' && isPastDue && (
                 <div className="mt-3 mb-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <AlertTriangle size={16} strokeWidth={1.5} className="text-amber-400 mt-0.5 shrink-0" />
                   <div>
@@ -195,21 +199,23 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {!isPastDue && isCanceling && periodEnd && (
+              {plan === 'pro' && !isPastDue && isCanceling && periodEnd && (
                 <p className="text-sm text-dark-400">Cancels on {formatDate(periodEnd)}</p>
               )}
-              {!isPastDue && !isCanceling && periodEnd && (
+              {plan === 'pro' && !isPastDue && !isCanceling && periodEnd && (
                 <p className="text-sm text-dark-400">Renews on {formatDate(periodEnd)}</p>
               )}
 
-              <button
-                onClick={() => handleBilling(isPastDue ? 'portal' : 'portal')}
-                disabled={billingLoading}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors disabled:opacity-50"
-              >
-                {billingLoading ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} strokeWidth={1.5} />}
-                {isPastDue ? 'Update payment method' : 'Manage subscription'}
-              </button>
+              {plan === 'pro' && (
+                <button
+                  onClick={() => handleBilling('portal')}
+                  disabled={billingLoading}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-dark-400 hover:text-dark-200 transition-colors disabled:opacity-50"
+                >
+                  {billingLoading ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} strokeWidth={1.5} />}
+                  {isPastDue ? 'Update payment method' : 'Manage subscription'}
+                </button>
+              )}
             </div>
           ) : (
             <div>
@@ -233,11 +239,11 @@ export default function ProfilePage() {
           <h2 className="text-sm font-medium text-dark-300 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Mail size={14} strokeWidth={1.5} />
             Email Notifications
-            {plan !== 'pro' && (
+            {!hasPro && (
               <span className="text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded uppercase tracking-wide">Pro</span>
             )}
           </h2>
-          {plan !== 'pro' ? (
+          {!hasPro ? (
             <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-5">
               <div className="flex items-start gap-3">
                 <Lock size={16} className="text-dark-500 mt-0.5 shrink-0" />

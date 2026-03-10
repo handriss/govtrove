@@ -201,16 +201,17 @@ interface GovTroveUser {
   workosId: string;
   email: string;
   plan: string;
+  freeForever: boolean;
 }
 
 async function lookupUser(workosId: string): Promise<GovTroveUser | null> {
   const result = await pool.query(
-    "SELECT id, workos_id, email, plan FROM users WHERE workos_id = $1",
+    "SELECT id, workos_id, email, plan, free_forever FROM users WHERE workos_id = $1",
     [workosId]
   );
   if (result.rows.length === 0) return null;
   const row = result.rows[0];
-  return { id: row.id, workosId: row.workos_id, email: row.email, plan: row.plan };
+  return { id: row.id, workosId: row.workos_id, email: row.email, plan: row.plan, freeForever: row.free_forever };
 }
 
 async function getDailyUsageCount(userId: number): Promise<number> {
@@ -326,10 +327,11 @@ async function withUsageTracking(
   const user = sessionId ? sessionUsers.get(sessionId) : undefined;
 
   if (user) {
-    const dailyLimit = user.plan === "pro" ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+    const effectivePlan = (user.plan === "pro" || user.freeForever) ? "pro" : "free";
+    const dailyLimit = effectivePlan === "pro" ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
     const count = await getDailyUsageCount(user.id);
     if (count >= dailyLimit) {
-      return rateLimitError(user.plan);
+      return rateLimitError(effectivePlan);
     }
   }
 

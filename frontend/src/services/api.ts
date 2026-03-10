@@ -22,6 +22,7 @@ export interface GovTroveUser {
   first_name: string;
   last_name: string;
   plan: string;
+  free_forever: boolean;
   subscription_status?: string;
   cancel_at_period_end: boolean;
   current_period_end?: string;
@@ -406,6 +407,7 @@ export interface AdminUser {
   last_name: string;
   plan: string;
   is_admin: boolean;
+  free_forever: boolean;
   created_at: string;
   updated_at: string;
   pending_export: boolean;
@@ -1046,6 +1048,15 @@ export async function adminExportUserData(token: string, userId: number): Promis
   });
   if (!response.ok) throw new Error(`${response.status}`);
   return response.json();
+}
+
+export async function adminSetFreeForever(token: string, userId: number, freeForever: boolean): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/users/${userId}/free-forever`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ free_forever: freeForever }),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
 }
 
 export async function adminDeleteUser(token: string, userId: number): Promise<void> {

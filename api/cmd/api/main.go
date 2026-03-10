@@ -333,6 +333,7 @@ func main() {
 				r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
 				r.Delete("/promo-codes/{id}", adminHandler.RevokePromoCode)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
+				r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)
 				})
 
