@@ -45,6 +45,11 @@ function AuthCallback() {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-dark-500 text-sm">Signing in...</div>;
   }
+  const returnTo = sessionStorage.getItem('govtrove_auth_return');
+  if (returnTo) {
+    sessionStorage.removeItem('govtrove_auth_return');
+    return <Navigate to={returnTo} replace />;
+  }
   return <Navigate to="/" replace />;
 }
 
