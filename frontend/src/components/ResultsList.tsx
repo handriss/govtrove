@@ -70,6 +70,7 @@ export const STATE_FILTER_OPTIONS: FilterOption[] = US_STATE_CODES.map((s) => ({
 }));
 
 export const SET_ASIDE_FILTER_OPTIONS: FilterOption[] = [
+  { value: 'NONE', label: 'None / Full & Open', searchTerms: ['none', 'full and open', 'unrestricted'] },
   { value: 'SBA', label: 'SBA' },
   { value: 'SBP', label: 'Small Business', searchTerms: ['sbp', 'small business set-aside'] },
   { value: '8A', label: '8(a)', searchTerms: ['8a', 'minority', 'disadvantaged'] },

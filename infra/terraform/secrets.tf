@@ -82,6 +82,30 @@ resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
   secret_string = var.stripe_webhook_secret
 }
 
+resource "aws_secretsmanager_secret" "stripe_price_monthly" {
+  count       = var.stripe_price_monthly != "" ? 1 : 0
+  name        = "${var.project_name}/stripe-price-monthly"
+  description = "Stripe Price ID for the monthly Pro plan"
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_price_monthly" {
+  count         = var.stripe_price_monthly != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.stripe_price_monthly[0].id
+  secret_string = var.stripe_price_monthly
+}
+
+resource "aws_secretsmanager_secret" "stripe_promo_coupon_id" {
+  count       = var.stripe_promo_coupon_id != "" ? 1 : 0
+  name        = "${var.project_name}/stripe-promo-coupon-id"
+  description = "Stripe Coupon ID for promo code generation"
+}
+
+resource "aws_secretsmanager_secret_version" "stripe_promo_coupon_id" {
+  count         = var.stripe_promo_coupon_id != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.stripe_promo_coupon_id[0].id
+  secret_string = var.stripe_promo_coupon_id
+}
+
 resource "aws_secretsmanager_secret" "posthog_key" {
   count       = var.posthog_key != "" ? 1 : 0
   name        = "${var.project_name}/posthog-key"

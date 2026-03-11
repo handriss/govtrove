@@ -237,9 +237,26 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	}
 
 	if len(params.SetAsides) > 0 && exclude != "set_aside" {
-		conditions = append(conditions, fmt.Sprintf("set_aside_code = ANY($%d)", argNum))
-		args = append(args, params.SetAsides)
-		argNum++
+		hasNone := false
+		var codes []string
+		for _, sa := range params.SetAsides {
+			if sa == "NONE" {
+				hasNone = true
+			} else {
+				codes = append(codes, sa)
+			}
+		}
+		if hasNone && len(codes) > 0 {
+			conditions = append(conditions, fmt.Sprintf("(set_aside_code IS NULL OR set_aside_code = 'NONE' OR set_aside_code = ANY($%d))", argNum))
+			args = append(args, codes)
+			argNum++
+		} else if hasNone {
+			conditions = append(conditions, "(set_aside_code IS NULL OR set_aside_code = 'NONE')")
+		} else {
+			conditions = append(conditions, fmt.Sprintf("set_aside_code = ANY($%d)", argNum))
+			args = append(args, codes)
+			argNum++
+		}
 	}
 
 	if exclude != "naics" {
