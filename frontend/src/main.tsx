@@ -8,12 +8,13 @@ import { capturedUTM } from './hooks/useUTMCapture'
 
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY
 const posthogOptions = {
-  api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://k.govtrove.com',
+  api_host: 'https://k.govtrove.com',
   ui_host: 'https://us.posthog.com',
   person_profiles: 'identified_only' as const,
   capture_pageview: true,
   capture_pageleave: true,
   autocapture: false,
+  disable_toolbar: true,
   persistence: 'memory' as const,
   loaded: (ph: PostHogInterface) => {
     const props: Record<string, string> = {}
