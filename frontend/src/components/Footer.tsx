@@ -26,8 +26,8 @@ export default function Footer() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const posthog = usePostHog();
   const ctaVariant = useFeatureFlagVariantKey('founder-cta-variant');
-  const variant = typeof ctaVariant === 'string' ? ctaVariant : null;
-  const cta = variant ? FOUNDER_CTA_COPY[variant] : null;
+  const variant = typeof ctaVariant === 'string' ? ctaVariant : 'read-every-email';
+  const cta = FOUNDER_CTA_COPY[variant] || FOUNDER_CTA_COPY['read-every-email'];
 
   useEffect(() => {
     getStatus()
@@ -40,19 +40,17 @@ export default function Footer() {
   return (
     <footer className="bg-dark-950 border-t border-dark-800 px-4 py-4 text-xs text-dark-500">
       <div className="max-w-7xl mx-auto flex flex-col items-center gap-2">
-        {cta && variant && (
-          <span className="text-dark-400">
-            {cta.prefix}{' '}
-            <a
-              href="mailto:andrew@govtrove.com"
-              className="underline hover:text-dark-200"
-              onClick={() => trackFounderCtaClicked(posthog, variant)}
-            >
-              {variant === 'i-reply' ? 'andrew@govtrove.com' : '\u2192 andrew@govtrove.com'}
-            </a>
-            {cta.suffix && ` ${cta.suffix}`}
-          </span>
-        )}
+        <span className="text-dark-400">
+          {cta.prefix}{' '}
+          <a
+            href="mailto:andrew@govtrove.com"
+            className="underline hover:text-dark-200"
+            onClick={() => trackFounderCtaClicked(posthog, variant)}
+          >
+            {variant === 'i-reply' ? 'andrew@govtrove.com' : '\u2192 andrew@govtrove.com'}
+          </a>
+          {cta.suffix && ` ${cta.suffix}`}
+        </span>
         <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-3">
             <span>
