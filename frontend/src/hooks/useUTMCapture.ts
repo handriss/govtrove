@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { usePostHog } from '@posthog/react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 // Capture UTM params at module load time — before any React effects can
 // strip them from the URL (useFilterState in SimpleSearchPage fires before
 // parent effects and cleans unrecognized query params).
+// PostHog super properties are registered in the `loaded` callback in main.tsx
+// so they attach to the very first $pageview.
 const initialParams = new URLSearchParams(window.location.search);
 const capturedSource = initialParams.get('utm_source');
 const capturedMedium = initialParams.get('utm_medium');
@@ -18,17 +19,8 @@ export const capturedUTM = {
 };
 
 export default function useUTMCapture() {
-  const posthog = usePostHog();
-
   useEffect(() => {
     if (!capturedSource && !capturedMedium && !capturedCampaign) return;
-
-    // Attach UTM params to all PostHog events for this session
-    const props: Record<string, string> = {};
-    if (capturedSource) props.utm_source = capturedSource;
-    if (capturedMedium) props.utm_medium = capturedMedium;
-    if (capturedCampaign) props.utm_campaign = capturedCampaign;
-    posthog?.register(props);
 
     if (capturedCampaign) {
       sessionStorage.setItem('govtrove_utm_campaign', capturedCampaign);
@@ -61,5 +53,5 @@ export default function useUTMCapture() {
       const clean = window.location.pathname + (remaining ? '?' + remaining : '');
       window.history.replaceState({}, '', clean);
     }
-  }, [posthog]);
+  }, []);
 }
