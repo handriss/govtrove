@@ -57,3 +57,7 @@ export function trackSignIn(ph: PostHog | undefined) {
 export function trackSignUp(ph: PostHog | undefined) {
   ph?.capture('sign_up');
 }
+
+export function trackFounderCtaClicked(ph: PostHog | undefined, variant: string) {
+  ph?.capture('founder_cta_clicked', { variant });
+}
