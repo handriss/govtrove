@@ -3,6 +3,7 @@ import { useAuth } from '@workos-inc/authkit-react';
 import { usePostHog } from '@posthog/react';
 import { syncUser, getMe, AUTH_ERROR_EVENT, type GovTroveUser } from '../services/api';
 import { trackSignIn, trackSignUp } from '../lib/analytics';
+import { capturedUTM } from '../hooks/useUTMCapture';
 
 interface AuthContextValue {
   user: ReturnType<typeof useAuth>['user'];
@@ -49,12 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (!cancelled) {
           setGovtroveUser(synced);
+          const utmOnce: Record<string, string> = {};
+          if (capturedUTM.source) utmOnce.$initial_utm_source = capturedUTM.source;
+          if (capturedUTM.medium) utmOnce.$initial_utm_medium = capturedUTM.medium;
+          if (capturedUTM.campaign) utmOnce.$initial_utm_campaign = capturedUTM.campaign;
           posthog?.identify(auth.user!.id, {
             email: auth.user!.email,
             name: `${auth.user!.firstName ?? ''} ${auth.user!.lastName ?? ''}`.trim(),
             plan: synced.plan,
             created_at: synced.created_at,
-          });
+          }, utmOnce);
           const isNew = Date.now() - new Date(synced.created_at).getTime() < 60_000;
           if (isNew) trackSignUp(posthog); else trackSignIn(posthog);
         }
@@ -64,12 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const me = await getMe(token);
           if (!cancelled) {
             setGovtroveUser(me);
+            const utmOnceFb: Record<string, string> = {};
+            if (capturedUTM.source) utmOnceFb.$initial_utm_source = capturedUTM.source;
+            if (capturedUTM.medium) utmOnceFb.$initial_utm_medium = capturedUTM.medium;
+            if (capturedUTM.campaign) utmOnceFb.$initial_utm_campaign = capturedUTM.campaign;
             posthog?.identify(auth.user!.id, {
               email: auth.user!.email,
               name: `${auth.user!.firstName ?? ''} ${auth.user!.lastName ?? ''}`.trim(),
               plan: me.plan,
               created_at: me.created_at,
-            });
+            }, utmOnceFb);
           }
         } catch {
           // Failed to sync — user can still use the app
