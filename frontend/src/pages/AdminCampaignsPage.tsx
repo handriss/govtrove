@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import { getAdminUTMAnalytics, type UTMAnalytics } from '../services/api';
 
@@ -10,6 +10,7 @@ function formatDate(dateStr: string) {
 function CampaignsContent() {
   const { getToken } = useAdminContext();
   const [period, setPeriod] = useState('30d');
+  const [campaign, setCampaign] = useState('all');
   const [data, setData] = useState<UTMAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -27,35 +28,64 @@ function CampaignsContent() {
     fetchData(period);
   }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const campaignNames = useMemo(() => {
+    if (!data?.campaigns) return [];
+    return data.campaigns.map((c) => c.campaign);
+  }, [data]);
+
+  const filtered = useMemo(() => {
+    if (!data || campaign === 'all') return data;
+    return {
+      ...data,
+      total_visits: data.campaigns?.find((c) => c.campaign === campaign)?.total_visits ?? 0,
+      campaigns: data.campaigns?.filter((c) => c.campaign === campaign) ?? null,
+      sources: data.sources,
+      daily_visits: data.daily_visits,
+      search_activity: data.search_activity?.filter((sa) => sa.campaign === campaign) ?? null,
+    };
+  }, [data, campaign]);
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-dark-100">
           Campaign Tracking{' '}
-          {data && <span className="text-dark-500 text-lg font-normal">({data.total_visits} visits)</span>}
+          {filtered && <span className="text-dark-500 text-lg font-normal">({filtered.total_visits} visits)</span>}
         </h1>
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          className="bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-1.5 text-sm text-dark-200 focus:outline-none focus:border-accent/50"
-        >
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
-          <option value="90d">Last 90 days</option>
-          <option value="all">All time</option>
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={campaign}
+            onChange={(e) => setCampaign(e.target.value)}
+            className="bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-1.5 text-sm text-dark-200 focus:outline-none focus:border-accent/50"
+          >
+            <option value="all">All campaigns</option>
+            {campaignNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="bg-dark-800 border border-dark-700/50 rounded-lg px-3 py-1.5 text-sm text-dark-200 focus:outline-none focus:border-accent/50"
+          >
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+        </div>
       </div>
 
       {loading && !data ? (
         <div className="flex items-center justify-center py-20 text-dark-500 text-sm">Loading...</div>
-      ) : !data ? (
+      ) : !filtered ? (
         <div className="flex items-center justify-center py-20 text-dark-500 text-sm">Failed to load data</div>
       ) : (
         <div className="space-y-8">
           {/* Campaign Funnel */}
           <section>
             <h2 className="text-lg font-medium text-dark-200 mb-3">Campaign Funnel</h2>
-            {data.campaigns && data.campaigns.length > 0 ? (
+            {filtered.campaigns && filtered.campaigns.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border border-dark-700/50">
                 <table className="w-full text-sm">
                   <thead>
@@ -70,7 +100,7 @@ function CampaignsContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.campaigns.map((c) => {
+                    {filtered.campaigns.map((c) => {
                       const ctr = c.landing_visits > 0 ? ((c.app_visits / c.landing_visits) * 100).toFixed(1) : '-';
                       return (
                         <tr key={c.campaign} className="border-b border-dark-700/30 hover:bg-dark-800/50 transition-colors">
@@ -92,8 +122,8 @@ function CampaignsContent() {
             )}
           </section>
 
-          {/* Sources */}
-          {data.sources && data.sources.length > 0 && (
+          {/* Sources — only show in "all" view */}
+          {campaign === 'all' && filtered.sources && filtered.sources.length > 0 && (
             <section>
               <h2 className="text-lg font-medium text-dark-200 mb-3">Traffic Sources</h2>
               <div className="overflow-x-auto rounded-xl border border-dark-700/50">
@@ -106,7 +136,7 @@ function CampaignsContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.sources.map((s, i) => (
+                    {filtered.sources.map((s, i) => (
                       <tr key={i} className="border-b border-dark-700/30 hover:bg-dark-800/50 transition-colors">
                         <td className="px-4 py-3 text-dark-200">{s.source}</td>
                         <td className="px-4 py-3 text-dark-300">{s.medium}</td>
@@ -120,11 +150,11 @@ function CampaignsContent() {
           )}
 
           {/* Search Activity */}
-          {data.search_activity && data.search_activity.length > 0 && (
+          {filtered.search_activity && filtered.search_activity.length > 0 && (
             <section>
               <h2 className="text-lg font-medium text-dark-200 mb-3">Campaign Search Activity</h2>
               <div className="space-y-4">
-                {data.search_activity.map((sa) => (
+                {filtered.search_activity.map((sa) => (
                   <div key={sa.campaign} className="rounded-xl border border-dark-700/50 p-4">
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-mono text-xs text-dark-200">{sa.campaign}</span>
@@ -149,13 +179,13 @@ function CampaignsContent() {
             </section>
           )}
 
-          {/* Daily Visits */}
-          {data.daily_visits && data.daily_visits.length > 0 && (
+          {/* Daily Visits — only show in "all" view */}
+          {campaign === 'all' && filtered.daily_visits && filtered.daily_visits.length > 0 && (
             <section>
               <h2 className="text-lg font-medium text-dark-200 mb-3">Visits by Day</h2>
               <div className="rounded-xl border border-dark-700/50 p-4">
                 <div className="space-y-1 text-sm">
-                  {data.daily_visits.map((d) => (
+                  {filtered.daily_visits.map((d) => (
                     <div key={d.date} className="flex items-center justify-between">
                       <span className="text-dark-400">{formatDate(d.date)}</span>
                       <span className="text-dark-200 font-medium">{d.count}</span>
