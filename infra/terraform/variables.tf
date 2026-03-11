@@ -165,12 +165,14 @@ variable "stripe_webhook_secret" {
 variable "stripe_price_monthly" {
   description = "Stripe Price ID for the monthly Pro plan"
   type        = string
+  sensitive   = true
   default     = ""
 }
 
 variable "stripe_promo_coupon_id" {
   description = "Stripe Coupon ID for promo code generation"
   type        = string
+  sensitive   = true
   default     = ""
 }
 

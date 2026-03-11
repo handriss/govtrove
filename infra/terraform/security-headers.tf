@@ -22,7 +22,7 @@ resource "aws_cloudfront_response_headers_policy" "frontend" {
     }
 
     content_security_policy {
-      content_security_policy = "default-src 'self'; script-src 'self' https://cdn.counter.dev https://*.tawk.to https://*.i.posthog.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tawk.to; font-src 'self' https://fonts.gstatic.com https://*.tawk.to; connect-src 'self' https://api.govtrove.com https://*.workos.com https://*.sentry.io https://t.counter.dev https://*.tawk.to wss://*.tawk.to https://*.i.posthog.com; img-src 'self' data: https://*.tawk.to; frame-src https://*.workos.com https://*.tawk.to; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      content_security_policy = "default-src 'self'; script-src 'self' https://cdn.counter.dev https://*.tawk.to https://*.i.posthog.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.tawk.to; font-src 'self' https://fonts.gstatic.com https://*.tawk.to; connect-src 'self' https://api.govtrove.com https://k.govtrove.com https://*.workos.com https://*.sentry.io https://t.counter.dev https://*.tawk.to wss://*.tawk.to https://*.i.posthog.com; img-src 'self' data: https://*.tawk.to; frame-src https://*.workos.com https://*.tawk.to; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
       override               = true
     }
   }

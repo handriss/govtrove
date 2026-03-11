@@ -251,6 +251,12 @@ func (r *UserRepository) DeleteUser(ctx context.Context, userID int, email strin
 	if _, err := tx.Exec(ctx, `UPDATE contact_messages SET name = 'deleted', email = 'deleted@deleted.invalid' WHERE email = $1`, email); err != nil {
 		return fmt.Errorf("anonymizing contact_messages: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `DELETE FROM mcp_usage WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("deleting mcp_usage: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM invite_link_redemptions WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("deleting invite_link_redemptions: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID); err != nil {
 		return fmt.Errorf("deleting user: %w", err)
 	}

@@ -32,6 +32,7 @@ export const DEADLINE_PRESET_LABELS: Record<string, string> = {
 };
 
 export const SET_ASIDE_LABELS: Record<string, string> = {
+  'NONE': 'None / Full & Open',
   'SBA': 'SBA',
   'SBP': 'Small Business',
   '8A': '8(a)',
