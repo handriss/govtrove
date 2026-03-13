@@ -21,10 +21,14 @@ const ICONS = {
   deadline: Clock,
 } as const;
 
+function unquote(s: string) { return s.replace(/^"|"$/g, ''); }
+
 function isActive(chip: QuickFilter, filters: FilterState): boolean {
   switch (chip.type) {
-    case 'keyword':
-      return filters.keyword.toLowerCase() === chip.value.toLowerCase();
+    case 'keyword': {
+      const terms = filters.keyword.split(' OR ').map(t => unquote(t).toLowerCase());
+      return terms.includes(chip.value.toLowerCase());
+    }
     case 'setAside':
       return filters.setAside.includes(chip.value);
     case 'deadline':
@@ -42,9 +46,16 @@ export default function QuickFilterChips({ filters, setFilter, onSearch }: Quick
   const toggle = (chip: QuickFilter) => {
     const active = isActive(chip, filters);
     switch (chip.type) {
-      case 'keyword':
-        setFilter('keyword', active ? '' : chip.value);
+      case 'keyword': {
+        const terms = filters.keyword.split(' OR ').filter(Boolean);
+        const quoted = `"${chip.value}"`;
+        if (active) {
+          setFilter('keyword', terms.filter(t => unquote(t).toLowerCase() !== chip.value.toLowerCase()).join(' OR '));
+        } else {
+          setFilter('keyword', terms.length > 0 ? terms.join(' OR ') + ' OR ' + quoted : quoted);
+        }
         break;
+      }
       case 'setAside':
         setFilter(
           'setAside',
