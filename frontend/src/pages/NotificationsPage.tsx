@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, FileText, ChevronDown, ChevronRight, Bell, Zap, CheckCheck, Loader2, Trash2, Mail } from 'lucide-react';
+import { Search, FileText, Bell, Zap, CheckCheck, Loader2, Trash2, Mail } from 'lucide-react';
 import type { OpportunityListItem, Notification } from '../types/api';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAppAuth } from '../contexts/AuthContext';
@@ -134,17 +134,39 @@ interface OpportunityUpdateNotification {
 
 type NotificationItem = SearchMatchNotification | OpportunityUpdateNotification;
 
+// --- Build search URL from saved filter object ---
+
+function buildSearchUrl(filters: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+  if (filters.keyword) params.set('q', String(filters.keyword));
+  if (Array.isArray(filters.naics) && filters.naics.length) params.set('naics', filters.naics.join(','));
+  if (Array.isArray(filters.psc) && filters.psc.length) params.set('psc', filters.psc.join(','));
+  if (Array.isArray(filters.setAside) && filters.setAside.length) params.set('set_aside', filters.setAside.join(','));
+  if (Array.isArray(filters.noticeType) && filters.noticeType.length) params.set('type', filters.noticeType.join(','));
+  if (Array.isArray(filters.agency) && filters.agency.length) params.set('agency', filters.agency.join(','));
+  else if (typeof filters.department === 'string' && filters.department) params.set('agency', filters.department);
+  if (filters.state) params.set('state', String(filters.state));
+  if (filters.postedFrom) params.set('posted_from', String(filters.postedFrom));
+  if (filters.postedTo) params.set('posted_to', String(filters.postedTo));
+  if (filters.deadlinePreset) params.set('deadline', String(filters.deadlinePreset));
+  if (filters.deadlineFrom) params.set('deadline_from', String(filters.deadlineFrom));
+  if (filters.deadlineTo) params.set('deadline_to', String(filters.deadlineTo));
+  const qs = params.toString();
+  return qs ? `/?${qs}` : '/';
+}
+
 // --- Map API notification to local types ---
 
 function mapNotification(n: Notification): NotificationItem | null {
   const d = n.details;
   if (n.update_type === 'search_matches') {
     const matches = (d.matches as OpportunityListItem[] | undefined) || [];
+    const filters = (d.search_filters as Record<string, unknown>) || {};
     return {
       id: n.id,
       type: 'search_matches',
       searchName: (d.search_name as string) || 'Search',
-      searchUrl: (d.search_url as string) || '/',
+      searchUrl: buildSearchUrl(filters),
       matches,
       totalMatches: (d.total_matches as number) || matches.length,
       isRead: n.is_read,
@@ -240,7 +262,6 @@ function SearchMatchCard({ notification, onMarkRead, onDelete }: {
   onMarkRead: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
   const displayedMatches = notification.matches.slice(0, 3);
   const remaining = notification.totalMatches - 3;
 
@@ -259,16 +280,15 @@ function SearchMatchCard({ notification, onMarkRead, onDelete }: {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={() => setExpanded(!expanded)}
+            <Link
+              to={notification.searchUrl}
               className="flex items-center gap-1.5 text-sm text-dark-200 hover:text-dark-100 transition-colors"
             >
-              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span className="font-medium">"{notification.searchName}"</span>
               <span className="text-dark-400">
                 — {notification.totalMatches} new match{notification.totalMatches !== 1 ? 'es' : ''}
               </span>
-            </button>
+            </Link>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-[11px] text-dark-600">{formatTimeAgo(notification.createdAt)}</span>
               {!notification.isRead && (
@@ -300,23 +320,21 @@ function SearchMatchCard({ notification, onMarkRead, onDelete }: {
         </div>
       </div>
 
-      {/* Expanded opportunity list */}
-      {expanded && (
-        <div className="px-4 pb-3 space-y-1.5">
-          {displayedMatches.map((opp) => (
-            <MiniOpportunityCard key={opp.id} opp={opp} />
-          ))}
-          {remaining > 0 && (
-            <Link
-              to={notification.searchUrl}
-              className="block text-center text-xs text-dark-500 hover:text-dark-300
-                py-1.5 transition-colors"
-            >
-              + {remaining} more match{remaining !== 1 ? 'es' : ''}
-            </Link>
-          )}
-        </div>
-      )}
+      {/* Opportunity list */}
+      <div className="px-4 pb-3 space-y-1.5">
+        {displayedMatches.map((opp) => (
+          <MiniOpportunityCard key={opp.id} opp={opp} />
+        ))}
+        {remaining > 0 && (
+          <Link
+            to={notification.searchUrl}
+            className="block text-center text-xs text-dark-500 hover:text-dark-300
+              py-1.5 transition-colors"
+          >
+            + {remaining} more match{remaining !== 1 ? 'es' : ''}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
