@@ -52,7 +52,7 @@ export default function RedeemPage() {
           <h1 className="text-2xl font-semibold text-dark-50 mb-2">You've received a gift!</h1>
           <p className="text-dark-400 mb-6">Sign in or create an account to activate your free Pro access.</p>
           <button
-            onClick={() => signIn()}
+            onClick={() => { sessionStorage.setItem('govtrove_redeem_code', code!); signIn(); }}
             className="px-6 py-3 text-sm font-semibold text-dark-950 rounded-lg bg-accent hover:bg-accent/90 transition-colors"
           >
             Sign in to redeem

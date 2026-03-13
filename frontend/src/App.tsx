@@ -46,6 +46,11 @@ function AuthCallback() {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center text-dark-500 text-sm">Signing in...</div>;
   }
+  const redeemCode = sessionStorage.getItem('govtrove_redeem_code');
+  if (redeemCode) {
+    sessionStorage.removeItem('govtrove_redeem_code');
+    return <Navigate to={`/redeem/${encodeURIComponent(redeemCode)}`} replace />;
+  }
   const promo = sessionStorage.getItem('govtrove_promo_code');
   if (promo) {
     return <Navigate to={`/profile?promo=${encodeURIComponent(promo)}`} replace />;
