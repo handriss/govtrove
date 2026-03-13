@@ -75,7 +75,9 @@ export default function SearchResults({
   const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const anySelected = selectedIds.size > 0;
-  const displayKeyword = keyword?.replace(/^"+|"+$/g, '') || keyword;
+  const displayKeyword = keyword
+    ? keyword.split(' OR ').map(t => t.replace(/^"|"$/g, '')).join(', ')
+    : keyword;
 
   // Clear selection when results change
   useEffect(() => {
@@ -321,7 +323,7 @@ function ZeroResults({
       </h3>
       {keyword && (
         <p className="text-dark-400 text-sm mb-2">
-          No results for &ldquo;<span className="text-dark-300">{keyword?.replace(/^"+|"+$/g, '')}</span>&rdquo;
+          No results for &ldquo;<span className="text-dark-300">{keyword?.split(' OR ').map(t => t.replace(/^"|"$/g, '')).join(', ')}</span>&rdquo;
         </p>
       )}
       {querySuggestion && onQuerySuggestionClick && (

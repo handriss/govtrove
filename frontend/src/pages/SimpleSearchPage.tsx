@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Bookmark, X, ChevronDown } from 'lucide-react';
-import SearchInput from '../components/SearchInput';
+import KeywordChipInput from '../components/KeywordChipInput';
 import QuickFilterChips from '../components/QuickFilterChips';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
 import SignupPromptModal, { type SignupPromptContext } from '../components/SignupPromptModal';
-import SignupNudgeBanner, { incrementAnonSearchCount } from '../components/SignupNudgeBanner';
 import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
 import { useFilterState } from '../hooks/useFilterState';
 import { useFacetCounts } from '../hooks/useFacetCounts';
@@ -150,7 +149,6 @@ export default function SimpleSearchPage() {
     search(params);
     setHasSearched(true);
     isInitialSearch.current = false;
-    if (!isAuthenticated) incrementAnonSearchCount();
   }, [debouncedAutoSearch, searchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial search on mount if URL has filters (wait for tree data to be ready)
@@ -248,14 +246,13 @@ export default function SimpleSearchPage() {
         {!showResults && (
           <>
             <div className="w-full max-w-2xl px-6 mb-8">
-              <SearchInput
+              <KeywordChipInput
                 ref={inputRef}
                 value={fs.filters.keyword}
                 onChange={(v) => fs.setFilter('keyword', v)}
                 onSubmit={handleSubmit}
                 loading={loading && fs.filters.keyword.length >= 2}
                 size="large"
-                placeholder="Search contracts, solicitations, awards..."
                 autoFocus
                 showSubmitButton
               />
@@ -424,8 +421,6 @@ export default function SimpleSearchPage() {
               )}
             </div>
           )}
-
-          <SignupNudgeBanner />
 
           {showProTip && (
             <div className="mb-4 rounded-xl bg-accent/5 border border-accent/20 px-4 py-3 flex items-center justify-between gap-3 animate-in fade-in">

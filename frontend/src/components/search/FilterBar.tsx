@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Filter, ChevronUp, ChevronDown, HelpCircle } from 'lucide-react';
-import SearchInput from '../SearchInput';
+import KeywordChipInput from '../KeywordChipInput';
 import {
   SearchableDropdownFilter,
   EnhancedDeadlineFilter,
@@ -100,13 +100,18 @@ export default function FilterBar({
         setFilter('activeOnly', true);
         return;
       }
+      if (key === 'keyword' && value) {
+        const terms = filters.keyword.split(' OR ').filter(t => t !== value);
+        setFilter('keyword', terms.join(' OR '));
+        return;
+      }
       if (value && (key === 'naics' || key === 'psc' || key === 'setAside' || key === 'noticeType' || key === 'agency')) {
         removeFilter(key, value);
       } else {
         clearFilter(key);
       }
     },
-    [setFilter, removeFilter, clearFilter],
+    [filters.keyword, setFilter, removeFilter, clearFilter],
   );
 
   return (
@@ -114,13 +119,12 @@ export default function FilterBar({
       {/* ROW 1: Keyword search */}
       <div className="flex gap-2 items-center">
         <div className="flex-1">
-          <SearchInput
+          <KeywordChipInput
             ref={inputRef}
             value={filters.keyword}
             onChange={(v) => setFilter('keyword', v)}
             onSubmit={onSearch}
             loading={loading && !!filters.keyword}
-            placeholder="Search contracts, solicitations, awards..."
           />
         </div>
 
@@ -272,16 +276,16 @@ function SearchHelpButton() {
               <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1.5">Search tips</h3>
               <ul className="space-y-1 text-dark-400">
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">"..."</kbd>
-                  <span>match exact phrases (e.g. "IT services")</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">Enter</kbd>
+                  <span>add keyword &mdash; each is an exact phrase match</span>
                 </li>
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">word1 OR word2</kbd>
-                  <span>match either term</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">,</kbd>
+                  <span>add multiple keywords at once (e.g. cyber, cloud)</span>
                 </li>
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">-word</kbd>
-                  <span>exclude a single word</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">Backspace</kbd>
+                  <span>remove the last keyword</span>
                 </li>
               </ul>
             </div>

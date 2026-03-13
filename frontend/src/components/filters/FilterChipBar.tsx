@@ -37,11 +37,17 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
     const result: Chip[] = [];
 
     if (filters.keyword) {
-      result.push({
-        id: 'keyword',
-        filterKey: 'keyword',
-        label: filters.keyword.startsWith('"') ? filters.keyword : `"${filters.keyword}"`,
-      });
+      const terms = filters.keyword.split(' OR ');
+      for (const term of terms) {
+        if (!term) continue;
+        const display = term.replace(/^"|"$/g, '');
+        result.push({
+          id: `keyword:${term}`,
+          filterKey: 'keyword',
+          value: term,
+          label: `"${display}"`,
+        });
+      }
     }
 
     for (const code of filters.naics) {
