@@ -113,13 +113,13 @@ func TestBuildFilterConditions_ORQuery(t *testing.T) {
 	if !strings.Contains(ftsExpr, "||") {
 		t.Errorf("ftsExpr should contain ||: %s", ftsExpr)
 	}
-	// active, is_latest, and the OR compound condition
+	// active, is_latest, and the combined search_vector condition
 	if len(conditions) != 3 {
 		t.Errorf("expected 3 conditions, got %d: %v", len(conditions), conditions)
 	}
 	orCond := conditions[2]
-	if !strings.HasPrefix(orCond, "(") || !strings.Contains(orCond, "||") {
-		t.Errorf("expected compound condition with tsquery ||, got: %s", orCond)
+	if !strings.Contains(orCond, "search_vector") || !strings.Contains(orCond, "||") {
+		t.Errorf("expected search_vector condition with ||, got: %s", orCond)
 	}
 }
 
@@ -127,14 +127,14 @@ func TestBuildFilterConditions_ORWithQuotedPhrase(t *testing.T) {
 	params := models.SearchParams{Query: `sterilizer OR "exact phrase" OR autoclave`, Page: 1, Limit: 20}
 	conditions, args, _, ftsExpr := buildFilterConditions(params, "", 1)
 
-	// 2 FTS args + 1 ILIKE arg = 3
+	// All go through FTS now: 2 websearch + 1 phraseto = 3 args
 	if len(args) != 3 {
 		t.Fatalf("expected 3 args, got %d: %v", len(args), args)
 	}
 	if args[0] != "sterilizer" {
 		t.Errorf("args[0]: %v", args[0])
 	}
-	if args[1] != "%exact phrase%" {
+	if args[1] != "exact phrase" {
 		t.Errorf("args[1]: %v", args[1])
 	}
 	if args[2] != "autoclave" {
@@ -143,10 +143,10 @@ func TestBuildFilterConditions_ORWithQuotedPhrase(t *testing.T) {
 	if ftsExpr == "" || !strings.Contains(ftsExpr, "||") {
 		t.Errorf("expected combined ftsExpr with ||, got: %s", ftsExpr)
 	}
-	// The OR condition should contain both ILIKE and FTS parts
+	// Should be a single search_vector condition combining all terms
 	orCond := conditions[2]
-	if !strings.Contains(orCond, "ILIKE") || !strings.Contains(orCond, "search_vector") {
-		t.Errorf("expected ILIKE + FTS in OR condition, got: %s", orCond)
+	if !strings.Contains(orCond, "search_vector") || !strings.Contains(orCond, "phraseto_tsquery") {
+		t.Errorf("expected search_vector with phraseto_tsquery, got: %s", orCond)
 	}
 }
 
@@ -154,13 +154,13 @@ func TestBuildFilterConditions_ORAllQuoted(t *testing.T) {
 	params := models.SearchParams{Query: `"phrase one" OR "phrase two"`, Page: 1, Limit: 20}
 	_, args, _, ftsExpr := buildFilterConditions(params, "", 1)
 
-	if ftsExpr != "" {
-		t.Errorf("expected empty ftsExpr (all quoted), got: %s", ftsExpr)
+	if ftsExpr == "" || !strings.Contains(ftsExpr, "phraseto_tsquery") {
+		t.Errorf("expected ftsExpr with phraseto_tsquery, got: %s", ftsExpr)
 	}
 	if len(args) != 2 {
 		t.Fatalf("expected 2 args, got %d: %v", len(args), args)
 	}
-	if args[0] != "%phrase one%" || args[1] != "%phrase two%" {
+	if args[0] != "phrase one" || args[1] != "phrase two" {
 		t.Errorf("args: %v", args)
 	}
 }

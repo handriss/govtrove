@@ -165,10 +165,16 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		segments := splitOR(params.Query)
 		if len(segments) <= 1 {
 			phrases, ftsQuery := parseQuotedPhrases(params.Query)
-			for _, phrase := range phrases {
-				conditions = append(conditions, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-				args = append(args, "%"+phrase+"%")
-				argNum++
+			if len(phrases) > 0 {
+				var phraseExprs []string
+				for _, phrase := range phrases {
+					phraseExprs = append(phraseExprs, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
+					args = append(args, phrase)
+					argNum++
+				}
+				combined := strings.Join(phraseExprs, " || ")
+				conditions = append(conditions, fmt.Sprintf("search_vector @@ (%s)", combined))
+				ftsExpr = combined
 			}
 			if ftsQuery != "" {
 				conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
@@ -177,14 +183,13 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 				argNum++
 			}
 		} else {
-			var orParts []string
 			var ftsExprs []string
 
 			for _, seg := range segments {
 				phrases, ftsQuery := parseQuotedPhrases(seg)
 				for _, phrase := range phrases {
-					orParts = append(orParts, fmt.Sprintf("(title ILIKE $%d OR description ILIKE $%d OR solicitation_number ILIKE $%d)", argNum, argNum, argNum))
-					args = append(args, "%"+phrase+"%")
+					ftsExprs = append(ftsExprs, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
+					args = append(args, phrase)
 					argNum++
 				}
 				if ftsQuery != "" {
@@ -196,12 +201,8 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 
 			if len(ftsExprs) > 0 {
 				combined := strings.Join(ftsExprs, " || ")
-				orParts = append(orParts, fmt.Sprintf("search_vector @@ (%s)", combined))
+				conditions = append(conditions, fmt.Sprintf("search_vector @@ (%s)", combined))
 				ftsExpr = combined
-			}
-
-			if len(orParts) > 0 {
-				conditions = append(conditions, "("+strings.Join(orParts, " OR ")+")")
 			}
 		}
 	}
