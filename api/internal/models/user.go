@@ -15,6 +15,7 @@ type User struct {
 	SubscriptionStatus *string    `json:"subscription_status,omitempty"`
 	CancelAtPeriodEnd  bool       `json:"cancel_at_period_end"`
 	CurrentPeriodEnd   *time.Time `json:"current_period_end,omitempty"`
+	GiftExpiresAt      *time.Time `json:"gift_expires_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 }

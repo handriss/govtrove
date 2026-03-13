@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2 } from 'lucide-react';
+import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2, Gift } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getAdminUsers, type AdminUser } from '../services/api';
 
@@ -49,6 +49,7 @@ const navGroups: NavGroup[] = [
       { label: 'Sent Emails', icon: Send, path: '/admin', tab: 'sent-emails' },
       { label: 'Promo Codes', icon: Ticket, path: '/admin', tab: 'promo-codes' },
       { label: 'Invite Links', icon: Link2, path: '/admin', tab: 'invite-links' },
+      { label: 'Gift Codes', icon: Gift, path: '/admin', tab: 'gift-codes' },
     ],
   },
   {

@@ -10,6 +10,7 @@ import {
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
   getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
   getAdminInviteLinks, adminCreateInviteLink, getAdminInviteLinkDetail, adminUpdateInviteLink, adminDeactivateInviteLink,
+  getAdminGiftCodes, adminCreateGiftCode, getAdminGiftCodeDetail, adminUpdateGiftCode, adminDeactivateGiftCode,
   getAdminMcpUsage, adminSetFreeForever,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
@@ -17,6 +18,7 @@ import {
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
   type AdminPromoCode, type McpUsageEvent,
   type AdminInviteLink, type AdminInviteLinkRedemption,
+  type AdminGiftCode, type AdminGiftCodeRedemption,
 } from '../services/api';
 import type { Notification } from '../types/api';
 import { useAppAuth } from '../contexts/AuthContext';
@@ -1785,6 +1787,310 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   );
 }
 
+function GiftCodesTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [codes, setCodes] = useState<AdminGiftCode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [campaignName, setCampaignName] = useState('');
+  const [customCode, setCustomCode] = useState('');
+  const [durationDays, setDurationDays] = useState(365);
+  const [maxRedemptions, setMaxRedemptions] = useState(0);
+  const [expiresInDays, setExpiresInDays] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<number | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [redemptions, setRedemptions] = useState<AdminGiftCodeRedemption[]>([]);
+  const [redemptionsLoading, setRedemptionsLoading] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editMax, setEditMax] = useState(0);
+
+  const loadCodes = useCallback(async () => {
+    try {
+      const token = await getToken();
+      setCodes(await getAdminGiftCodes(token));
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }, [getToken]);
+
+  useEffect(() => { loadCodes(); }, [loadCodes]);
+
+  async function handleCreate() {
+    if (!campaignName) return;
+    setGenerating(true);
+    setError('');
+    try {
+      const token = await getToken();
+      await adminCreateGiftCode(token, {
+        campaign_name: campaignName,
+        code: customCode || undefined,
+        duration_days: durationDays,
+        max_redemptions: maxRedemptions,
+        expires_in_days: expiresInDays || undefined,
+      });
+      setCampaignName('');
+      setCustomCode('');
+      await loadCodes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create gift code');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleCopy(gc: AdminGiftCode) {
+    const url = `${window.location.origin}/redeem/${gc.code}`;
+    navigator.clipboard.writeText(url);
+    setCopied(gc.id);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function handleExpand(id: number) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    setRedemptionsLoading(true);
+    try {
+      const token = await getToken();
+      const detail = await getAdminGiftCodeDetail(token, id);
+      setRedemptions(detail.redemptions);
+    } catch {
+      setRedemptions([]);
+    } finally {
+      setRedemptionsLoading(false);
+    }
+  }
+
+  async function handleDeactivate(id: number) {
+    if (!confirm('Deactivate this gift code? New users will no longer be able to redeem it.')) return;
+    setDeactivatingId(id);
+    try {
+      const token = await getToken();
+      await adminDeactivateGiftCode(token, id);
+      await loadCodes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to deactivate');
+    } finally {
+      setDeactivatingId(null);
+    }
+  }
+
+  async function handleSaveMax(id: number) {
+    try {
+      const token = await getToken();
+      await adminUpdateGiftCode(token, id, { max_redemptions: editMax });
+      setEditingId(null);
+      await loadCodes();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update');
+    }
+  }
+
+  function statusBadge(gc: AdminGiftCode) {
+    if (gc.deactivated_at) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Deactivated</span>;
+    }
+    if (gc.expires_at && new Date(gc.expires_at) < new Date()) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">Expired</span>;
+    }
+    if (gc.max_redemptions > 0 && gc.redemption_count >= gc.max_redemptions) {
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">Full</span>;
+    }
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">Active</span>;
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-medium text-dark-200 mb-4">Gift Codes</h2>
+
+      <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-4 mb-6">
+        <h3 className="text-sm font-medium text-dark-300 mb-3">Create New Gift Code</h3>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Campaign Name</label>
+            <input
+              type="text"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              placeholder="e.g. Beta Testers"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[200px]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Custom Code (optional)</label>
+            <input
+              type="text"
+              value={customCode}
+              onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+              placeholder="GIFT-BETA-2026"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[200px]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Duration (days)</label>
+            <input
+              type="number"
+              value={durationDays}
+              onChange={(e) => setDurationDays(Number(e.target.value))}
+              min={1}
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Max Redemptions</label>
+            <input
+              type="number"
+              value={maxRedemptions}
+              onChange={(e) => setMaxRedemptions(Number(e.target.value))}
+              min={0}
+              placeholder="0 = unlimited"
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Code expires in (days)</label>
+            <input
+              type="number"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(Number(e.target.value))}
+              min={0}
+              placeholder="0 = never"
+              className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <button
+            onClick={handleCreate}
+            disabled={!campaignName || generating}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-dark-950 hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {generating ? 'Creating...' : 'Create Gift Code'}
+          </button>
+        </div>
+        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      </div>
+
+      {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
+
+      {!loading && codes.length === 0 && (
+        <p className="text-dark-500 text-sm py-8 text-center">No gift codes yet.</p>
+      )}
+
+      {!loading && codes.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-dark-700/50 text-dark-400 text-left">
+                <th className="px-4 py-3 font-medium">Campaign</th>
+                <th className="px-4 py-3 font-medium">Code</th>
+                <th className="px-4 py-3 font-medium">Duration</th>
+                <th className="px-4 py-3 font-medium">Redemptions</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+                <th className="px-4 py-3 font-medium">Expires</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((gc) => (
+                <>
+                  <tr
+                    key={gc.id}
+                    className={`border-b border-dark-700/30 last:border-0 hover:bg-dark-800/30 cursor-pointer ${expandedId === gc.id ? 'bg-dark-800/20' : ''}`}
+                    onClick={() => handleExpand(gc.id)}
+                  >
+                    <td className="px-4 py-3 text-dark-200">{gc.campaign_name}</td>
+                    <td className="px-4 py-3 text-dark-100 text-xs font-mono">{gc.code}</td>
+                    <td className="px-4 py-3 text-dark-300">{gc.duration_days}d</td>
+                    <td className="px-4 py-3 text-dark-300">
+                      {editingId === gc.id ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <span className="text-dark-400">{gc.redemption_count} /</span>
+                          <input
+                            type="number"
+                            value={editMax}
+                            onChange={(e) => setEditMax(Number(e.target.value))}
+                            min={0}
+                            className="w-16 px-1 py-0.5 text-xs bg-dark-800 border border-dark-600 rounded text-dark-100"
+                            autoFocus
+                          />
+                          <button onClick={() => handleSaveMax(gc.id)} className="text-green-400 hover:text-green-300 text-xs">Save</button>
+                          <button onClick={() => setEditingId(null)} className="text-dark-500 hover:text-dark-300"><X size={12} /></button>
+                        </div>
+                      ) : (
+                        <span>
+                          {gc.redemption_count} / {gc.max_redemptions || '\u221e'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">{statusBadge(gc)}</td>
+                    <td className="px-4 py-3 text-dark-400 text-xs">{formatDate(gc.created_at)}</td>
+                    <td className="px-4 py-3 text-dark-400 text-xs">{gc.expires_at ? formatDate(gc.expires_at) : '\u2014'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {!gc.deactivated_at && (
+                          <>
+                            <button
+                              onClick={() => handleCopy(gc)}
+                              title="Copy redeem URL"
+                              className="p-1 text-dark-400 hover:text-accent transition-colors"
+                            >
+                              {copied === gc.id ? <span className="text-xs text-green-400">Copied</span> : <Copy size={14} />}
+                            </button>
+                            <button
+                              onClick={() => { setEditingId(gc.id); setEditMax(gc.max_redemptions); }}
+                              title="Edit max redemptions"
+                              className="p-1 text-dark-400 hover:text-accent transition-colors"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeactivate(gc.id)}
+                              disabled={deactivatingId === gc.id}
+                              title="Deactivate"
+                              className="p-1 text-dark-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                            >
+                              {deactivatingId === gc.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedId === gc.id && (
+                    <tr key={`${gc.id}-detail`} className="border-b border-dark-700/30">
+                      <td colSpan={8} className="px-8 py-4 bg-dark-900/30">
+                        <h4 className="text-sm font-medium text-dark-300 mb-2">Redemptions</h4>
+                        {redemptionsLoading ? (
+                          <p className="text-dark-400 text-xs">Loading...</p>
+                        ) : redemptions.length === 0 ? (
+                          <p className="text-dark-500 text-xs">No redemptions yet.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {redemptions.map((r) => (
+                              <div key={r.user_id} className="flex items-center gap-4 text-xs text-dark-300">
+                                <span className="text-dark-200">{r.email}</span>
+                                <span className="text-dark-500">{r.name}</span>
+                                <span className="text-dark-400">until {formatDate(r.granted_until)}</span>
+                                <span className="text-dark-500">{formatDateTime(r.redeemed_at)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function InviteLinksTab({ getToken }: { getToken: () => Promise<string> }) {
   const [links, setLinks] = useState<AdminInviteLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2178,7 +2484,7 @@ function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'mcp-usage';
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'gift-codes' | 'mcp-usage';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -2207,6 +2513,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
       {activeTab === 'promo-codes' && <PromoCodesTab users={users} getToken={getToken} />}
       {activeTab === 'invite-links' && <InviteLinksTab getToken={getToken} />}
+      {activeTab === 'gift-codes' && <GiftCodesTab getToken={getToken} />}
       {activeTab === 'mcp-usage' && <McpUsageTab getToken={getToken} />}
     </div>
   );
