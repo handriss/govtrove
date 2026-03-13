@@ -30,6 +30,7 @@ type AdminHandler struct {
 	sentEmailsRepo   *repository.SentEmailsRepository
 	promoRepo        *repository.PromoCodeRepository
 	inviteLinkRepo   *repository.InviteLinkRepository
+	giftCodeRepo     *repository.GiftCodeRepository
 	emailSvc         *email.Service
 	sc               *stripe.Client
 	promoCouponID    string
@@ -46,6 +47,7 @@ func NewAdminHandler(
 	sentEmailsRepo *repository.SentEmailsRepository,
 	promoRepo *repository.PromoCodeRepository,
 	inviteLinkRepo *repository.InviteLinkRepository,
+	giftCodeRepo *repository.GiftCodeRepository,
 	emailSvc *email.Service,
 	sc *stripe.Client,
 	promoCouponID string,
@@ -61,6 +63,7 @@ func NewAdminHandler(
 		sentEmailsRepo:   sentEmailsRepo,
 		promoRepo:        promoRepo,
 		inviteLinkRepo:   inviteLinkRepo,
+		giftCodeRepo:     giftCodeRepo,
 		emailSvc:         emailSvc,
 		sc:               sc,
 		promoCouponID:    promoCouponID,
@@ -1300,6 +1303,179 @@ func (h *AdminHandler) DeactivateInviteLink(w http.ResponseWriter, r *http.Reque
 	}
 
 	h.logger.Info("invite link deactivated", "id", id, "code", link.Code)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) CreateGiftCode(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CampaignName   string `json:"campaign_name"`
+		Code           string `json:"code"`
+		DurationDays   int    `json:"duration_days"`
+		MaxRedemptions int    `json:"max_redemptions"`
+		ExpiresInDays  int    `json:"expires_in_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if body.CampaignName == "" {
+		http.Error(w, "campaign_name is required", http.StatusBadRequest)
+		return
+	}
+	if body.DurationDays <= 0 {
+		body.DurationDays = 365
+	}
+
+	asciiOnly := regexp.MustCompile(`[^a-zA-Z0-9]`)
+	code := body.Code
+	if code == "" {
+		randBytes := make([]byte, 3)
+		rand.Read(randBytes)
+		suffix := strings.ToUpper(hex.EncodeToString(randBytes))
+		campaignSlug := strings.ToUpper(asciiOnly.ReplaceAllString(body.CampaignName, ""))
+		if len(campaignSlug) > 20 {
+			campaignSlug = campaignSlug[:20]
+		}
+		if campaignSlug == "" {
+			campaignSlug = "GIFT"
+		}
+		code = fmt.Sprintf("GIFT-%s-%s", campaignSlug, suffix)
+	}
+
+	exists, err := h.giftCodeRepo.CodeExists(r.Context(), code)
+	if err != nil {
+		h.logger.Error("gift code lookup failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if exists {
+		http.Error(w, "code already exists", http.StatusConflict)
+		return
+	}
+
+	var expiresAt *time.Time
+	if body.ExpiresInDays > 0 {
+		t := time.Now().Add(time.Duration(body.ExpiresInDays) * 24 * time.Hour)
+		expiresAt = &t
+	}
+
+	id, err := h.giftCodeRepo.Create(r.Context(), code, body.CampaignName, body.DurationDays, body.MaxRedemptions, expiresAt)
+	if err != nil {
+		h.logger.Error("failed to create gift code", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	redeemURL := fmt.Sprintf("%s/redeem/%s", h.appURL, code)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":         id,
+		"code":       code,
+		"redeem_url": redeemURL,
+	})
+}
+
+func (h *AdminHandler) ListGiftCodes(w http.ResponseWriter, r *http.Request) {
+	codes, err := h.giftCodeRepo.List(r.Context())
+	if err != nil {
+		h.logger.Error("list gift codes failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if codes == nil {
+		codes = []repository.GiftCodeRow{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(codes)
+}
+
+func (h *AdminHandler) GetGiftCodeDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	gc, err := h.giftCodeRepo.GetByID(r.Context(), id)
+	if err != nil || gc == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	redemptions, err := h.giftCodeRepo.GetRedemptions(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get gift code redemptions failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if redemptions == nil {
+		redemptions = []repository.GiftCodeRedemptionRow{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"gift_code":   gc,
+		"redemptions": redemptions,
+	})
+}
+
+func (h *AdminHandler) UpdateGiftCode(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		MaxRedemptions int `json:"max_redemptions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	gc, err := h.giftCodeRepo.GetByID(r.Context(), id)
+	if err != nil || gc == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.giftCodeRepo.UpdateMaxRedemptions(r.Context(), id, body.MaxRedemptions); err != nil {
+		h.logger.Error("update gift code failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) DeactivateGiftCode(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	gc, err := h.giftCodeRepo.GetByID(r.Context(), id)
+	if err != nil || gc == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if gc.DeactivatedAt != nil {
+		http.Error(w, "already deactivated", http.StatusConflict)
+		return
+	}
+
+	if err := h.giftCodeRepo.Deactivate(r.Context(), id); err != nil {
+		h.logger.Error("deactivate gift code failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	h.logger.Info("gift code deactivated", "id", id, "code", gc.Code)
 	w.WriteHeader(http.StatusNoContent)
 }
 

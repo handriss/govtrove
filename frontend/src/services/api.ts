@@ -26,6 +26,7 @@ export interface GovTroveUser {
   subscription_status?: string;
   cancel_at_period_end: boolean;
   current_period_end?: string;
+  gift_expires_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -1283,4 +1284,104 @@ export async function adminDeactivateInviteLink(token: string, id: number): Prom
     const text = await response.text();
     throw new Error(text || `${response.status}`);
   }
+}
+
+// --- Gift Codes ---
+
+export interface AdminGiftCode {
+  id: number;
+  code: string;
+  campaign_name: string;
+  duration_days: number;
+  max_redemptions: number;
+  redemption_count: number;
+  expires_at: string | null;
+  created_at: string;
+  deactivated_at: string | null;
+}
+
+export interface AdminGiftCodeRedemption {
+  user_id: number;
+  email: string;
+  name: string;
+  granted_until: string;
+  redeemed_at: string;
+}
+
+export interface AdminGiftCodeDetail {
+  gift_code: AdminGiftCode;
+  redemptions: AdminGiftCodeRedemption[];
+}
+
+export async function getAdminGiftCodes(token: string): Promise<AdminGiftCode[]> {
+  const response = await fetch(`${API_BASE}/admin/gift-codes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminCreateGiftCode(
+  token: string,
+  data: { campaign_name: string; code?: string; duration_days: number; max_redemptions: number; expires_in_days?: number },
+): Promise<{ id: number; code: string; redeem_url: string }> {
+  const response = await fetch(`${API_BASE}/admin/gift-codes`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getAdminGiftCodeDetail(
+  token: string,
+  id: number,
+): Promise<AdminGiftCodeDetail> {
+  const response = await fetch(`${API_BASE}/admin/gift-codes/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminUpdateGiftCode(
+  token: string,
+  id: number,
+  data: { max_redemptions: number },
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/gift-codes/${id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+}
+
+export async function adminDeactivateGiftCode(token: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/gift-codes/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+}
+
+export async function redeemGiftCode(token: string, code: string): Promise<{ granted_until: string }> {
+  const response = await fetch(`${API_BASE}/gift-codes/redeem`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  checkAuth(response);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+  return response.json();
 }

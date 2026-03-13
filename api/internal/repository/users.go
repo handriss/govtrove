@@ -14,14 +14,14 @@ import (
 
 const userColumns = `id, workos_id, email, first_name, last_name, plan, free_forever, stripe_customer_id,
 	subscription_id, subscription_status, cancel_at_period_end, current_period_end,
-	created_at, updated_at`
+	gift_expires_at, created_at, updated_at`
 
 func scanUser(row pgx.Row, u *models.User) error {
 	return row.Scan(
 		&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName,
 		&u.Plan, &u.FreeForever, &u.StripeCustomerID,
 		&u.SubscriptionID, &u.SubscriptionStatus, &u.CancelAtPeriodEnd, &u.CurrentPeriodEnd,
-		&u.CreatedAt, &u.UpdatedAt,
+		&u.GiftExpiresAt, &u.CreatedAt, &u.UpdatedAt,
 	)
 }
 
@@ -62,7 +62,7 @@ func (r *UserRepository) Upsert(ctx context.Context, input *models.UpsertUserInp
 		&u.ID, &u.WorkOSID, &u.Email, &u.FirstName, &u.LastName,
 		&u.Plan, &u.FreeForever, &u.StripeCustomerID,
 		&u.SubscriptionID, &u.SubscriptionStatus, &u.CancelAtPeriodEnd, &u.CurrentPeriodEnd,
-		&u.CreatedAt, &u.UpdatedAt, &isNew,
+		&u.GiftExpiresAt, &u.CreatedAt, &u.UpdatedAt, &isNew,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("upserting user: %w", err)
@@ -257,6 +257,9 @@ func (r *UserRepository) DeleteUser(ctx context.Context, userID int, email strin
 	if _, err := tx.Exec(ctx, `DELETE FROM invite_link_redemptions WHERE user_id = $1`, userID); err != nil {
 		return fmt.Errorf("deleting invite_link_redemptions: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `DELETE FROM gift_code_redemptions WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("deleting gift_code_redemptions: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID); err != nil {
 		return fmt.Errorf("deleting user: %w", err)
 	}
@@ -308,6 +311,17 @@ func (r *UserRepository) SetFreeForever(ctx context.Context, userID int, freeFor
 	)
 	if err != nil {
 		return fmt.Errorf("setting free_forever: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepository) SetGiftExpiry(ctx context.Context, userID int, giftExpiresAt *time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE users SET gift_expires_at = GREATEST(gift_expires_at, $1), updated_at = NOW() WHERE id = $2`,
+		giftExpiresAt, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("setting gift_expires_at: %w", err)
 	}
 	return nil
 }

@@ -161,6 +161,7 @@ func main() {
 	sentEmailsRepo := repository.NewSentEmailsRepository(pool)
 	promoRepo := repository.NewPromoCodeRepository(pool)
 	inviteLinkRepo := repository.NewInviteLinkRepository(pool)
+	giftCodeRepo := repository.NewGiftCodeRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
 
 	appURL := "https://app.govtrove.com"
@@ -185,7 +186,8 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, giftCodeRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
+	giftHandler := handlers.NewGiftHandler(giftCodeRepo, userRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
 	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
@@ -299,6 +301,7 @@ func main() {
 					r.Post("/billing/checkout", stripeHandler.CreateCheckoutSession)
 					r.Post("/billing/portal", stripeHandler.CreatePortalSession)
 				}
+				r.Post("/gift-codes/redeem", giftHandler.Redeem)
 				r.Post("/account/requests", accountRequestHandler.Create)
 				r.Get("/preferences", preferencesHandler.Get)
 				r.Put("/preferences", preferencesHandler.Update)
@@ -338,6 +341,11 @@ func main() {
 				r.Get("/invite-links/{id}", adminHandler.GetInviteLinkDetail)
 				r.Put("/invite-links/{id}", adminHandler.UpdateInviteLink)
 				r.Delete("/invite-links/{id}", adminHandler.DeactivateInviteLink)
+				r.Post("/gift-codes", adminHandler.CreateGiftCode)
+				r.Get("/gift-codes", adminHandler.ListGiftCodes)
+				r.Get("/gift-codes/{id}", adminHandler.GetGiftCodeDetail)
+				r.Put("/gift-codes/{id}", adminHandler.UpdateGiftCode)
+				r.Delete("/gift-codes/{id}", adminHandler.DeactivateGiftCode)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
 				r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)

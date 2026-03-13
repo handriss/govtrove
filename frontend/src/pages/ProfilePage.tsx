@@ -106,7 +106,9 @@ export default function ProfilePage() {
   const memberSince = govtroveUser?.created_at ? formatMemberSince(govtroveUser.created_at) : null;
   const plan = govtroveUser?.plan || 'free';
   const freeForever = govtroveUser?.free_forever ?? false;
-  const hasPro = plan === 'pro' || freeForever;
+  const giftExpiresAt = govtroveUser?.gift_expires_at;
+  const hasActiveGift = !!giftExpiresAt && new Date(giftExpiresAt) > new Date();
+  const hasPro = plan === 'pro' || freeForever || hasActiveGift;
   const subStatus = govtroveUser?.subscription_status;
   const cancelAtPeriodEnd = govtroveUser?.cancel_at_period_end ?? false;
   const periodEnd = govtroveUser?.current_period_end;
@@ -207,8 +209,13 @@ export default function ProfilePage() {
           {hasPro ? (
             <div>
               <p className="text-dark-100 font-medium text-lg mb-1">
-                Pro{freeForever && plan !== 'pro' && <span className="text-sm text-dark-400 font-normal ml-2">(complimentary)</span>}
+                Pro{freeForever && plan !== 'pro' && !hasActiveGift && <span className="text-sm text-dark-400 font-normal ml-2">(complimentary)</span>}
+                {hasActiveGift && plan !== 'pro' && !freeForever && <span className="text-sm text-dark-400 font-normal ml-2">(gift)</span>}
               </p>
+
+              {hasActiveGift && plan !== 'pro' && giftExpiresAt && (
+                <p className="text-sm text-dark-400">Gift access expires on {formatDate(giftExpiresAt)}</p>
+              )}
 
               {plan === 'pro' && isPastDue && (
                 <div className="mt-3 mb-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">

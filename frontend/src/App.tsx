@@ -21,6 +21,7 @@ const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
 const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
 const AdminObservabilityPage = lazy(() => import('./pages/AdminObservabilityPage'));
 const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
+const RedeemPage = lazy(() => import('./pages/RedeemPage'));
 const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
 const SearchGuideInteractivePage = lazy(() => import('./pages/SearchGuideInteractivePage'));
 const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
@@ -126,6 +127,7 @@ function AppRoutes() {
           <Route path="/snap/archived-csv/:id" element={<SnapDetailPage source="archived-csv" />} />
           <Route path="/snap/api/:id" element={<SnapDetailPage source="api" />} />
           {/* Standalone routes — no layout */}
+          <Route path="/redeem/:code" element={<RedeemPage />} />
           <Route path="/callback" element={<AuthCallback />} />
           <Route path="/terms" element={<ExternalRedirect to="https://govtrove.com/terms.html" />} />
           <Route path="/privacy" element={<ExternalRedirect to="https://govtrove.com/privacy.html" />} />
