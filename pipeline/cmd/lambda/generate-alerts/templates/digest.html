@@ -51,7 +51,7 @@ Saved Search Matches
 </p>
 {{end}}
 {{if .HasMore}}
-<p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">+ {{.RemainingCount}} more</p>
+<p style="margin:4px 0 0 0;font-size:12px;"><a href="{{.SearchURL}}" target="_blank" style="color:#6b7280;text-decoration:none;">+ {{.RemainingCount}} more</a></p>
 {{end}}
 <p style="margin:8px 0 0 0;">
 <a href="{{.SearchURL}}" target="_blank" style="font-size:13px;color:#2563eb;text-decoration:none;font-weight:500;">View all results &rarr;</a>
