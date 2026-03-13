@@ -723,7 +723,7 @@ func (r *OpportunityRepository) getFacet(ctx context.Context, params models.Sear
 	selectExpr := selectCol
 	groupBy := selectCol
 	if labelCol != "" {
-		selectExpr = fmt.Sprintf("%s, %s", selectCol, labelCol)
+		selectExpr = fmt.Sprintf("%s, COALESCE(%s, '')", selectCol, labelCol)
 		groupBy = fmt.Sprintf("%s, %s", selectCol, labelCol)
 	}
 
