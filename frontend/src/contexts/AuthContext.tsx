@@ -14,6 +14,7 @@ interface AuthContextValue {
   signUp: ReturnType<typeof useAuth>['signUp'];
   signOut: () => void;
   getAccessToken: ReturnType<typeof useAuth>['getAccessToken'];
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -91,6 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; };
   }, [auth.user?.id]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const token = await auth.getAccessToken();
+      const me = await getMe(token);
+      setGovtroveUser(me);
+    } catch {
+      // ignore
+    }
+  }, [auth.getAccessToken]);
+
   const signOut = useCallback(() => {
     posthog?.reset();
     auth.signOut({ returnTo: window.location.origin });
@@ -118,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp: auth.signUp,
         signOut,
         getAccessToken: auth.getAccessToken,
+        refreshUser,
       }}
     >
       {children}

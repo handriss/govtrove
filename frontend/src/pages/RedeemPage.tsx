@@ -11,7 +11,7 @@ function formatDate(dateStr: string) {
 
 export default function RedeemPage() {
   const { code } = useParams<{ code: string }>();
-  const { isAuthenticated, isLoading, signIn, getAccessToken, govtroveUser } = useAppAuth();
+  const { isAuthenticated, isLoading, signIn, getAccessToken, govtroveUser, refreshUser } = useAppAuth();
   const [status, setStatus] = useState<'idle' | 'redeeming' | 'success' | 'error'>('idle');
   const [grantedUntil, setGrantedUntil] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -26,6 +26,7 @@ export default function RedeemPage() {
         const token = await getAccessToken();
         const result = await redeemGiftCode(token, code);
         setGrantedUntil(result.granted_until);
+        await refreshUser();
         setStatus('success');
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : 'Failed to redeem gift code');
