@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -252,37 +253,58 @@ func joinFields(fields []string) string {
 	return fields[0] + ", " + fields[1] + fmt.Sprintf(", +%d more", len(fields)-2)
 }
 
+// keyMap translates saved search filter JSON keys (camelCase) to frontend URL params.
+var keyMap = map[string]string{
+	"keyword":            "q",
+	"naics":              "naics",
+	"psc":                "psc",
+	"setAside":           "set_aside",
+	"noticeType":         "type",
+	"agency":             "agency",
+	"department":         "agency",
+	"state":              "state",
+	"postedFrom":         "posted_from",
+	"postedTo":           "posted_to",
+	"deadlinePreset":     "deadline",
+	"deadlineFrom":       "deadline_from",
+	"deadlineTo":         "deadline_to",
+	"solicitationNumber": "sol_num",
+	"popCity":            "pop_city",
+	"activeOnly":         "active",
+}
+
 func (e *EmailSender) buildSearchURL(filters map[string]any) string {
-	var params []string
+	q := url.Values{}
 	for k, v := range filters {
+		param, ok := keyMap[k]
+		if !ok {
+			continue
+		}
 		switch val := v.(type) {
 		case string:
 			if val != "" {
-				params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(val))
+				q.Set(param, val)
 			}
 		case bool:
-			if val {
-				params = append(params, url.QueryEscape(k)+"=true")
+			if !val {
+				q.Set(param, "false")
 			}
 		case []any:
+			var items []string
 			for _, item := range val {
 				if s, ok := item.(string); ok && s != "" {
-					params = append(params, url.QueryEscape(k)+"="+url.QueryEscape(s))
+					items = append(items, s)
 				}
+			}
+			if len(items) > 0 {
+				q.Set(param, strings.Join(items, ","))
 			}
 		}
 	}
-	if len(params) == 0 {
+	if len(q) == 0 {
 		return e.baseURL + "/"
 	}
-	result := e.baseURL + "/?"
-	for i, p := range params {
-		if i > 0 {
-			result += "&"
-		}
-		result += p
-	}
-	return result
+	return e.baseURL + "/?" + q.Encode()
 }
 
 func (e *EmailSender) buildSubject(searches []searchAlertData, opps []oppAlertData) string {
