@@ -191,21 +191,29 @@ var _ = Describe("Ingest Active Handler", func() {
 		})
 
 		It("skips change detection and counts all records as new", func() {
-			detectChangesCalled := false
-			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
-				detectChangesCalled = true
-				return 0, 0, nil
+			getHashesCalled := false
+			store.GetPreviousRunHashesFn = func(_ context.Context, _ uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+				getHashesCalled = true
+				return nil, nil
 			}
 
 			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output.Status).To(Equal("ok"))
-			Expect(detectChangesCalled).To(BeFalse())
+			Expect(getHashesCalled).To(BeFalse())
 		})
 	})
 
 	Context("when a previous run exists", func() {
+		// Hash matching the CSV row for OPP-001 ("NoticeId":"OPP-001","Title":"Test Opportunity","Type":"Solicitation","Active":"Yes")
+		opp001Hash := database.ComputeContentHash(map[string]string{
+			"NoticeId": "OPP-001", "Title": "Test Opportunity", "Type": "Solicitation", "Active": "Yes",
+		})
+		opp002Hash := database.ComputeContentHash(map[string]string{
+			"NoticeId": "OPP-002", "Title": "Second Opportunity", "Type": "Award", "Active": "No",
+		})
+
 		BeforeEach(func() {
 			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
@@ -215,21 +223,90 @@ var _ = Describe("Ingest Active Handler", func() {
 			}
 		})
 
-		It("runs change detection and reports counts", func() {
-			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
-				return 5, 3, nil
+		It("counts new, changed, and disappeared records", func() {
+			store.GetPreviousRunHashesFn = func(_ context.Context, _ uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+				return map[string]database.PreviousRunRecord{
+					"OPP-001": {ContentHash: "different-hash"},                        // changed
+					"OPP-003": {ContentHash: "gone", SolicitationNumber: "SOL-003"},   // disappeared
+				}, nil
+				// OPP-002 is not in the map → new
 			}
-			store.DetectDisappearancesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, error) {
-				return 2, nil
+
+			var capturedStats map[string]any
+			store.CompletePipelineStepFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
+				capturedStats = stats
+				return nil
+			}
+			store.InsertDisappearancesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, records []database.DisappearedRecord, _ *slog.Logger) (int, error) {
+				Expect(records).To(HaveLen(1))
+				Expect(records[0].NoticeID).To(Equal("OPP-003"))
+				Expect(records[0].SolicitationNumber).To(Equal("SOL-003"))
+				return len(records), nil
 			}
 			store.DetectReappearancesFn = func(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
-				return 1, nil
+				return 0, nil
 			}
 
 			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedStats).NotTo(BeNil())
+			Expect(capturedStats["new"]).To(Equal(1))
+			Expect(capturedStats["changed"]).To(Equal(1))
+			Expect(capturedStats["disappeared"]).To(Equal(1))
+			Expect(capturedStats["records"]).To(Equal(2))
+		})
+
+		It("reports zero changes when all records match", func() {
+			store.GetPreviousRunHashesFn = func(_ context.Context, _ uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+				return map[string]database.PreviousRunRecord{
+					"OPP-001": {ContentHash: opp001Hash},
+					"OPP-002": {ContentHash: opp002Hash},
+				}, nil
+			}
+
+			var capturedStats map[string]any
+			store.CompletePipelineStepFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
+				capturedStats = stats
+				return nil
+			}
+			store.DetectReappearancesFn = func(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
+				return 0, nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedStats).NotTo(BeNil())
+			Expect(capturedStats["new"]).To(Equal(0))
+			Expect(capturedStats["changed"]).To(Equal(0))
+			Expect(capturedStats["disappeared"]).To(Equal(0))
+		})
+
+		It("counts all as new when previous run was empty", func() {
+			store.GetPreviousRunHashesFn = func(_ context.Context, _ uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+				return map[string]database.PreviousRunRecord{}, nil
+			}
+
+			var capturedStats map[string]any
+			store.CompletePipelineStepFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
+				capturedStats = stats
+				return nil
+			}
+			store.DetectReappearancesFn = func(_ context.Context, _ uuid.UUID, _ time.Time) (int, error) {
+				return 0, nil
+			}
+
+			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedStats).NotTo(BeNil())
+			Expect(capturedStats["new"]).To(Equal(2))
+			Expect(capturedStats["changed"]).To(Equal(0))
+			Expect(capturedStats["disappeared"]).To(Equal(0))
 		})
 	})
 
@@ -279,7 +356,7 @@ var _ = Describe("Ingest Active Handler", func() {
 		})
 	})
 
-	Context("when change detection fails", func() {
+	Context("when loading previous run hashes fails", func() {
 		It("still completes the run successfully", func() {
 			s3mock.GetObjectFn = func(_ context.Context, _ *s3.GetObjectInput, _ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 				return &s3.GetObjectOutput{Body: gzipCSV(csvData)}, nil
@@ -287,8 +364,8 @@ var _ = Describe("Ingest Active Handler", func() {
 			store.GetLastCompletedRunFn = func(_ context.Context, _ string) (uuid.UUID, time.Time, error) {
 				return uuid.New(), time.Now(), nil
 			}
-			store.DetectChangesFn = func(_ context.Context, _, _ uuid.UUID, _ time.Time, _ *slog.Logger) (int, int, error) {
-				return 0, 0, errors.New("timeout")
+			store.GetPreviousRunHashesFn = func(_ context.Context, _ uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+				return nil, errors.New("timeout")
 			}
 
 			output, err := h.Handle(ctx, buildEvent("raw/csv/2026-02-18.csv.gz"))

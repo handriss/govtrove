@@ -49,12 +49,34 @@ func simulateIngest(ctx context.Context, store database.Store, csvData string, j
 		}
 
 		if prevRunID != uuid.Nil {
-			if _, _, err := store.DetectChanges(ctx, runID, prevRunID, snapshotDate, logger); err != nil {
-				return uuid.Nil, fmt.Errorf("detect changes: %w", err)
+			prevHashes, err := store.GetPreviousRunHashes(ctx, prevRunID)
+			if err != nil {
+				return uuid.Nil, fmt.Errorf("get previous run hashes: %w", err)
 			}
-			if _, err := store.DetectDisappearances(ctx, runID, prevRunID, snapshotDate, logger); err != nil {
-				return uuid.Nil, fmt.Errorf("detect disappearances: %w", err)
+
+			// In-memory change detection: mark seen records
+			for _, row := range snapRows {
+				delete(prevHashes, row.NoticeID)
 			}
+
+			// Remaining entries are disappearances
+			if len(prevHashes) > 0 {
+				disappeared := make([]database.DisappearedRecord, 0, len(prevHashes))
+				for noticeID, prev := range prevHashes {
+					disappeared = append(disappeared, database.DisappearedRecord{
+						NoticeID:           noticeID,
+						SolicitationNumber: prev.SolicitationNumber,
+						Type:               prev.Type,
+						ArchiveType:        prev.ArchiveType,
+						ArchiveDate:        prev.ArchiveDate,
+						LastSeenDate:       prev.SnapshotDate,
+					})
+				}
+				if _, err := store.InsertDisappearances(ctx, runID, snapshotDate, disappeared, logger); err != nil {
+					return uuid.Nil, fmt.Errorf("insert disappearances: %w", err)
+				}
+			}
+
 			if _, err := store.DetectReappearances(ctx, runID, snapshotDate); err != nil {
 				return uuid.Nil, fmt.Errorf("detect reappearances: %w", err)
 			}

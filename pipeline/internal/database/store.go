@@ -24,8 +24,8 @@ type Store interface {
 
 	// Snapshot operations
 	BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []SnapCSVRow) (int64, error)
-	DetectChanges(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, int, error)
-	DetectDisappearances(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, error)
+	GetPreviousRunHashes(ctx context.Context, runID uuid.UUID) (map[string]PreviousRunRecord, error)
+	InsertDisappearances(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []DisappearedRecord, logger *slog.Logger) (int, error)
 	DetectReappearances(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error)
 
 	// Reconcile operations
