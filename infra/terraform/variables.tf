@@ -74,11 +74,6 @@ variable "schedule_expression" {
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
 
-variable "bulkcsv_schedule_expression" {
-  description = "EventBridge schedule expression for pipeline (active + archived)"
-  type        = string
-  default     = "cron(0/15 * * * ? *)"
-}
 
 variable "pipeline_schedule_enabled" {
   description = "Whether the pipeline schedule is enabled"
