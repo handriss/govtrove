@@ -3,7 +3,7 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	mcp-install mcp-dev mcp-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	test test-e2e lambda-build \
+	test test-e2e test-api-search lambda-build \
 	ecr-login deploy-frontend minify-landing deploy-landing deploy-api deploy-mcp deploy-pipeline deploy-all \
 	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
@@ -323,6 +323,9 @@ test-e2e:
 	@mkdir -p .reports
 	cd pipeline && go test -v ./internal/e2e/ -timeout 120s -ginkgo.json-report=../../../.reports/e2e-report.json
 	@echo "Report saved to .reports/e2e-report.json"
+
+test-api-search:
+	cd api && go test -v -count=1 ./internal/searchtest/ -timeout 120s
 
 lambda-build:
 	@for svc in $(LAMBDA_FUNCTIONS); do \

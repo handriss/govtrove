@@ -1,0 +1,144 @@
+package searchtest_test
+
+import (
+	"context"
+	"log/slog"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/handriss/govtrove/api/internal/handlers"
+	"github.com/handriss/govtrove/api/internal/repository"
+)
+
+var (
+	server *httptest.Server
+	pool   *pgxpool.Pool
+	pgCtr  *postgres.PostgresContainer
+)
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	var err error
+	pgCtr, err = postgres.Run(ctx,
+		"postgres:16-alpine",
+		postgres.WithDatabase("govtrove_test"),
+		postgres.WithUsername("test"),
+		postgres.WithPassword("test"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second),
+		),
+	)
+	if err != nil {
+		slog.Error("failed to start postgres container", "error", err)
+		os.Exit(1)
+	}
+
+	dbURL, err := pgCtr.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		slog.Error("failed to get connection string", "error", err)
+		os.Exit(1)
+	}
+
+	pool, err = pgxpool.New(ctx, dbURL)
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+
+	if _, err := pool.Exec(ctx, schemaSQL); err != nil {
+		slog.Error("failed to apply schema", "error", err)
+		os.Exit(1)
+	}
+
+	if _, err := pool.Exec(ctx, seedSQL); err != nil {
+		slog.Error("failed to seed data", "error", err)
+		os.Exit(1)
+	}
+
+	oppRepo := repository.NewOpportunityRepository(pool)
+	eventRepo := repository.NewEventRepository(pool)
+	userRepo := repository.NewUserRepository(pool)
+	eventLog := handlers.NewEventLogger(eventRepo, logger)
+	oppHandler := handlers.NewOpportunityHandler(oppRepo, nil, logger, eventLog, userRepo)
+
+	r := chi.NewRouter()
+	r.Get("/api/opportunities", oppHandler.Search)
+
+	server = httptest.NewServer(r)
+
+	code := m.Run()
+
+	server.Close()
+	pool.Close()
+	if pgCtr != nil {
+		_ = pgCtr.Terminate(ctx)
+	}
+	os.Exit(code)
+}
+
+func TestSearch_KeywordSterilizer(t *testing.T) {
+	params := url.Values{"q": {"sterilizer"}}
+	result := searchGet(t, server.URL, params)
+
+	// "sterilizer" stems to "steril" which matches title hits (TEST-001, TEST-006)
+	// and also TEST-003's description containing "sterilization"
+	if result.Total != 3 {
+		t.Fatalf("expected 3 results, got %d: %v", result.Total, titles(result))
+	}
+
+	if !hasTitle(result, "Sterilizer Equipment Maintenance") {
+		t.Error("missing 'Sterilizer Equipment Maintenance'")
+	}
+	if !hasTitle(result, "Sterilizer Supply Chain Analysis") {
+		t.Error("missing 'Sterilizer Supply Chain Analysis'")
+	}
+	if !hasTitle(result, "Autoclave Repair and Calibration") {
+		t.Error("missing 'Autoclave Repair and Calibration' (description match via stemming)")
+	}
+}
+
+func TestSearch_FilterByType(t *testing.T) {
+	params := url.Values{"type": {"o"}}
+	result := searchGet(t, server.URL, params)
+
+	if result.Total != 3 {
+		t.Fatalf("expected 3 Solicitation results, got %d: %v", result.Total, titles(result))
+	}
+
+	for _, opp := range result.Opportunities {
+		if opp.Type == nil || *opp.Type != "Solicitation" {
+			t.Errorf("expected type 'Solicitation', got %v for %s", opp.Type, opp.Title)
+		}
+	}
+}
+
+func TestSearch_NoResults(t *testing.T) {
+	params := url.Values{"q": {"xyznonexistent123"}}
+	result := searchGet(t, server.URL, params)
+
+	if result.Total != 0 {
+		t.Fatalf("expected 0 results, got %d", result.Total)
+	}
+	if result.Page != 1 {
+		t.Errorf("expected page 1, got %d", result.Page)
+	}
+	if result.TotalPages != 1 {
+		t.Errorf("expected total_pages 1, got %d", result.TotalPages)
+	}
+	if len(result.Opportunities) != 0 {
+		t.Errorf("expected empty opportunities slice, got %d items", len(result.Opportunities))
+	}
+}
