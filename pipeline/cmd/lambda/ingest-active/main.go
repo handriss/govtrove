@@ -281,6 +281,23 @@ func (h *Handler) processStream(ctx context.Context, runID uuid.UUID, snapshotDa
 	}
 	defer gz.Close()
 
+	// Load previous run's hashes for in-memory change detection
+	prevRunID, _, prevErr := h.Store.GetLastCompletedRun(ctx, jobType)
+	if prevErr != nil {
+		h.Logger.Warn("failed to get previous run", "error", prevErr)
+	}
+
+	var prevHashes map[string]database.PreviousRunRecord
+	if prevRunID != uuid.Nil {
+		prevHashes, err = h.Store.GetPreviousRunHashes(ctx, prevRunID)
+		if err != nil {
+			h.Logger.Error("failed to load previous run hashes", "error", err)
+			prevHashes = nil
+		} else {
+			h.Logger.Info("loaded previous run for change detection", "previous_run_id", prevRunID, "records", len(prevHashes))
+		}
+	}
+
 	batch := make([]database.SnapCSVRow, 0, batchSize)
 	stats := &pipelineStats{}
 
@@ -297,8 +314,21 @@ func (h *Handler) processStream(ctx context.Context, runID uuid.UUID, snapshotDa
 	}
 
 	_, parsed, _, parseErr := samgov.ParseCSVStream(gz, h.Logger, func(row map[string]string) error {
-		batch = append(batch, ingest.ExtractSnapCSVRow(row))
+		snapRow := ingest.ExtractSnapCSVRow(row)
+		batch = append(batch, snapRow)
 		stats.recordCount++
+
+		if prevHashes != nil {
+			if prev, exists := prevHashes[snapRow.NoticeID]; exists {
+				if prev.ContentHash != snapRow.ContentHash {
+					stats.changedRecords++
+				}
+				delete(prevHashes, snapRow.NoticeID)
+			} else {
+				stats.newRecords++
+			}
+		}
+
 		if len(batch) >= batchSize {
 			if err := flush(); err != nil {
 				return err
@@ -320,35 +350,35 @@ func (h *Handler) processStream(ctx context.Context, runID uuid.UUID, snapshotDa
 		h.Logger.Warn("record count mismatch", "tracked", stats.recordCount, "parsed", parsed)
 	}
 
-	// Change detection
-	prevRunID, _, prevErr := h.Store.GetLastCompletedRun(ctx, jobType)
-	if prevErr != nil {
-		h.Logger.Warn("failed to get previous run", "error", prevErr)
+	if prevHashes != nil && len(prevHashes) > 0 {
+		// Remaining entries in prevHashes are records that disappeared
+		disappeared := make([]database.DisappearedRecord, 0, len(prevHashes))
+		for noticeID, prev := range prevHashes {
+			disappeared = append(disappeared, database.DisappearedRecord{
+				NoticeID:           noticeID,
+				SolicitationNumber: prev.SolicitationNumber,
+				Type:               prev.Type,
+				ArchiveType:        prev.ArchiveType,
+				ArchiveDate:        prev.ArchiveDate,
+				LastSeenDate:       prev.SnapshotDate,
+			})
+		}
+		count, err := h.Store.InsertDisappearances(ctx, runID, snapshotDate, disappeared, h.Logger)
+		if err != nil {
+			h.Logger.Error("disappearance insertion failed", "error", err)
+		} else {
+			stats.disappearedRecords = count
+		}
 	}
 
 	if prevRunID != uuid.Nil {
-		newCount, changedCount, err := h.Store.DetectChanges(ctx, runID, prevRunID, snapshotDate, h.Logger)
-		if err != nil {
-			h.Logger.Error("change detection failed", "error", err)
-		} else {
-			stats.newRecords = newCount
-			stats.changedRecords = changedCount
-		}
-
-		disappearedCount, err := h.Store.DetectDisappearances(ctx, runID, prevRunID, snapshotDate, h.Logger)
-		if err != nil {
-			h.Logger.Error("disappearance detection failed", "error", err)
-		} else {
-			stats.disappearedRecords = disappearedCount
-		}
-
 		reappearedCount, err := h.Store.DetectReappearances(ctx, runID, snapshotDate)
 		if err != nil {
 			h.Logger.Error("reappearance detection failed", "error", err)
 		} else if reappearedCount > 0 {
 			h.Logger.Info("reappearances detected", "count", reappearedCount)
 		}
-	} else {
+	} else if prevHashes == nil {
 		h.Logger.Info("first run — skipping change detection", "records", stats.recordCount)
 		stats.newRecords = stats.recordCount
 	}

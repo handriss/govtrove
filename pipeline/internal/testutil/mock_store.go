@@ -21,10 +21,10 @@ type MockStore struct {
 	FailIngestionRunFn     func(ctx context.Context, runID uuid.UUID, errMsg string, durationMs int) error
 	GetLastCompletedRunFn  func(ctx context.Context, jobType string) (uuid.UUID, time.Time, error)
 
-	BulkInsertSnapCSVFn     func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error)
-	DetectChangesFn         func(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, int, error)
-	DetectDisappearancesFn  func(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, error)
-	DetectReappearancesFn   func(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error)
+	BulkInsertSnapCSVFn      func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error)
+	GetPreviousRunHashesFn   func(ctx context.Context, runID uuid.UUID) (map[string]database.PreviousRunRecord, error)
+	InsertDisappearancesFn   func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.DisappearedRecord, logger *slog.Logger) (int, error)
+	DetectReappearancesFn    func(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error)
 
 	GetSnapCSVRawDataFn              func(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssuesFn        func(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry)
@@ -120,16 +120,16 @@ func (m *MockStore) BulkInsertSnapCSV(ctx context.Context, runID uuid.UUID, snap
 	return int64(len(rows)), nil
 }
 
-func (m *MockStore) DetectChanges(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, int, error) {
-	if m.DetectChangesFn != nil {
-		return m.DetectChangesFn(ctx, currentRunID, previousRunID, snapshotDate, logger)
+func (m *MockStore) GetPreviousRunHashes(ctx context.Context, runID uuid.UUID) (map[string]database.PreviousRunRecord, error) {
+	if m.GetPreviousRunHashesFn != nil {
+		return m.GetPreviousRunHashesFn(ctx, runID)
 	}
-	return 0, 0, nil
+	return nil, nil
 }
 
-func (m *MockStore) DetectDisappearances(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, error) {
-	if m.DetectDisappearancesFn != nil {
-		return m.DetectDisappearancesFn(ctx, currentRunID, previousRunID, snapshotDate, logger)
+func (m *MockStore) InsertDisappearances(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.DisappearedRecord, logger *slog.Logger) (int, error) {
+	if m.InsertDisappearancesFn != nil {
+		return m.InsertDisappearancesFn(ctx, runID, snapshotDate, records, logger)
 	}
 	return 0, nil
 }

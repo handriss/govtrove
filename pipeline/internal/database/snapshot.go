@@ -106,75 +106,87 @@ func (s *snapCSVCopySource) Values() ([]interface{}, error) {
 
 func (s *snapCSVCopySource) Err() error { return nil }
 
-func (db *DB) DetectChanges(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (newCount, changedCount int, err error) {
-	// Count new records (in current but not in previous)
-	err = db.pool.QueryRow(ctx, `
-		SELECT count(*)
-		FROM pipeline.snap_csv c
-		LEFT JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
-		WHERE c.run_id = $1 AND p.notice_id IS NULL
-	`, currentRunID, previousRunID).Scan(&newCount)
-	if err != nil {
-		return 0, 0, fmt.Errorf("count new records: %w", err)
-	}
-
-	// Count changed records (hash mismatch). Field-level diffs are tracked via
-	// versioned opportunity rows, so we only need the count here for logging.
-	err = db.pool.QueryRow(ctx, `
-		SELECT count(*)
-		FROM pipeline.snap_csv c
-		JOIN pipeline.snap_csv p ON c.notice_id = p.notice_id AND p.run_id = $2
-		WHERE c.run_id = $1 AND c.content_hash != p.content_hash
-	`, currentRunID, previousRunID).Scan(&changedCount)
-	if err != nil {
-		return newCount, 0, fmt.Errorf("count changed records: %w", err)
-	}
-
-	return newCount, changedCount, nil
+// PreviousRunRecord holds the data needed for in-memory change detection.
+type PreviousRunRecord struct {
+	ContentHash        string
+	SolicitationNumber string
+	Type               string
+	ArchiveType        string
+	ArchiveDate        string
+	SnapshotDate       time.Time
 }
 
-func (db *DB) DetectDisappearances(ctx context.Context, currentRunID, previousRunID uuid.UUID, snapshotDate time.Time, logger *slog.Logger) (int, error) {
+func (db *DB) GetPreviousRunHashes(ctx context.Context, runID uuid.UUID) (map[string]PreviousRunRecord, error) {
 	rows, err := db.pool.Query(ctx, `
-		SELECT p.notice_id, p.solicitation_number, p.type, p.archive_type, p.archive_date, p.snapshot_date
-		FROM pipeline.snap_csv p
-		LEFT JOIN pipeline.snap_csv c ON p.notice_id = c.notice_id AND c.run_id = $1
-		WHERE p.run_id = $2 AND c.notice_id IS NULL
-	`, currentRunID, previousRunID)
+		SELECT notice_id, content_hash, solicitation_number, type, archive_type, archive_date, snapshot_date
+		FROM pipeline.snap_csv
+		WHERE run_id = $1
+	`, runID)
 	if err != nil {
-		return 0, fmt.Errorf("detect disappearances: %w", err)
+		return nil, fmt.Errorf("query previous run hashes: %w", err)
 	}
 	defer rows.Close()
 
-	batch := &pgx.Batch{}
-	count := 0
+	result := make(map[string]PreviousRunRecord, 80000)
 	for rows.Next() {
 		var noticeID string
+		var rec PreviousRunRecord
 		var solNum, typ, archType, archDate *string
-		var lastSeen time.Time
-		if err := rows.Scan(&noticeID, &solNum, &typ, &archType, &archDate, &lastSeen); err != nil {
-			return count, fmt.Errorf("scan disappeared record: %w", err)
+		if err := rows.Scan(&noticeID, &rec.ContentHash, &solNum, &typ, &archType, &archDate, &rec.SnapshotDate); err != nil {
+			return nil, fmt.Errorf("scan previous run record: %w", err)
 		}
-		count++
+		if solNum != nil {
+			rec.SolicitationNumber = *solNum
+		}
+		if typ != nil {
+			rec.Type = *typ
+		}
+		if archType != nil {
+			rec.ArchiveType = *archType
+		}
+		if archDate != nil {
+			rec.ArchiveDate = *archDate
+		}
+		result[noticeID] = rec
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate previous run records: %w", err)
+	}
+	return result, nil
+}
+
+// DisappearedRecord holds metadata for a record that vanished from the active CSV.
+type DisappearedRecord struct {
+	NoticeID           string
+	SolicitationNumber string
+	Type               string
+	ArchiveType        string
+	ArchiveDate        string
+	LastSeenDate       time.Time
+}
+
+func (db *DB) InsertDisappearances(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []DisappearedRecord, logger *slog.Logger) (int, error) {
+	if len(records) == 0 {
+		return 0, nil
+	}
+
+	batch := &pgx.Batch{}
+	for _, r := range records {
 		batch.Queue(`
 			INSERT INTO pipeline.snap_disappearances (run_id, notice_id, solicitation_number, last_seen_date, disappeared_date, last_type, last_archive_type, last_archive_date)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`, currentRunID, noticeID, solNum, lastSeen, snapshotDate, typ, archType, archDate)
-	}
-	if err := rows.Err(); err != nil {
-		return count, fmt.Errorf("iterate disappeared records: %w", err)
+		`, runID, r.NoticeID, nilIfEmpty(r.SolicitationNumber), r.LastSeenDate, snapshotDate, nilIfEmpty(r.Type), nilIfEmpty(r.ArchiveType), nilIfEmpty(r.ArchiveDate))
 	}
 
-	if batch.Len() > 0 {
-		results := db.pool.SendBatch(ctx, batch)
-		defer results.Close()
-		for i := 0; i < batch.Len(); i++ {
-			if _, err := results.Exec(); err != nil {
-				logger.Warn("failed to insert snap_disappearance", "error", err)
-			}
+	results := db.pool.SendBatch(ctx, batch)
+	defer results.Close()
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
+			logger.Warn("failed to insert snap_disappearance", "error", err)
 		}
 	}
 
-	return count, nil
+	return len(records), nil
 }
 
 func (db *DB) DetectReappearances(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error) {
