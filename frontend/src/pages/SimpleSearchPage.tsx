@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Bookmark, X, ChevronDown } from 'lucide-react';
+import { Clock, Bookmark, X, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import KeywordChipInput from '../components/KeywordChipInput';
 import QuickFilterChips from '../components/QuickFilterChips';
 import { FilterBar, SearchResults } from '../components/search';
@@ -30,6 +30,7 @@ export default function SimpleSearchPage() {
   const saved = useSavedOpportunities();
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const [savedSearchesOpen, setSavedSearchesOpen] = useState(false);
@@ -127,12 +128,17 @@ export default function SimpleSearchPage() {
     trackSearch(posthog, params.q || '', { ...params }, total);
   }, [hasSearched, loading, total]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset results when all filters are cleared
+  // Reset results when all filters are cleared (unless browsing)
   useEffect(() => {
     if (!hasActiveFilters && hasSearched) {
-      reset();
-      setHasSearched(false);
-      lastSearchedRef.current = '';
+      if (browsing) {
+        search({ limit: pageSize });
+        lastSearchedRef.current = '';
+      } else {
+        reset();
+        setHasSearched(false);
+        lastSearchedRef.current = '';
+      }
     }
   }, [hasActiveFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -210,6 +216,11 @@ export default function SimpleSearchPage() {
     fs.setFilters(normalized as Partial<typeof fs.filters>);
   }, [fs]);
 
+  const clearAllAndReset = useCallback(() => {
+    fs.clearAllFilters();
+    setBrowsing(false);
+  }, [fs]);
+
   const showResults = hasSearched || results.length > 0;
 
   return (
@@ -230,14 +241,14 @@ export default function SimpleSearchPage() {
               <p className="text-center text-dark-400 text-sm mt-2 tracking-wide">
                 Government Contract Intelligence
               </p>
-              {heroTotal > 0 && (
-                <div className="flex items-center justify-center gap-1.5 mt-3">
+              <div className="flex items-center justify-center gap-1.5 mt-3 h-6">
+                {heroTotal > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-dark-300 text-xs bg-dark-800/60 border border-dark-700/30 px-3 py-1 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-success" />
                     {heroTotal.toLocaleString()} active opportunities
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
         </Link>
@@ -274,6 +285,19 @@ export default function SimpleSearchPage() {
                   <Clock size={14} strokeWidth={1.5} />
                   What's New Today?
                 </button>
+                <button
+                  onClick={() => {
+                    search({ limit: pageSize });
+                    setHasSearched(true);
+                    setBrowsing(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium
+                             border border-dark-500/40 bg-dark-800/60 text-dark-200
+                             hover:border-dark-400/50 hover:text-dark-100 transition-all duration-200"
+                >
+                  <SlidersHorizontal size={14} strokeWidth={1.5} />
+                  Browse with Filters
+                </button>
               </div>
 
               <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
@@ -303,7 +327,7 @@ export default function SimpleSearchPage() {
             setFilters={fs.setFilters}
             removeFilter={fs.removeFilter}
             clearFilter={fs.clearFilter}
-            clearAllFilters={fs.clearAllFilters}
+            clearAllFilters={clearAllAndReset}
             filterCount={fs.filterCount}
             facets={facets}
             facetsLoading={facetsLoading}
@@ -453,7 +477,7 @@ export default function SimpleSearchPage() {
             onSaveAll={saved.saveAll}
             querySuggestion={suggestion}
             onQuerySuggestionClick={handleQuerySuggestion}
-            clearAllFilters={fs.clearAllFilters}
+            clearAllFilters={clearAllAndReset}
             error={error}
             onRetry={handleSubmit}
             isAuthenticated={isAuthenticated}
@@ -464,7 +488,7 @@ export default function SimpleSearchPage() {
             filters={fs.filters}
             setFilter={fs.setFilter}
             setFilters={fs.setFilters}
-            clearAllFilters={fs.clearAllFilters}
+            clearAllFilters={clearAllAndReset}
             filterCount={fs.filterCount}
             facets={facets}
             facetsLoading={facetsLoading}
