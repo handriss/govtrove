@@ -106,7 +106,7 @@ type Output struct {
 
 const (
 	jobType   = "snapshot-csv"
-	batchSize = 5000
+	batchSize = 20000
 )
 
 // S3Getter abstracts the S3 GetObject call for testability.
