@@ -225,6 +225,289 @@ var _ = Describe("Reconcile Handler", func() {
 		})
 	})
 
+	Context("verifies records passed to UpsertOpportunities", func() {
+		It("passes all CSV notice_ids to upsert", func() {
+			activeRunID := uuid.New()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "CSV-001", "Title": "First", "Active": "Yes"},
+					{"NoticeId": "CSV-002", "Title": "Second", "Active": "Yes"},
+					{"NoticeId": "CSV-003", "Title": "Third", "Active": "Yes"},
+				}, nil
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, nil)
+
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(upsertedOpps).To(HaveLen(3))
+			ids := make([]string, len(upsertedOpps))
+			for i, o := range upsertedOpps {
+				ids[i] = o.NoticeID
+			}
+			Expect(ids).To(ConsistOf("CSV-001", "CSV-002", "CSV-003"))
+		})
+
+		It("uses activeRunID as upsert run_id when both CSV and API are present", func() {
+			activeRunID := uuid.New()
+			apiRunID := uuid.New()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "OPP-001", "Title": "CSV", "Active": "Yes"},
+				}, nil
+			}
+			store.GetSnapAPIRawDataFn = func(_ context.Context, _ uuid.UUID) ([]database.SnapAPIRawRow, error) {
+				return []database.SnapAPIRawRow{
+					{NoticeID: "API-001", RawData: json.RawMessage(`{"noticeId":"API-001","title":"API Only","active":"Yes"}`)},
+				}, nil
+			}
+
+			var capturedRunID uuid.UUID
+			store.UpsertOpportunitiesFn = func(_ context.Context, runID uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				capturedRunID = runID
+				return len(opps), nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, &IngestionResult{
+				Status: "ok", RunID: apiRunID.String(), JobType: "snapshot-api",
+			})
+
+			_, err := h.Handle(ctx, event)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(capturedRunID).To(Equal(activeRunID))
+		})
+
+		It("uses apiRunID as upsert run_id when only API is present", func() {
+			apiRunID := uuid.New()
+
+			store.GetSnapAPIRawDataFn = func(_ context.Context, _ uuid.UUID) ([]database.SnapAPIRawRow, error) {
+				return []database.SnapAPIRawRow{
+					{NoticeID: "API-001", RawData: json.RawMessage(`{"noticeId":"API-001","title":"API Only","active":"Yes"}`)},
+				}, nil
+			}
+
+			var capturedRunID uuid.UUID
+			store.UpsertOpportunitiesFn = func(_ context.Context, runID uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				capturedRunID = runID
+				return len(opps), nil
+			}
+
+			event := buildEvent([]IngestionResult{}, &IngestionResult{
+				Status: "ok", RunID: apiRunID.String(), JobType: "snapshot-api",
+			})
+
+			_, err := h.Handle(ctx, event)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(capturedRunID).To(Equal(apiRunID))
+		})
+	})
+
+	Context("CSV+API merge with overlapping and unique records", func() {
+		It("merges overlapping records and includes unique from each source", func() {
+			activeRunID := uuid.New()
+			apiRunID := uuid.New()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "SHARED-001", "Title": "CSV Title", "Active": "Yes"},
+					{"NoticeId": "CSV-ONLY-001", "Title": "CSV Only", "Active": "Yes"},
+				}, nil
+			}
+			store.GetSnapAPIRawDataFn = func(_ context.Context, _ uuid.UUID) ([]database.SnapAPIRawRow, error) {
+				return []database.SnapAPIRawRow{
+					{NoticeID: "SHARED-001", RawData: json.RawMessage(`{"noticeId":"SHARED-001","title":"API Title","active":"Yes","additionalInfoLink":"http://info"}`)},
+					{NoticeID: "API-ONLY-001", RawData: json.RawMessage(`{"noticeId":"API-ONLY-001","title":"API Only","active":"Yes"}`)},
+				}, nil
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, &IngestionResult{
+				Status: "ok", RunID: apiRunID.String(), JobType: "snapshot-api",
+			})
+
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(upsertedOpps).To(HaveLen(3))
+
+			oppMap := make(map[string]reconcile.Opportunity)
+			for _, o := range upsertedOpps {
+				oppMap[o.NoticeID] = o
+			}
+
+			// Shared record: CSV title wins, API-only fields carried forward
+			shared := oppMap["SHARED-001"]
+			Expect(shared.Title).To(Equal("CSV Title"))
+			Expect(shared.AdditionalInfoLink).To(Equal("http://info"))
+			Expect(shared.DataSources).To(Equal("csv+api"))
+
+			// CSV-only record
+			csvOnly := oppMap["CSV-ONLY-001"]
+			Expect(csvOnly.Title).To(Equal("CSV Only"))
+			Expect(csvOnly.DataSources).To(Equal("csv"))
+
+			// API-only record
+			apiOnly := oppMap["API-ONLY-001"]
+			Expect(apiOnly.Title).To(Equal("API Only"))
+			Expect(apiOnly.DataSources).To(Equal("api"))
+		})
+
+		It("carries API-only fields into merged records", func() {
+			activeRunID := uuid.New()
+			apiRunID := uuid.New()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "MERGED-001", "Title": "CSV Title", "Active": "Yes"},
+				}, nil
+			}
+			store.GetSnapAPIRawDataFn = func(_ context.Context, _ uuid.UUID) ([]database.SnapAPIRawRow, error) {
+				return []database.SnapAPIRawRow{
+					{NoticeID: "MERGED-001", RawData: json.RawMessage(`{
+						"noticeId":"MERGED-001",
+						"title":"API Title",
+						"active":"Yes",
+						"fullParentPathName":"DEPT.SUBTIER.OFFICE",
+						"fullParentPathCode":"001.002.003",
+						"additionalInfoLink":"http://extra",
+						"resourceLinks":["http://doc1.pdf","http://doc2.pdf"],
+						"award":{"awardee":{"name":"Acme Corp","ueiSAM":"ABC123","location":{"streetAddress":"123 Main St","city":{"code":"NYC","name":"New York"},"state":{"code":"NY","name":"New York"},"country":{"code":"US","name":"USA"},"zip":"10001"}}}
+					}`)},
+				}, nil
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, &IngestionResult{
+				Status: "ok", RunID: apiRunID.String(), JobType: "snapshot-api",
+			})
+
+			_, err := h.Handle(ctx, event)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(upsertedOpps).To(HaveLen(1))
+
+			merged := upsertedOpps[0]
+			Expect(merged.Title).To(Equal("CSV Title"))
+			Expect(merged.FullParentPathName).To(Equal("DEPT.SUBTIER.OFFICE"))
+			Expect(merged.FullParentPathCode).To(Equal("001.002.003"))
+			Expect(merged.AdditionalInfoLink).To(Equal("http://extra"))
+			Expect(merged.ResourceLinks).To(ConsistOf("http://doc1.pdf", "http://doc2.pdf"))
+			Expect(merged.AwardeeName).To(Equal("Acme Corp"))
+			Expect(merged.AwardeeUeiSAM).To(Equal("ABC123"))
+		})
+	})
+
+	Context("pipeline step stats", func() {
+		It("reports correct stats via CompletePipelineStep", func() {
+			activeRunID := uuid.New()
+			apiRunID := uuid.New()
+			execID := uuid.New()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "OPP-001", "Title": "A", "Active": "Yes"},
+					{"NoticeId": "OPP-002", "Title": "B", "Active": "Yes"},
+				}, nil
+			}
+			store.GetSnapAPIRawDataFn = func(_ context.Context, _ uuid.UUID) ([]database.SnapAPIRawRow, error) {
+				return []database.SnapAPIRawRow{
+					{NoticeID: "OPP-001", RawData: json.RawMessage(`{"noticeId":"OPP-001","title":"A-api","active":"Yes"}`)},
+					{NoticeID: "API-001", RawData: json.RawMessage(`{"noticeId":"API-001","title":"API Only","active":"Yes"}`)},
+				}, nil
+			}
+
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				return len(opps), nil
+			}
+
+			var capturedStats map[string]any
+			store.CompletePipelineStepFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
+				capturedStats = stats
+				return nil
+			}
+
+			input := Input{
+				ExecutionID: execID.String(),
+				IngestionResults: []IngestionResult{
+					{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+				},
+				APIResult: &IngestionResult{
+					Status: "ok", RunID: apiRunID.String(), JobType: "snapshot-api",
+				},
+			}
+			b, _ := json.Marshal(input)
+
+			output, err := h.Handle(ctx, b)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedStats).NotTo(BeNil())
+			Expect(capturedStats["upserted"]).To(Equal(3))
+			Expect(capturedStats["csv_count"]).To(Equal(2))
+			Expect(capturedStats["api_count"]).To(Equal(2))
+		})
+	})
+
+	Context("post-upsert housekeeping", func() {
+		It("calls RefreshAgencies", func() {
+			refreshCalled := false
+			store.RefreshAgenciesFn = func(_ context.Context) (int, error) {
+				refreshCalled = true
+				return 42, nil
+			}
+
+			event := buildEvent([]IngestionResult{}, nil)
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(refreshCalled).To(BeTrue())
+		})
+
+		It("calls DeleteOldSearchEvents with 90 days", func() {
+			var capturedDays int
+			store.DeleteOldSearchEventsFn = func(_ context.Context, days int) (int64, error) {
+				capturedDays = days
+				return 5, nil
+			}
+
+			event := buildEvent([]IngestionResult{}, nil)
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedDays).To(Equal(90))
+		})
+	})
+
 	Context("with API result present", func() {
 		var apiRunID uuid.UUID
 
@@ -408,6 +691,186 @@ var _ = Describe("Reconcile Handler", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(output.Status).To(Equal("ok"))
 			Expect(upsertedOpps).To(HaveLen(2))
+		})
+	})
+
+	Context("change detection optimization", func() {
+		var activeRunID uuid.UUID
+
+		BeforeEach(func() {
+			activeRunID = uuid.New()
+		})
+
+		It("sends only changed records to UpsertOpportunities and touches unchanged", func() {
+			// Build a known CSV opp so we can compute its hash
+			csvRow := map[string]string{"NoticeId": "UNCHANGED-001", "Title": "Same Title", "Active": "Yes"}
+			unchangedOpp, _ := reconcile.FromCSV(csvRow)
+			unchangedOpp.DataSources = "csv"
+			unchangedHash := unchangedOpp.ContentHash()
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					csvRow,
+					{"NoticeId": "CHANGED-001", "Title": "New Title", "Active": "Yes"},
+					{"NoticeId": "NEW-001", "Title": "Brand New", "Active": "Yes"},
+				}, nil
+			}
+
+			store.GetExistingOpportunityHashesFn = func(_ context.Context) (map[string]string, error) {
+				return map[string]string{
+					"UNCHANGED-001": unchangedHash,
+					"CHANGED-001":   "old-hash-that-no-longer-matches",
+				}, nil
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			var touchedRecords []database.UnchangedRecord
+			store.BulkTouchUnchangedFn = func(_ context.Context, _ uuid.UUID, _ time.Time, records []database.UnchangedRecord) (int, error) {
+				touchedRecords = records
+				return len(records), nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, nil)
+
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+
+			// Only changed + new should go to upsert
+			Expect(upsertedOpps).To(HaveLen(2))
+			upsertIDs := make([]string, len(upsertedOpps))
+			for i, o := range upsertedOpps {
+				upsertIDs[i] = o.NoticeID
+			}
+			Expect(upsertIDs).To(ConsistOf("CHANGED-001", "NEW-001"))
+
+			// Unchanged should be touched
+			Expect(touchedRecords).To(HaveLen(1))
+			Expect(touchedRecords[0].NoticeID).To(Equal("UNCHANGED-001"))
+			Expect(touchedRecords[0].Active).To(BeTrue())
+			Expect(touchedRecords[0].DataSources).To(Equal("csv"))
+		})
+
+		It("falls back to full upsert when GetExistingOpportunityHashes fails", func() {
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "OPP-001", "Title": "Test", "Active": "Yes"},
+				}, nil
+			}
+
+			store.GetExistingOpportunityHashesFn = func(_ context.Context) (map[string]string, error) {
+				return nil, errors.New("connection timeout")
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			touchCalled := false
+			store.BulkTouchUnchangedFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ []database.UnchangedRecord) (int, error) {
+				touchCalled = true
+				return 0, nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, nil)
+
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(upsertedOpps).To(HaveLen(1))
+			Expect(touchCalled).To(BeFalse())
+		})
+
+		It("treats all records as changed when no existing hashes match", func() {
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "NEW-001", "Title": "A", "Active": "Yes"},
+					{"NoticeId": "NEW-002", "Title": "B", "Active": "Yes"},
+				}, nil
+			}
+
+			store.GetExistingOpportunityHashesFn = func(_ context.Context) (map[string]string, error) {
+				return map[string]string{}, nil
+			}
+
+			var upsertedOpps []reconcile.Opportunity
+			store.UpsertOpportunitiesFn = func(_ context.Context, _ uuid.UUID, _ time.Time, opps []reconcile.Opportunity) (int, error) {
+				upsertedOpps = opps
+				return len(opps), nil
+			}
+
+			touchCalled := false
+			store.BulkTouchUnchangedFn = func(_ context.Context, _ uuid.UUID, _ time.Time, _ []database.UnchangedRecord) (int, error) {
+				touchCalled = true
+				return 0, nil
+			}
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, nil)
+
+			output, err := h.Handle(ctx, event)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(upsertedOpps).To(HaveLen(2))
+			Expect(touchCalled).To(BeFalse())
+		})
+
+		It("reports touched count in pipeline step stats", func() {
+			csvRow := map[string]string{"NoticeId": "UNCHANGED-001", "Title": "Same", "Active": "Yes"}
+			unchangedOpp, _ := reconcile.FromCSV(csvRow)
+			unchangedOpp.DataSources = "csv"
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{csvRow}, nil
+			}
+
+			store.GetExistingOpportunityHashesFn = func(_ context.Context) (map[string]string, error) {
+				return map[string]string{
+					"UNCHANGED-001": unchangedOpp.ContentHash(),
+				}, nil
+			}
+
+			store.BulkTouchUnchangedFn = func(_ context.Context, _ uuid.UUID, _ time.Time, records []database.UnchangedRecord) (int, error) {
+				return len(records), nil
+			}
+
+			var capturedStats map[string]any
+			store.CompletePipelineStepFn = func(_ context.Context, _ uuid.UUID, stats map[string]any, _ int) error {
+				capturedStats = stats
+				return nil
+			}
+
+			execID := uuid.New()
+			input := Input{
+				ExecutionID: execID.String(),
+				IngestionResults: []IngestionResult{
+					{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+				},
+			}
+			b, _ := json.Marshal(input)
+
+			output, err := h.Handle(ctx, b)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.Status).To(Equal("ok"))
+			Expect(capturedStats).NotTo(BeNil())
+			Expect(capturedStats["upserted"]).To(Equal(0))
+			Expect(capturedStats["touched"]).To(Equal(1))
 		})
 	})
 })

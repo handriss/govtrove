@@ -269,18 +269,60 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Store.InsertReconcileDQIssues(ctx, activeRunID, apiRunID, reconcileDQ)
 	}
 
-	// 7. Upsert reconciled opportunities
+	// 7. Partition reconciled into changed vs unchanged, upsert only changed
 	upsertRunID := activeRunID
 	if upsertRunID == uuid.Nil {
 		upsertRunID = apiRunID
 	}
-	var totalUpserted int
+	var totalUpserted, totalTouched int
 	if len(reconciled) > 0 && upsertRunID != uuid.Nil {
-		upserted, err := h.Store.UpsertOpportunities(ctx, upsertRunID, snapshotDate, reconciled)
+		existingHashes, err := h.Store.GetExistingOpportunityHashes(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("upsert opportunities: %w", err)
+			h.Logger.Warn("failed to load existing hashes, falling back to full upsert", "error", err)
+			existingHashes = nil
 		}
-		totalUpserted = upserted
+
+		var changed []reconcile.Opportunity
+		var unchanged []database.UnchangedRecord
+
+		if existingHashes != nil {
+			for _, opp := range reconciled {
+				hash := opp.ContentHash()
+				if prevHash, exists := existingHashes[opp.NoticeID]; exists && prevHash == hash {
+					unchanged = append(unchanged, database.UnchangedRecord{
+						NoticeID:    opp.NoticeID,
+						Active:      opp.Active,
+						DataSources: opp.DataSources,
+					})
+				} else {
+					changed = append(changed, opp)
+				}
+			}
+		} else {
+			changed = reconciled
+		}
+
+		h.Logger.Info("change detection complete",
+			"changed", len(changed),
+			"unchanged", len(unchanged),
+			"total", len(reconciled),
+		)
+
+		if len(unchanged) > 0 {
+			touched, err := h.Store.BulkTouchUnchanged(ctx, upsertRunID, snapshotDate, unchanged)
+			if err != nil {
+				return nil, fmt.Errorf("bulk touch unchanged: %w", err)
+			}
+			totalTouched = touched
+		}
+
+		if len(changed) > 0 {
+			upserted, err := h.Store.UpsertOpportunities(ctx, upsertRunID, snapshotDate, changed)
+			if err != nil {
+				return nil, fmt.Errorf("upsert opportunities: %w", err)
+			}
+			totalUpserted = upserted
+		}
 	}
 
 	// 8. Disappearances
@@ -305,6 +347,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 
 	h.Logger.Info("reconcile complete",
 		"upserted", totalUpserted,
+		"touched", totalTouched,
 		"csv_count", len(csvOpps),
 		"api_count", len(apiOpps),
 		"duration_ms", durationMs,
@@ -313,6 +356,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	if stepID != uuid.Nil {
 		stepStats := map[string]any{
 			"upserted":       totalUpserted,
+			"touched":        totalTouched,
 			"csv_count":      len(csvOpps),
 			"api_count":      len(apiOpps),
 			"dq_issues":      len(allDQEntries),
