@@ -20,6 +20,74 @@ type existingRow struct {
 	Version     int
 }
 
+type UnchangedRecord struct {
+	NoticeID    string
+	Active      bool
+	DataSources string
+}
+
+func (db *DB) GetExistingOpportunityHashes(ctx context.Context) (map[string]string, error) {
+	rows, err := db.pool.Query(ctx, `
+		SELECT notice_id, COALESCE(content_hash, '')
+		FROM opportunities
+		WHERE is_latest = true
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query opportunity hashes: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]string)
+	for rows.Next() {
+		var nid, hash string
+		if err := rows.Scan(&nid, &hash); err != nil {
+			return nil, fmt.Errorf("scan opportunity hash: %w", err)
+		}
+		result[nid] = hash
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate opportunity hashes: %w", err)
+	}
+	return result, nil
+}
+
+func (db *DB) BulkTouchUnchanged(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []UnchangedRecord) (int, error) {
+	if len(records) == 0 {
+		return 0, nil
+	}
+
+	const batchSize = 10000
+	total := 0
+	for i := 0; i < len(records); i += batchSize {
+		end := i + batchSize
+		if end > len(records) {
+			end = len(records)
+		}
+		batch := records[i:end]
+
+		noticeIDs := make([]string, len(batch))
+		actives := make([]bool, len(batch))
+		sources := make([]string, len(batch))
+		for j, r := range batch {
+			noticeIDs[j] = r.NoticeID
+			actives[j] = r.Active
+			sources[j] = r.DataSources
+		}
+
+		tag, err := db.pool.Exec(ctx, `
+			UPDATE opportunities o
+			SET last_csv_run_id = $1, last_seen_csv = $2, active = u.active, data_sources = u.data_sources
+			FROM unnest($3::text[], $4::boolean[], $5::text[]) AS u(notice_id, active, data_sources)
+			WHERE o.notice_id = u.notice_id AND o.is_latest = true
+		`, runID, snapshotDate, noticeIDs, actives, sources)
+		if err != nil {
+			return total, fmt.Errorf("bulk touch unchanged batch %d-%d: %w", i, end, err)
+		}
+		total += int(tag.RowsAffected())
+	}
+	return total, nil
+}
+
 func (db *DB) UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (affected int, err error) {
 	for i := 0; i < len(opps); i += upsertBatchSize {
 		end := i + upsertBatchSize

@@ -29,6 +29,8 @@ type MockStore struct {
 	GetSnapCSVRawDataFn              func(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssuesFn        func(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry)
 	InsertReconcileDQIssuesFn        func(ctx context.Context, csvRunID, apiRunID uuid.UUID, entries []database.ReconcileDQEntry)
+	GetExistingOpportunityHashesFn   func(ctx context.Context) (map[string]string, error)
+	BulkTouchUnchangedFn             func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.UnchangedRecord) (int, error)
 	UpsertOpportunitiesFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
 	MarkDisappearedInactiveFn           func(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunitiesFn func(ctx context.Context) (int, int, error)
@@ -158,6 +160,20 @@ func (m *MockStore) InsertReconcileDQIssues(ctx context.Context, csvRunID, apiRu
 	if m.InsertReconcileDQIssuesFn != nil {
 		m.InsertReconcileDQIssuesFn(ctx, csvRunID, apiRunID, entries)
 	}
+}
+
+func (m *MockStore) GetExistingOpportunityHashes(ctx context.Context) (map[string]string, error) {
+	if m.GetExistingOpportunityHashesFn != nil {
+		return m.GetExistingOpportunityHashesFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) BulkTouchUnchanged(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.UnchangedRecord) (int, error) {
+	if m.BulkTouchUnchangedFn != nil {
+		return m.BulkTouchUnchangedFn(ctx, runID, snapshotDate, records)
+	}
+	return len(records), nil
 }
 
 func (m *MockStore) UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error) {

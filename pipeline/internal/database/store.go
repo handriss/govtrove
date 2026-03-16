@@ -32,6 +32,8 @@ type Store interface {
 	GetSnapCSVRawData(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssues(ctx context.Context, runID uuid.UUID, entries []DataQualityEntry)
 	InsertReconcileDQIssues(ctx context.Context, csvRunID, apiRunID uuid.UUID, entries []ReconcileDQEntry)
+	GetExistingOpportunityHashes(ctx context.Context) (map[string]string, error)
+	BulkTouchUnchanged(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []UnchangedRecord) (int, error)
 	UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
 	MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunities(ctx context.Context) (int, int, error)
