@@ -756,6 +756,7 @@ Provide a plain-English analysis:
                  award_number, award_date, award_amount,
                  awardee_name, awardee_uei,
                  pop_street_address, pop_city, pop_state, pop_zip, pop_country,
+                 pop_state_name, pop_country_name,
                  primary_contact_title, primary_contact_fullname,
                  primary_contact_email, primary_contact_phone,
                  secondary_contact_title, secondary_contact_fullname,
@@ -809,9 +810,9 @@ Provide a plain-English analysis:
           place_of_performance: {
             street: row.pop_street_address,
             city: row.pop_city,
-            state: row.pop_state,
+            state: row.pop_state_name || row.pop_state,
             zip: row.pop_zip,
-            country: row.pop_country,
+            country: row.pop_country_name || row.pop_country,
           },
           contacts: {
             primary: row.primary_contact_fullname

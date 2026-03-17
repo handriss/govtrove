@@ -89,10 +89,18 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		if pop.State != nil {
 			opp.PopState = pop.State.Name
 			opp.PopStateCode = pop.State.Code
+			opp.PopStateName = LookupStateName(pop.State.Code)
+			if opp.PopStateName == pop.State.Code && pop.State.Name != "" {
+				opp.PopStateName = pop.State.Name
+			}
 		}
 		if pop.Country != nil {
 			opp.PopCountry = pop.Country.Name
 			opp.PopCountryCode = pop.Country.Code
+			opp.PopCountryName = LookupCountryName(pop.Country.Code)
+			if opp.PopCountryName == pop.Country.Code && pop.Country.Name != "" {
+				opp.PopCountryName = pop.Country.Name
+			}
 		}
 		opp.PopZip = pop.Zip
 		opp.PopStreetAddress = pop.StreetAddress

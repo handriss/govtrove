@@ -40,6 +40,8 @@ export interface Opportunity {
   pop_city_code?: string;
   pop_state_code?: string;
   pop_country_code?: string;
+  pop_state_name?: string;
+  pop_country_name?: string;
   award_number?: string;
   award_amount?: number;
   awardee_name?: string;

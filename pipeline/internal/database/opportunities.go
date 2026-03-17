@@ -228,19 +228,20 @@ func oppContentParams(o reconcile.Opportunity) []interface{} {
 		nilIfEmpty(o.PopStreetAddress), nilIfEmpty(o.PopCity), nilIfEmpty(o.PopState),                 // 24-26
 		nilIfEmpty(o.PopZip), nilIfEmpty(o.PopCountry),                                               // 27-28
 		nilIfEmpty(o.PopCityCode), nilIfEmpty(o.PopStateCode), nilIfEmpty(o.PopCountryCode),          // 29-31
-		nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry), // 32-35
-		nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),                 // 36-39
-		nilIfEmpty(o.AwardeeName), nilIfEmpty(o.AwardeeUeiSAM), nilIfEmpty(o.AwardeeStreetAddress),   // 40-42
-		nilIfEmpty(o.AwardeeCity), nilIfEmpty(o.AwardeeCityCode),                                     // 43-44
-		nilIfEmpty(o.AwardeeState), nilIfEmpty(o.AwardeeStateCode),                                   // 45-46
-		nilIfEmpty(o.AwardeeCountry), nilIfEmpty(o.AwardeeCountryCode), nilIfEmpty(o.AwardeeZip),     // 47-49
-		nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname),                       // 50-51
-		nilIfEmpty(o.PrimaryContactEmail), nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax), // 52-54
-		nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname),                   // 55-56
-		nilIfEmpty(o.SecondaryContactEmail), nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax), // 57-59
-		nilIfEmpty(o.UILink), nilIfEmpty(o.AdditionalInfoLink), nilIfEmpty(o.DescriptionURL),          // 60-62
-		resourceLinksJSON(o.ResourceLinks),                                                            // 63
-		computeFullParentPathName(o), nilIfEmpty(o.FullParentPathCode),                                // 64-65
+		nilIfEmpty(o.PopStateName), nilIfEmpty(o.PopCountryName),                                      // 32-33
+		nilIfEmpty(o.OfficeCity), nilIfEmpty(o.OfficeState), nilIfEmpty(o.OfficeZip), nilIfEmpty(o.OfficeCountry), // 34-37
+		nilIfEmpty(o.AwardNumber), o.AwardDate, o.AwardAmount, nilIfEmpty(o.Awardee),                 // 38-41
+		nilIfEmpty(o.AwardeeName), nilIfEmpty(o.AwardeeUeiSAM), nilIfEmpty(o.AwardeeStreetAddress),   // 42-44
+		nilIfEmpty(o.AwardeeCity), nilIfEmpty(o.AwardeeCityCode),                                     // 45-46
+		nilIfEmpty(o.AwardeeState), nilIfEmpty(o.AwardeeStateCode),                                   // 47-48
+		nilIfEmpty(o.AwardeeCountry), nilIfEmpty(o.AwardeeCountryCode), nilIfEmpty(o.AwardeeZip),     // 49-51
+		nilIfEmpty(o.PrimaryContactTitle), nilIfEmpty(o.PrimaryContactFullname),                       // 52-53
+		nilIfEmpty(o.PrimaryContactEmail), nilIfEmpty(o.PrimaryContactPhone), nilIfEmpty(o.PrimaryContactFax), // 54-56
+		nilIfEmpty(o.SecondaryContactTitle), nilIfEmpty(o.SecondaryContactFullname),                   // 57-58
+		nilIfEmpty(o.SecondaryContactEmail), nilIfEmpty(o.SecondaryContactPhone), nilIfEmpty(o.SecondaryContactFax), // 59-61
+		nilIfEmpty(o.UILink), nilIfEmpty(o.AdditionalInfoLink), nilIfEmpty(o.DescriptionURL),          // 62-64
+		resourceLinksJSON(o.ResourceLinks),                                                            // 65
+		computeFullParentPathName(o), nilIfEmpty(o.FullParentPathCode),                                // 66-67
 	}
 }
 
@@ -273,8 +274,8 @@ func computeFullParentPathName(o reconcile.Opportunity) *string {
 	return &s
 }
 
-// insertSQL: 65 content params + version($66), is_latest($67), content_hash($68),
-// data_sources($69), last_csv_run_id($70), last_seen_csv($71)
+// insertSQL: 67 content params + version($68), is_latest($69), content_hash($70),
+// data_sources($71), last_csv_run_id($72), last_seen_csv($73)
 const insertSQL = `
 	INSERT INTO opportunities (
 		notice_id, solicitation_number, title, description, type, base_type, organization_type,
@@ -283,6 +284,7 @@ const insertSQL = `
 		department, sub_tier, office, cgac, fpds_code, aac_code, middle_tier,
 		pop_street_address, pop_city, pop_state, pop_zip, pop_country,
 		pop_city_code, pop_state_code, pop_country_code,
+		pop_state_name, pop_country_name,
 		office_city, office_state, office_zip, office_country,
 		award_number, award_date, award_amount, awardee,
 		awardee_name, awardee_uei, awardee_street_address,
@@ -301,21 +303,22 @@ const insertSQL = `
 		$17, $18, $19, $20, $21, $22, $23,
 		$24, $25, $26, $27, $28,
 		$29, $30, $31,
-		$32, $33, $34, $35,
-		$36, $37, $38, $39,
-		$40, $41, $42,
-		$43, $44, $45, $46,
-		$47, $48, $49,
-		$50, $51, $52, $53, $54,
-		$55, $56, $57, $58, $59,
-		$60, $61, $62, $63,
-		$64, $65,
-		$66, $67, $68,
-		$69, $70, $71
+		$32, $33,
+		$34, $35, $36, $37,
+		$38, $39, $40, $41,
+		$42, $43, $44,
+		$45, $46, $47, $48,
+		$49, $50, $51,
+		$52, $53, $54, $55, $56,
+		$57, $58, $59, $60, $61,
+		$62, $63, $64, $65,
+		$66, $67,
+		$68, $69, $70,
+		$71, $72, $73
 	)`
 
 // backfillSQL: same content params (minus notice_id) + content_hash, data_sources, run tracking, WHERE.
-// Params: content[2:65] as $1-$64, content_hash=$65, data_sources=$66, run_id=$67, seen=$68, notice_id=$69
+// Params: content[2:67] as $1-$66, content_hash=$67, data_sources=$68, run_id=$69, seen=$70, notice_id=$71
 const backfillSQL = `
 	UPDATE opportunities SET
 		solicitation_number = $1, title = $2, description = $3, type = $4, base_type = $5, organization_type = $6,
@@ -324,19 +327,20 @@ const backfillSQL = `
 		department = $16, sub_tier = $17, office = $18, cgac = $19, fpds_code = $20, aac_code = $21, middle_tier = $22,
 		pop_street_address = $23, pop_city = $24, pop_state = $25, pop_zip = $26, pop_country = $27,
 		pop_city_code = $28, pop_state_code = $29, pop_country_code = $30,
-		office_city = $31, office_state = $32, office_zip = $33, office_country = $34,
-		award_number = $35, award_date = $36, award_amount = $37, awardee = $38,
-		awardee_name = $39, awardee_uei = $40, awardee_street_address = $41,
-		awardee_city = $42, awardee_city_code = $43, awardee_state = $44, awardee_state_code = $45,
-		awardee_country = $46, awardee_country_code = $47, awardee_zip = $48,
-		primary_contact_title = $49, primary_contact_fullname = $50, primary_contact_email = $51, primary_contact_phone = $52, primary_contact_fax = $53,
-		secondary_contact_title = $54, secondary_contact_fullname = $55, secondary_contact_email = $56, secondary_contact_phone = $57, secondary_contact_fax = $58,
-		ui_link = $59, additional_info_link = $60, description_url = $61, resource_links = $62,
-		full_parent_path_name = $63, full_parent_path_code = $64,
-		content_hash = $65,
-		data_sources = $66,
-		last_csv_run_id = $67, last_seen_csv = $68
-	WHERE notice_id = $69 AND is_latest = true
+		pop_state_name = $31, pop_country_name = $32,
+		office_city = $33, office_state = $34, office_zip = $35, office_country = $36,
+		award_number = $37, award_date = $38, award_amount = $39, awardee = $40,
+		awardee_name = $41, awardee_uei = $42, awardee_street_address = $43,
+		awardee_city = $44, awardee_city_code = $45, awardee_state = $46, awardee_state_code = $47,
+		awardee_country = $48, awardee_country_code = $49, awardee_zip = $50,
+		primary_contact_title = $51, primary_contact_fullname = $52, primary_contact_email = $53, primary_contact_phone = $54, primary_contact_fax = $55,
+		secondary_contact_title = $56, secondary_contact_fullname = $57, secondary_contact_email = $58, secondary_contact_phone = $59, secondary_contact_fax = $60,
+		ui_link = $61, additional_info_link = $62, description_url = $63, resource_links = $64,
+		full_parent_path_name = $65, full_parent_path_code = $66,
+		content_hash = $67,
+		data_sources = $68,
+		last_csv_run_id = $69, last_seen_csv = $70
+	WHERE notice_id = $71 AND is_latest = true
 `
 
 func (db *DB) MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error) {
