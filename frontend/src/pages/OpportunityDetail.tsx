@@ -282,9 +282,9 @@ export default function OpportunityDetail() {
   const placeOfPerformance = [
     opportunity.pop_street_address,
     opportunity.pop_city,
-    opportunity.pop_state,
+    opportunity.pop_state_name || opportunity.pop_state,
     opportunity.pop_zip,
-    opportunity.pop_country,
+    opportunity.pop_country_name || opportunity.pop_country,
   ]
     .filter(Boolean)
     .join(', ');
@@ -527,9 +527,9 @@ export default function OpportunityDetail() {
                   <InfoRow label="Address" value={opportunity.pop_street_address} />
                 )}
                 {opportunity.pop_city && <InfoRow label="City" value={opportunity.pop_city} />}
-                {opportunity.pop_state && <InfoRow label="State" value={opportunity.pop_state} />}
+                {(opportunity.pop_state_name || opportunity.pop_state) && <InfoRow label="State" value={opportunity.pop_state_name || opportunity.pop_state || ''} />}
                 {opportunity.pop_zip && <InfoRow label="ZIP Code" value={opportunity.pop_zip} mono />}
-                {opportunity.pop_country && <InfoRow label="Country" value={opportunity.pop_country} />}
+                {(opportunity.pop_country_name || opportunity.pop_country) && <InfoRow label="Country" value={opportunity.pop_country_name || opportunity.pop_country || ''} />}
               </dl>
             </Section>
           )}

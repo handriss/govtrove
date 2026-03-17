@@ -234,6 +234,8 @@ CREATE TABLE opportunities (
     pop_city_code   TEXT,
     pop_state_code  TEXT,
     pop_country_code TEXT,
+    pop_state_name  TEXT,
+    pop_country_name TEXT,
     office_city     TEXT,
     office_state    TEXT,
     office_zip      TEXT,
@@ -301,6 +303,8 @@ BEGIN
         setweight(to_tsvector('english', COALESCE(NEW.classification_code, '')), 'D') ||
         setweight(to_tsvector('english', COALESCE(NEW.naics_code, '')), 'D') ||
         setweight(to_tsvector('english', COALESCE(NEW.pop_city, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.pop_state_name, '')), 'D') ||
+        setweight(to_tsvector('english', COALESCE(NEW.pop_country_name, '')), 'D') ||
         setweight(to_tsvector('english', COALESCE(NEW.award_number, '')), 'D') ||
         setweight(to_tsvector('english', COALESCE(NEW.primary_contact_fullname, '')), 'D');
     RETURN NEW;

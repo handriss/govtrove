@@ -28,6 +28,8 @@ type Opportunity struct {
 	PopCityCode        *string    `json:"pop_city_code,omitempty"`
 	PopStateCode       *string    `json:"pop_state_code,omitempty"`
 	PopCountryCode     *string    `json:"pop_country_code,omitempty"`
+	PopStateName       *string    `json:"pop_state_name,omitempty"`
+	PopCountryName     *string    `json:"pop_country_name,omitempty"`
 	AwardNumber        *string    `json:"award_number,omitempty"`
 	AwardAmount        *float64   `json:"award_amount,omitempty"`
 	AwardeeName        *string    `json:"awardee_name,omitempty"`

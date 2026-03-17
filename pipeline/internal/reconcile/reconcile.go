@@ -51,6 +51,8 @@ type Opportunity struct {
 	PopCityCode      string
 	PopStateCode     string
 	PopCountryCode   string
+	PopStateName     string `json:"-"`
+	PopCountryName   string `json:"-"`
 
 	OfficeCity    string
 	OfficeState   string
@@ -161,6 +163,8 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 		PopState:         raw["PopState"],
 		PopZip:           raw["PopZip"],
 		PopCountry:       raw["PopCountry"],
+		PopStateName:     LookupStateName(raw["PopState"]),
+		PopCountryName:   LookupCountryName(raw["PopCountry"]),
 
 		OfficeCity:    raw["City"],
 		OfficeState:   raw["State"],
