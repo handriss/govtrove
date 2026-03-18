@@ -767,8 +767,9 @@ func (h *AdminHandler) CreatePromoCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		UserID        int `json:"user_id"`
-		ExpiresInDays int `json:"expires_in_days"`
+		UserID        int    `json:"user_id"`
+		ExpiresInDays int    `json:"expires_in_days"`
+		CouponID      string `json:"coupon_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -822,8 +823,13 @@ func (h *AdminHandler) CreatePromoCode(w http.ResponseWriter, r *http.Request) {
 	}
 	code := fmt.Sprintf("GOVTROVE-%s-%s", firstName, suffix)
 
+	coupon := h.promoCouponID
+	if body.CouponID != "" {
+		coupon = body.CouponID
+	}
+
 	promoParams := &stripe.PromotionCodeCreateParams{
-		Coupon:         stripe.String(h.promoCouponID),
+		Coupon:         stripe.String(coupon),
 		Code:           stripe.String(code),
 		MaxRedemptions: stripe.Int64(1),
 		Customer:       stripe.String(customerID),
@@ -1097,6 +1103,7 @@ func (h *AdminHandler) CreateInviteLink(w http.ResponseWriter, r *http.Request) 
 		Code           string `json:"code"`
 		MaxRedemptions int    `json:"max_redemptions"`
 		ExpiresInDays  int    `json:"expires_in_days"`
+		CouponID       string `json:"coupon_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -1145,8 +1152,13 @@ func (h *AdminHandler) CreateInviteLink(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	coupon := h.promoCouponID
+	if body.CouponID != "" {
+		coupon = body.CouponID
+	}
+
 	promoParams := &stripe.PromotionCodeCreateParams{
-		Coupon: stripe.String(h.promoCouponID),
+		Coupon: stripe.String(coupon),
 		Code:   stripe.String(code),
 	}
 	if body.MaxRedemptions > 0 {
