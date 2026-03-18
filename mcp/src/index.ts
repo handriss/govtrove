@@ -2,6 +2,7 @@ import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { pipeline as hfPipeline } from "@huggingface/transformers";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
@@ -881,6 +882,33 @@ app.get("/.well-known/oauth-authorization-server", async (_req, res) => {
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// Embedding endpoint — internal service-to-service, no auth
+let embedder: any = null;
+async function getEmbedder() {
+  if (!embedder) {
+    embedder = await hfPipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {
+      cache_dir: process.env.HF_HOME || undefined,
+    });
+  }
+  return embedder;
+}
+
+app.post("/embed", express.json(), async (req, res) => {
+  const { text } = req.body;
+  if (!text || typeof text !== "string") {
+    res.status(400).json({ error: "text field is required" });
+    return;
+  }
+  try {
+    const model = await getEmbedder();
+    const output = await model(text, { pooling: "mean", normalize: true });
+    res.json({ embedding: Array.from(output.data as Float32Array) });
+  } catch (err) {
+    console.error("Embedding error:", err);
+    res.status(500).json({ error: "Failed to generate embedding" });
+  }
 });
 
 app.get("/schema", (_req, res) => {
