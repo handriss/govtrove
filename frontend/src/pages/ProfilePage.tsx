@@ -44,11 +44,12 @@ export default function ProfilePage() {
 
   const promoCode = searchParams.get('promo') || sessionStorage.getItem('govtrove_promo_code') || undefined;
 
+  const isPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever || (govtroveUser?.gift_expires_at && new Date(govtroveUser.gift_expires_at) > new Date());
   useEffect(() => {
-    if (promoCode && isAuthenticated) {
+    if (promoCode && isAuthenticated && isPro) {
       sessionStorage.removeItem('govtrove_promo_code');
     }
-  }, [promoCode, isAuthenticated]);
+  }, [promoCode, isAuthenticated, isPro]);
 
   useEffect(() => {
     if (searchParams.get('upgraded') === '1') {
@@ -173,8 +174,8 @@ export default function ProfilePage() {
 
         {promoCode && !hasPro && (
           <div className="mb-6 rounded-xl bg-accent/10 border-2 border-accent/30 p-6 text-center">
-            <p className="text-lg font-semibold text-dark-50 mb-2">You've been invited to GovTrove Pro!</p>
-            <p className="text-sm text-dark-400 mb-5">Click below to activate your free Pro account. No credit card required.</p>
+            <p className="text-lg font-semibold text-dark-50 mb-2">You have a special offer for GovTrove Pro!</p>
+            <p className="text-sm text-dark-400 mb-5">Click below to upgrade with your exclusive discount.</p>
             <button
               onClick={() => handleBilling('checkout')}
               disabled={billingLoading}
@@ -183,7 +184,7 @@ export default function ProfilePage() {
                          transition-all duration-200 disabled:opacity-50"
             >
               {billingLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-              Activate Pro Account
+              Claim Offer
             </button>
             {promoError && (
               <div className="mt-4">
