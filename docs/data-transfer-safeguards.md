@@ -13,13 +13,11 @@ Per GDPR Chapter V, personal data transfers to countries outside the EU/EEA requ
 | Stripe | Payment processing | US | Yes ([#6436](https://www.dataprivacyframework.gov/participant/6436)) | DPF | [Stripe DPA](https://stripe.com/legal/dpa) |
 | Neon | Database hosting | US | Yes | DPF + SCCs | [Neon DPA](https://neon.com/dpa) |
 | WorkOS | Authentication | US | No | SCCs (in DPA) | [WorkOS DPA](https://workos.com/legal/data-processing-addendum) |
-| Counter.dev | Page view analytics | Germany (EU) | N/A | No transfer | [Privacy policy](https://counter.dev/pages/privacy.html) |
 
 ## Notes
 
 - **DPF** = EU-US Data Privacy Framework. Company self-certifies with US Dept. of Commerce. EU recognizes this as adequate protection per adequacy decision of July 10, 2023.
 - **SCCs** = Standard Contractual Clauses. Pre-approved contract templates from the European Commission (Decision 2021/914). Valid alternative when DPF is not available.
-- **Counter.dev** is hosted in Frankfurt, Germany (Linode EU). No international transfer occurs, so no safeguard is required.
 - **WorkOS** is not DPF-certified but includes SCCs in their Data Processing Addendum, which is an equally valid GDPR transfer mechanism.
 
 ## Privacy Policy Alignment
