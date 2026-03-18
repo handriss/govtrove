@@ -1584,6 +1584,7 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
   const [expiresInDays, setExpiresInDays] = useState(365);
+  const [couponId, setCouponId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [sendStatus, setSendStatus] = useState<Record<number, 'success' | 'error'>>({});
@@ -1609,7 +1610,7 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
     setError('');
     try {
       const token = await getToken();
-      await adminCreatePromoCode(token, Number(selectedUserId), expiresInDays || undefined);
+      await adminCreatePromoCode(token, Number(selectedUserId), expiresInDays || undefined, couponId || undefined);
       setSelectedUserId('');
       await loadCodes();
     } catch (e) {
@@ -1695,6 +1696,16 @@ function PromoCodesTab({ users, getToken }: { users: AdminUser[]; getToken: () =
               onChange={(e) => setExpiresInDays(Number(e.target.value))}
               min={0}
               className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Coupon ID (optional)</label>
+            <input
+              type="text"
+              value={couponId}
+              onChange={(e) => setCouponId(e.target.value)}
+              placeholder="Default coupon"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[180px]"
             />
           </div>
           <button
@@ -2098,6 +2109,7 @@ function InviteLinksTab({ getToken }: { getToken: () => Promise<string> }) {
   const [customCode, setCustomCode] = useState('');
   const [maxRedemptions, setMaxRedemptions] = useState(50);
   const [expiresInDays, setExpiresInDays] = useState(0);
+  const [couponId, setCouponId] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<number | null>(null);
@@ -2129,6 +2141,7 @@ function InviteLinksTab({ getToken }: { getToken: () => Promise<string> }) {
         code: customCode || undefined,
         max_redemptions: maxRedemptions,
         expires_in_days: expiresInDays || undefined,
+        coupon_id: couponId || undefined,
       });
       setCampaignName('');
       setCustomCode('');
@@ -2249,6 +2262,16 @@ function InviteLinksTab({ getToken }: { getToken: () => Promise<string> }) {
               min={0}
               placeholder="0 = never"
               className="w-24 px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-dark-400 mb-1">Coupon ID (optional)</label>
+            <input
+              type="text"
+              value={couponId}
+              onChange={(e) => setCouponId(e.target.value)}
+              placeholder="Default coupon"
+              className="px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg text-dark-100 focus:outline-none focus:border-accent/50 min-w-[180px]"
             />
           </div>
           <button

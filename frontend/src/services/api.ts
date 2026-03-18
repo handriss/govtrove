@@ -1104,11 +1104,12 @@ export async function adminCreatePromoCode(
   token: string,
   userId: number,
   expiresInDays?: number,
+  couponId?: string,
 ): Promise<{ id: number; code: string; invite_url: string }> {
   const response = await fetch(`${API_BASE}/admin/promo-codes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ user_id: userId, expires_in_days: expiresInDays || 0 }),
+    body: JSON.stringify({ user_id: userId, expires_in_days: expiresInDays || 0, ...(couponId && { coupon_id: couponId }) }),
   });
   if (!response.ok) {
     const text = await response.text();
@@ -1237,7 +1238,7 @@ export async function getAdminInviteLinks(token: string): Promise<AdminInviteLin
 
 export async function adminCreateInviteLink(
   token: string,
-  data: { campaign_name: string; code?: string; max_redemptions: number; expires_in_days?: number },
+  data: { campaign_name: string; code?: string; max_redemptions: number; expires_in_days?: number; coupon_id?: string },
 ): Promise<{ id: number; code: string; invite_url: string }> {
   const response = await fetch(`${API_BASE}/admin/invite-links`, {
     method: 'POST',
