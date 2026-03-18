@@ -53,6 +53,9 @@ type Store interface {
 	// Agencies
 	RefreshAgencies(ctx context.Context) (int, error)
 
+	// Code correlations
+	RefreshCodeCorrelations(ctx context.Context) error
+
 	// Pipeline steps
 	CreatePipelineStep(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error)
 	CompletePipelineStep(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error

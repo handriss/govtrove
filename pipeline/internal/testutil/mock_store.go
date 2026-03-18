@@ -49,7 +49,8 @@ type MockStore struct {
 	CompletePipelineStepFn func(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
 	FailPipelineStepFn     func(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
 
-	RefreshAgenciesFn func(ctx context.Context) (int, error)
+	RefreshAgenciesFn          func(ctx context.Context) (int, error)
+	RefreshCodeCorrelationsFn  func(ctx context.Context) error
 
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
 }
@@ -258,6 +259,13 @@ func (m *MockStore) RefreshAgencies(ctx context.Context) (int, error) {
 		return m.RefreshAgenciesFn(ctx)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) RefreshCodeCorrelations(ctx context.Context) error {
+	if m.RefreshCodeCorrelationsFn != nil {
+		return m.RefreshCodeCorrelationsFn(ctx)
+	}
+	return nil
 }
 
 func (m *MockStore) CreatePipelineStep(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error) {

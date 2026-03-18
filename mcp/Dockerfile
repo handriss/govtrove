@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npx tsc
 
 RUN npm prune --production
 
-FROM node:22-alpine
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -19,7 +19,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
+RUN mkdir -p /tmp/hf-cache && chown node:node /tmp/hf-cache
+
 USER node
+
+ENV HF_HOME=/tmp/hf-cache
 
 EXPOSE 3000
 

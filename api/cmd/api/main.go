@@ -163,6 +163,7 @@ func main() {
 	inviteLinkRepo := repository.NewInviteLinkRepository(pool)
 	giftCodeRepo := repository.NewGiftCodeRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
+	codeRepo := repository.NewCodeRepository(pool)
 
 	appURL := "https://app.govtrove.com"
 	if strings.Contains(cfg.AllowedOrigins, "localhost") {
@@ -197,6 +198,7 @@ func main() {
 	webhookHandler := handlers.NewWebhookHandler(sentEmailsRepo, emailPrefsRepo, emailSvc, logger)
 	unsubscribeHandler := handlers.NewUnsubscribeHandler(emailPrefsRepo, emailSvc, logger)
 	preferencesHandler := handlers.NewPreferencesHandler(emailPrefsRepo, userRepo, logger)
+	codeHandler := handlers.NewCodeHandler(codeRepo, cfg.MCPInternalURL, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -231,6 +233,10 @@ func main() {
 	}))
 
 	r.Get("/health", healthHandler.Check)
+	r.Get("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("User-agent: *\nDisallow: /\n"))
+	})
 	r.Get("/og/opportunities/{id}/card.png", oppHandler.GetOGImage)
 	r.Get("/og/opportunities/{id}", oppHandler.GetOGCard)
 	// Admin access: check is_admin column first, fall back to ADMIN_EMAILS allowlist
@@ -278,6 +284,10 @@ func main() {
 			r.Use(httprate.LimitByIP(10, time.Minute))
 			r.Post("/", utmHandler.TrackVisit)
 		})
+
+		r.Post("/codes/naics/match", codeHandler.MatchNAICS)
+		r.Post("/codes/psc/match", codeHandler.MatchPSC)
+		r.Get("/codes/correlations", codeHandler.GetCorrelations)
 
 		r.Get("/agencies", agencyHandler.Search)
 		r.Get("/opportunities/facets", oppHandler.GetFacets)

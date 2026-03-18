@@ -375,6 +375,12 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Info("agencies refreshed", "count", refreshed)
 	}
 
+	if err := h.Store.RefreshCodeCorrelations(ctx); err != nil {
+		h.Logger.Error("failed to refresh code correlations", "error", err)
+	} else {
+		h.Logger.Info("code correlations refreshed")
+	}
+
 	if deleted, err := h.Store.DeleteOldSearchEvents(ctx, 90); err != nil {
 		h.Logger.Error("failed to delete old search events", "error", err)
 	} else if deleted > 0 {
