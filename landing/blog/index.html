@@ -61,6 +61,20 @@
         .blog-card-link { font-size: 0.9375rem; font-weight: 500; color: var(--accent); transition: color var(--transition-fast); }
         .blog-card-link:hover { color: var(--accent-hover); }
 
+        .tool-badge {
+            display: inline-block;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            background: rgba(37, 99, 235, 0.15);
+            color: var(--accent);
+        }
+        .blog-card.tool-card { border-color: rgba(37, 99, 235, 0.25); }
+        .blog-card.tool-card:hover { border-color: var(--accent); }
+
         @media (max-width: 440px) {
             .blog-grid { grid-template-columns: 1fr; }
         }
@@ -99,7 +113,7 @@
         },
         {
           "@type": "BlogPosting",
-          "headline": "SAM.gov Has Three Ways to Access Contract Data — Here's What Each One Actually Does",
+          "headline": "SAM.gov API & CSV Data Downloads Explained: What Each One Actually Gives You",
           "url": "https://govtrove.com/blog/sam-gov-data-services-csv-api-explained.html",
           "datePublished": "2026-02-25"
         },
@@ -111,13 +125,13 @@
         },
         {
           "@type": "BlogPosting",
-          "headline": "Understanding Set-Aside Contracts: A Guide for Small Businesses",
+          "headline": "Federal Set-Aside Contracts Explained: SBA, SDVOSB, 8(a), WOSB, HUBZone (2026 Guide)",
           "url": "https://govtrove.com/blog/understanding-set-asides.html",
           "datePublished": "2026-02-10"
         },
         {
           "@type": "BlogPosting",
-          "headline": "5 SAM.gov Search Tips You're Probably Missing",
+          "headline": "How to Search SAM.gov for Contracts: 5 Tips You're Probably Missing",
           "url": "https://govtrove.com/blog/sam-gov-search-tips.html",
           "datePublished": "2026-02-07"
         },
@@ -130,7 +144,6 @@
       ]
     }
     </script>
-    <script>if(!localStorage.getItem('govtrove_notrack')){var s=document.createElement('script');s.src='https://cdn.counter.dev/script.js';s.dataset.id='65dc1175-5654-4e33-b21c-a0886ea068d3';s.dataset.utcoffset='1';document.head.appendChild(s)}</script>
 </head>
 <body>
     <!-- Navigation -->
@@ -175,6 +188,26 @@
         <section>
             <div class="container">
                 <div class="blog-grid">
+                    <article class="blog-card tool-card">
+                        <a href="/naics-code-finder/" class="blog-card-overlay" aria-label="NAICS Code Finder"></a>
+                        <div class="blog-card-meta">
+                            <span class="tool-badge">Tool</span>
+                        </div>
+                        <h2>NAICS Code Finder</h2>
+                        <p class="blog-card-excerpt">Describe your business in plain English and get matched NAICS codes instantly using AI &mdash; plus correlated PSC codes from real federal contract data.</p>
+                        <span class="blog-card-link">Try it &rarr;</span>
+                    </article>
+
+                    <article class="blog-card tool-card">
+                        <a href="/psc-code-finder/" class="blog-card-overlay" aria-label="PSC Code Finder"></a>
+                        <div class="blog-card-meta">
+                            <span class="tool-badge">Tool</span>
+                        </div>
+                        <h2>PSC Code Finder</h2>
+                        <p class="blog-card-excerpt">Find the right Product and Service Codes for federal contracts. Describe what you sell or provide and get matched PSC codes using AI.</p>
+                        <span class="blog-card-link">Try it &rarr;</span>
+                    </article>
+
                     <article class="blog-card">
                         <a href="/blog/use-govtrove-with-ai-assistants.html" class="blog-card-overlay" aria-label="Use GovTrove with Claude, ChatGPT & Other AI Assistants"></a>
                         <div class="blog-card-meta">
@@ -209,12 +242,12 @@
                     </article>
 
                     <article class="blog-card">
-                        <a href="/blog/sam-gov-data-services-csv-api-explained.html" class="blog-card-overlay" aria-label="SAM.gov Has Three Ways to Access Contract Data"></a>
+                        <a href="/blog/sam-gov-data-services-csv-api-explained.html" class="blog-card-overlay" aria-label="SAM.gov API & CSV Data Downloads Explained"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-sam-gov">SAM.gov Tips</span>
                             <span class="blog-card-date">February 25, 2026</span>
                         </div>
-                        <h2>SAM.gov Has Three Ways to Access Contract Data &mdash; Here's What Each One Actually Does</h2>
+                        <h2>SAM.gov API &amp; CSV Data Downloads Explained: What Each One Actually Gives You</h2>
                         <p class="blog-card-excerpt">SAM.gov publishes contract opportunity data through daily CSV exports, weekly archives, and a public REST API. Each has different strengths and tradeoffs &mdash; here's what each one provides and how GovTrove combines them.</p>
                         <span class="blog-card-link">Read more &rarr;</span>
                     </article>
@@ -231,23 +264,23 @@
                     </article>
 
                     <article class="blog-card">
-                        <a href="/blog/understanding-set-asides.html" class="blog-card-overlay" aria-label="Understanding Set-Aside Contracts"></a>
+                        <a href="/blog/understanding-set-asides.html" class="blog-card-overlay" aria-label="Federal Set-Aside Contracts Explained"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-set-asides">Set-Asides</span>
                             <span class="blog-card-date">February 10, 2026</span>
                         </div>
-                        <h2>Understanding Set-Aside Contracts: A Guide for Small Businesses</h2>
+                        <h2>Federal Set-Aside Contracts Explained: SBA, SDVOSB, 8(a), WOSB &amp; HUBZone</h2>
                         <p class="blog-card-excerpt">A breakdown of SBA, 8(a), SDVOSB, WOSB, and HUBZone set-asides &mdash; what they mean, who qualifies, and how to find opportunities reserved for your business.</p>
                         <span class="blog-card-link">Read more &rarr;</span>
                     </article>
 
                     <article class="blog-card">
-                        <a href="/blog/sam-gov-search-tips.html" class="blog-card-overlay" aria-label="5 SAM.gov Search Tips You're Probably Missing"></a>
+                        <a href="/blog/sam-gov-search-tips.html" class="blog-card-overlay" aria-label="How to Search SAM.gov for Contracts"></a>
                         <div class="blog-card-meta">
                             <span class="blog-card-category category-sam-gov">SAM.gov Tips</span>
                             <span class="blog-card-date">February 7, 2026</span>
                         </div>
-                        <h2>5 SAM.gov Search Tips You're Probably Missing</h2>
+                        <h2>How to Search SAM.gov for Contracts: 5 Tips You&#39;re Probably Missing</h2>
                         <p class="blog-card-excerpt">Common mistakes when searching SAM.gov and how to get better results using filters, keywords, and NAICS codes. Stop missing opportunities hiding in plain sight.</p>
                         <span class="blog-card-link">Read more &rarr;</span>
                     </article>
