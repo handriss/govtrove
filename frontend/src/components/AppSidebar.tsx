@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Star, Bell, Building2, BookOpen, BookText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, Star, Bell, Building2, BookOpen, BookText, PanelLeftClose, PanelLeftOpen, Shield } from 'lucide-react';
 import { useNotificationsCount } from '../hooks/useNotifications';
 import { useSidebar } from '../contexts/SidebarContext';
+import { useIsAdmin } from '../hooks/useIsAdmin';
 
 interface NavItem {
   label: string;
@@ -15,6 +16,7 @@ interface NavItem {
 export default function AppSidebar() {
   const { collapsed, toggle } = useSidebar();
   const { count } = useNotificationsCount();
+  const isAdmin = useIsAdmin();
   const location = useLocation();
 
   const navItems: NavItem[] = [
@@ -108,6 +110,23 @@ export default function AppSidebar() {
           })}
         </div>
       </nav>
+
+      {isAdmin && (
+        <div className="px-2 py-3 border-t border-dark-700/50">
+          <Link
+            to="/admin"
+            title={collapsed ? 'Admin' : undefined}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+              location.pathname.startsWith('/admin')
+                ? 'bg-accent/10 text-accent'
+                : 'text-dark-400 hover:text-dark-200 hover:bg-dark-800/50'
+            }`}
+          >
+            <Shield size={18} className="shrink-0" />
+            {!collapsed && <span className="truncate">Admin</span>}
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }
