@@ -170,6 +170,7 @@ resource "aws_apprunner_service" "api" {
           SES_FROM_EMAIL    = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
           SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
           POSTHOG_HOST            = var.posthog_host
+          MCP_INTERNAL_URL        = "https://${aws_apprunner_service.mcp.service_url}"
         }
       }
     }

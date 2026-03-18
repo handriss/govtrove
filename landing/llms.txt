@@ -7,6 +7,10 @@
 - [Pricing](https://govtrove.com/pricing.html)
 - [Search Opportunities](https://app.govtrove.com)
 
+## Tools
+- [NAICS Code Finder](https://govtrove.com/naics-code-finder/) — Describe your business, get matched NAICS codes via AI + correlated PSC codes from real contract data
+- [PSC Code Finder](https://govtrove.com/psc-code-finder/) — Describe your products/services, get matched PSC codes via AI + correlated NAICS codes from real contract data
+
 ## Blog
 - [SAM.gov Search Tips](https://govtrove.com/blog/sam-gov-search-tips.html)
 - [NAICS Codes Explained](https://govtrove.com/blog/naics-codes-explained.html)
