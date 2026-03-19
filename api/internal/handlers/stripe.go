@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/handriss/govtrove/api/internal/analytics"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/webhook"
 
@@ -283,6 +284,20 @@ func (h *StripeHandler) handleCheckoutCompleted(ctx context.Context, event *stri
 		h.logger.Error("failed to upgrade user plan", "user_id", user.ID, "error", err)
 	} else {
 		h.logger.Info("user upgraded to pro", "user_id", user.ID, "email", user.Email)
+
+		interval := "unknown"
+		if session.Subscription != nil {
+			sub, subErr := h.sc.V1Subscriptions.Retrieve(ctx, session.Subscription.ID, nil)
+			if subErr == nil && len(sub.Items.Data) > 0 {
+				interval = string(sub.Items.Data[0].Price.Recurring.Interval)
+			}
+		}
+		analytics.CaptureEvent(user.WorkOSID, "subscription_started", map[string]any{
+			"plan":     "pro",
+			"amount":   session.AmountTotal,
+			"currency": string(session.Currency),
+			"interval": interval,
+		})
 	}
 
 	// Track promo code redemption
