@@ -16,6 +16,10 @@ const posthogOptions = {
   disable_toolbar: true,
   persistence: 'memory' as const,
   loaded: (ph: PostHogInterface) => {
+    if (window.location.pathname.startsWith('/admin')) {
+      ph.opt_out_capturing();
+      return;
+    }
     const props: Record<string, string> = {}
     if (capturedUTM.source) props.utm_source = capturedUTM.source
     if (capturedUTM.medium) props.utm_medium = capturedUTM.medium
