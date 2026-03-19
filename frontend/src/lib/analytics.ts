@@ -6,14 +6,18 @@ export function trackSearch(
   filters: Record<string, unknown>,
   resultCount: number,
 ) {
+  const hasFilters = !!(filters.naics || filters.set_aside || filters.type ||
+    filters.state || filters.agency);
   ph?.capture('search_performed', {
     query,
-    naics: filters.naics || null,
-    set_aside: filters.setAside || null,
-    type: filters.noticeType || null,
+    naics_code: filters.naics || null,
+    set_aside: filters.set_aside || null,
+    agency: filters.agency || null,
+    type: filters.type || null,
     state: filters.state || null,
     sort: filters.sort || null,
     result_count: resultCount,
+    has_filters: hasFilters,
   });
 }
 
@@ -55,7 +59,18 @@ export function trackSignIn(ph: PostHog | undefined) {
 }
 
 export function trackSignUp(ph: PostHog | undefined) {
-  ph?.capture('sign_up');
+  const referrer = document.referrer || '';
+  let referringDomain = '';
+  try { if (referrer) referringDomain = new URL(referrer).hostname; } catch {}
+
+  const params = new URLSearchParams(window.location.search);
+  ph?.capture('sign_up', {
+    utm_source: ph?.get_property?.('$initial_utm_source') ?? params.get('utm_source') ?? null,
+    utm_medium: ph?.get_property?.('$initial_utm_medium') ?? params.get('utm_medium') ?? null,
+    utm_campaign: ph?.get_property?.('$initial_utm_campaign') ?? params.get('utm_campaign') ?? null,
+    referrer: referrer || null,
+    referring_domain: referringDomain || null,
+  });
 }
 
 export function trackFounderCtaClicked(ph: PostHog | undefined, variant: string) {
