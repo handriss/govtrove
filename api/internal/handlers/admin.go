@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -14,29 +16,36 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/stripe/stripe-go/v82"
 
 	"github.com/handriss/govtrove/api/internal/email"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
+	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
 
 type AdminHandler struct {
-	userRepo         *repository.UserRepository
-	notificationRepo *repository.NotificationRepository
-	pipelineRepo     *repository.PipelineRepository
-	emailPrefsRepo   *repository.EmailPreferencesRepository
-	sentEmailsRepo   *repository.SentEmailsRepository
-	promoRepo        *repository.PromoCodeRepository
-	inviteLinkRepo   *repository.InviteLinkRepository
-	giftCodeRepo     *repository.GiftCodeRepository
-	emailSvc         *email.Service
-	sc               *stripe.Client
-	promoCouponID    string
-	appURL           string
-	workosAPIKey     string
-	logger           *slog.Logger
+	userRepo           *repository.UserRepository
+	notificationRepo   *repository.NotificationRepository
+	pipelineRepo       *repository.PipelineRepository
+	emailPrefsRepo     *repository.EmailPreferencesRepository
+	sentEmailsRepo     *repository.SentEmailsRepository
+	promoRepo          *repository.PromoCodeRepository
+	inviteLinkRepo     *repository.InviteLinkRepository
+	giftCodeRepo       *repository.GiftCodeRepository
+	accountRequestRepo *repository.AccountRequestRepository
+	emailSvc           *email.Service
+	sc                 *stripe.Client
+	s3Client           *s3.Client
+	s3PresignClient    *s3.PresignClient
+	dsarBucket         string
+	promoCouponID      string
+	appURL             string
+	workosAPIKey       string
+	logger             *slog.Logger
 }
 
 func NewAdminHandler(
@@ -48,28 +57,36 @@ func NewAdminHandler(
 	promoRepo *repository.PromoCodeRepository,
 	inviteLinkRepo *repository.InviteLinkRepository,
 	giftCodeRepo *repository.GiftCodeRepository,
+	accountRequestRepo *repository.AccountRequestRepository,
 	emailSvc *email.Service,
 	sc *stripe.Client,
+	s3Client *s3.Client,
+	s3PresignClient *s3.PresignClient,
+	dsarBucket string,
 	promoCouponID string,
 	appURL string,
 	workosAPIKey string,
 	logger *slog.Logger,
 ) *AdminHandler {
 	return &AdminHandler{
-		userRepo:         userRepo,
-		notificationRepo: notificationRepo,
-		pipelineRepo:     pipelineRepo,
-		emailPrefsRepo:   emailPrefsRepo,
-		sentEmailsRepo:   sentEmailsRepo,
-		promoRepo:        promoRepo,
-		inviteLinkRepo:   inviteLinkRepo,
-		giftCodeRepo:     giftCodeRepo,
-		emailSvc:         emailSvc,
-		sc:               sc,
-		promoCouponID:    promoCouponID,
-		appURL:           appURL,
-		workosAPIKey:     workosAPIKey,
-		logger:           logger,
+		userRepo:           userRepo,
+		notificationRepo:   notificationRepo,
+		pipelineRepo:       pipelineRepo,
+		emailPrefsRepo:     emailPrefsRepo,
+		sentEmailsRepo:     sentEmailsRepo,
+		promoRepo:          promoRepo,
+		inviteLinkRepo:     inviteLinkRepo,
+		giftCodeRepo:       giftCodeRepo,
+		accountRequestRepo: accountRequestRepo,
+		emailSvc:           emailSvc,
+		sc:                 sc,
+		s3Client:           s3Client,
+		s3PresignClient:    s3PresignClient,
+		dsarBucket:         dsarBucket,
+		promoCouponID:      promoCouponID,
+		appURL:             appURL,
+		workosAPIKey:       workosAPIKey,
+		logger:             logger,
 	}
 }
 
@@ -609,6 +626,9 @@ var allowedTemplates = map[string]bool{
 	"digest.html":        true,
 	"promo-invite.html":  true,
 	"promo-revoked.html": true,
+	"dsar-export.html":   true,
+	"dsar-deletion.html": true,
+	"welcome.html":       true,
 }
 
 func (h *AdminHandler) SendNewEmail(w http.ResponseWriter, r *http.Request) {
@@ -1489,6 +1509,220 @@ func (h *AdminHandler) DeactivateGiftCode(w http.ResponseWriter, r *http.Request
 
 	h.logger.Info("gift code deactivated", "id", id, "code", gc.Code)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) ListAccountRequests(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	requests, err := h.accountRequestRepo.ListAll(r.Context(), status)
+	if err != nil {
+		h.logger.Error("list account requests failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if requests == nil {
+		requests = []models.AccountRequestWithUser{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(requests)
+}
+
+func (h *AdminHandler) ExecuteExport(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	if h.s3Client == nil || h.dsarBucket == "" {
+		http.Error(w, "DSAR exports not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	req, err := h.accountRequestRepo.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get account request failed", "id", id, "error", err)
+		http.Error(w, "request not found", http.StatusNotFound)
+		return
+	}
+	if req.Status != "pending" {
+		http.Error(w, "request is not pending", http.StatusConflict)
+		return
+	}
+	if req.RequestType != "data_export" {
+		http.Error(w, "request is not a data export", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), req.UserID)
+	if err != nil || user == nil {
+		h.logger.Error("get user for export failed", "user_id", req.UserID, "error", err)
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	export, err := h.userRepo.ExportUserData(r.Context(), req.UserID, user.Email)
+	if err != nil {
+		h.logger.Error("export user data failed", "user_id", req.UserID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	exportJSON, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		h.logger.Error("marshal export failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	s3Key := fmt.Sprintf("exports/%d/%s-%s.json", req.ID, user.Email, time.Now().Format("2006-01-02"))
+
+	_, err = h.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
+		Bucket:      aws.String(h.dsarBucket),
+		Key:         aws.String(s3Key),
+		Body:        bytes.NewReader(exportJSON),
+		ContentType: aws.String("application/json"),
+	})
+	if err != nil {
+		h.logger.Error("s3 upload failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	presigned, err := h.s3PresignClient.PresignGetObject(r.Context(), &s3.GetObjectInput{
+		Bucket: aws.String(h.dsarBucket),
+		Key:    aws.String(s3Key),
+	}, s3.WithPresignExpires(48*time.Hour))
+	if err != nil {
+		h.logger.Error("presign failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	adminEmail := h.resolveAdminEmail(r.Context())
+	if err := h.accountRequestRepo.Complete(r.Context(), id, adminEmail, &s3Key); err != nil {
+		h.logger.Error("complete account request failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.emailSvc != nil {
+		firstName := user.FirstName
+		if firstName == "" {
+			firstName = "there"
+		}
+		_, emailErr := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+			UserID:       &user.ID,
+			ToEmail:      user.Email,
+			EmailType:    "dsar_export",
+			TemplateName: "dsar-export.html",
+			Subject:      "Your GovTrove Data Export is Ready",
+			TemplateData: map[string]any{
+				"FirstName":   firstName,
+				"DownloadURL": presigned.URL,
+				"ExpiryHours": 48,
+			},
+		})
+		if emailErr != nil {
+			h.logger.Error("failed to send export email", "user_id", user.ID, "error", emailErr)
+		}
+	}
+
+	h.logger.Info("DSAR export executed", "request_id", id, "user_id", req.UserID, "admin", adminEmail)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"download_url": presigned.URL})
+}
+
+func (h *AdminHandler) ExecuteDeletion(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	req, err := h.accountRequestRepo.GetByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("get account request failed", "id", id, "error", err)
+		http.Error(w, "request not found", http.StatusNotFound)
+		return
+	}
+	if req.Status != "pending" {
+		http.Error(w, "request is not pending", http.StatusConflict)
+		return
+	}
+	if req.RequestType != "account_deletion" {
+		http.Error(w, "request is not an account deletion", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.userRepo.GetByID(r.Context(), req.UserID)
+	if err != nil || user == nil {
+		h.logger.Error("get user for deletion failed", "user_id", req.UserID, "error", err)
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	requestingWorkOSID := authmw.UserIDFromContext(r.Context())
+	if requestingWorkOSID == user.WorkOSID {
+		http.Error(w, "cannot delete your own account", http.StatusBadRequest)
+		return
+	}
+
+	userEmail := user.Email
+	firstName := user.FirstName
+	if firstName == "" {
+		firstName = "there"
+	}
+
+	adminEmail := h.resolveAdminEmail(r.Context())
+	if err := h.accountRequestRepo.Complete(r.Context(), id, adminEmail, nil); err != nil {
+		h.logger.Error("complete account request failed", "id", id, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.workosAPIKey != "" && user.WorkOSID != "" {
+		if err := h.deleteWorkOSUser(user.WorkOSID); err != nil {
+			h.logger.Error("workos user deletion failed", "workos_id", user.WorkOSID, "error", err)
+		}
+	}
+
+	if err := h.userRepo.DeleteUser(r.Context(), req.UserID, userEmail); err != nil {
+		h.logger.Error("delete user failed", "user_id", req.UserID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if h.emailSvc != nil {
+		_, emailErr := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+			UserID:       nil,
+			ToEmail:      userEmail,
+			EmailType:    "dsar_deletion",
+			TemplateName: "dsar-deletion.html",
+			Subject:      "Your GovTrove Account Has Been Deleted",
+			TemplateData: map[string]any{
+				"FirstName": firstName,
+			},
+		})
+		if emailErr != nil {
+			h.logger.Error("failed to send deletion email", "email", userEmail, "error", emailErr)
+		}
+	}
+
+	h.logger.Info("DSAR deletion executed", "request_id", id, "user_email", userEmail, "admin", adminEmail)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AdminHandler) resolveAdminEmail(ctx context.Context) string {
+	workosID := authmw.UserIDFromContext(ctx)
+	if workosID == "" {
+		return "unknown"
+	}
+	user, err := h.userRepo.GetByWorkOSID(ctx, workosID)
+	if err != nil || user == nil {
+		return workosID
+	}
+	return user.Email
 }
 
 func (h *AdminHandler) deleteWorkOSUser(workosID string) error {
