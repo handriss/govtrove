@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -79,7 +80,7 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 			firstName = "there"
 		}
 		go func() {
-			if _, err := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+			if _, err := h.emailSvc.SendEmail(context.Background(), email.SendEmailInput{
 				UserID:       &result.User.ID,
 				ToEmail:      req.Email,
 				EmailType:    "welcome",
