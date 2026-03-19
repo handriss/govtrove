@@ -16,7 +16,9 @@ const posthogOptions = {
   disable_toolbar: true,
   persistence: 'memory' as const,
   loaded: (ph: PostHogInterface) => {
-    if (window.location.pathname.startsWith('/admin')) {
+    if (window.location.hostname === 'localhost' ||
+        window.location.pathname.startsWith('/admin') ||
+        localStorage.getItem('ph_opt_out') === '1') {
       ph.opt_out_capturing();
       return;
     }
