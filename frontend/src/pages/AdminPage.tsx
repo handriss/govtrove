@@ -1214,7 +1214,7 @@ const UNSUB_DEFAULT = 'https://api.govtrove.com/api/unsubscribe?token=test&uid=1
 
 const TEMPLATE_FIELDS: Record<string, TemplateField[]> = {
   'welcome.html': [
-    { name: 'Greeting', label: 'Greeting', type: 'text', default: 'Hi there,' },
+    { name: 'FirstName', label: 'First Name', type: 'text', default: 'there' },
   ],
   'opportunity_update.html': [
     { name: 'ChangeType', label: 'ChangeType', type: 'select', options: ['amendment', 'field_changes'], default: 'amendment' },

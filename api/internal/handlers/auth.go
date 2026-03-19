@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
@@ -14,11 +15,12 @@ import (
 type AuthHandler struct {
 	repo           *repository.UserRepository
 	emailPrefsRepo *repository.EmailPreferencesRepository
+	emailSvc       *email.Service
 	logger         *slog.Logger
 }
 
-func NewAuthHandler(repo *repository.UserRepository, emailPrefsRepo *repository.EmailPreferencesRepository, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{repo: repo, emailPrefsRepo: emailPrefsRepo, logger: logger}
+func NewAuthHandler(repo *repository.UserRepository, emailPrefsRepo *repository.EmailPreferencesRepository, emailSvc *email.Service, logger *slog.Logger) *AuthHandler {
+	return &AuthHandler{repo: repo, emailPrefsRepo: emailPrefsRepo, emailSvc: emailSvc, logger: logger}
 }
 
 type syncRequest struct {
@@ -71,6 +73,23 @@ func (h *AuthHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		if err := h.emailPrefsRepo.CreateDefaults(r.Context(), result.User.ID); err != nil {
 			h.logger.Error("failed to create email preferences", "error", err, "user_id", result.User.ID)
 		}
+
+		firstName := req.FirstName
+		if firstName == "" {
+			firstName = "there"
+		}
+		go func() {
+			if _, err := h.emailSvc.SendEmail(r.Context(), email.SendEmailInput{
+				UserID:       &result.User.ID,
+				ToEmail:      req.Email,
+				EmailType:    "welcome",
+				TemplateName: "welcome.html",
+				Subject:      "Welcome to GovTrove",
+				TemplateData: map[string]any{"FirstName": firstName},
+			}); err != nil {
+				h.logger.Error("failed to send welcome email", "error", err, "user_id", result.User.ID)
+			}
+		}()
 	}
 
 	h.logger.Info("user synced", "workos_id", workosID, "user_id", result.User.ID, "is_new", result.IsNew)

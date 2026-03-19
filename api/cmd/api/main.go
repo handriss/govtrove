@@ -12,6 +12,7 @@ import (
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/getsentry/sentry-go"
 	"github.com/MicahParks/keyfunc/v3"
@@ -98,13 +99,20 @@ func main() {
 	logger.Info("connected to database")
 
 	var snsClient *sns.Client
-	if cfg.SNSTopicARN != "" {
-		awsCfg, awsErr := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
-		if awsErr != nil {
-			logger.Warn("failed to load AWS config, SNS disabled", "error", awsErr)
-		} else {
+	var s3Client *s3.Client
+	var s3PresignClient *s3.PresignClient
+	awsCfg, awsErr := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
+	if awsErr != nil {
+		logger.Warn("failed to load AWS config", "error", awsErr)
+	} else {
+		if cfg.SNSTopicARN != "" {
 			snsClient = sns.NewFromConfig(awsCfg)
 			logger.Info("SNS client configured", "topic_arn", cfg.SNSTopicARN)
+		}
+		if cfg.DSARBucket != "" {
+			s3Client = s3.NewFromConfig(awsCfg)
+			s3PresignClient = s3.NewPresignClient(s3Client)
+			logger.Info("S3 DSAR client configured", "bucket", cfg.DSARBucket)
 		}
 	}
 
@@ -187,10 +195,10 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
-	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, giftCodeRepo, emailSvc, stripeClient, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
+	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, giftCodeRepo, accountRequestRepo, emailSvc, stripeClient, s3Client, s3PresignClient, cfg.DSARBucket, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
 	giftHandler := handlers.NewGiftHandler(giftCodeRepo, userRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
-	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, logger)
+	authHandler := handlers.NewAuthHandler(userRepo, emailPrefsRepo, emailSvc, logger)
 	savedOppHandler := handlers.NewSavedOpportunityHandler(savedOppRepo, userRepo, logger, eventLog)
 	savedSearchHandler := handlers.NewSavedSearchHandler(savedSearchRepo, userRepo, logger, eventLog)
 	notificationHandler := handlers.NewNotificationHandler(notificationRepo, userRepo, logger)
@@ -356,6 +364,9 @@ func main() {
 				r.Get("/gift-codes/{id}", adminHandler.GetGiftCodeDetail)
 				r.Put("/gift-codes/{id}", adminHandler.UpdateGiftCode)
 				r.Delete("/gift-codes/{id}", adminHandler.DeactivateGiftCode)
+				r.Get("/account-requests", adminHandler.ListAccountRequests)
+				r.Post("/account-requests/{id}/execute-export", adminHandler.ExecuteExport)
+				r.Post("/account-requests/{id}/execute-deletion", adminHandler.ExecuteDeletion)
 				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
 				r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
 				r.Delete("/users/{userId}", adminHandler.DeleteUser)
