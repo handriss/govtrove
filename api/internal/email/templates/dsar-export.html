@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your GovTrove Data Export is Ready</title>
+</head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f9fafb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;">
+<tr>
+<td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;">
+
+<!-- Header -->
+<tr>
+<td style="padding:24px 32px 16px 32px;border-bottom:1px solid #e5e7eb;">
+<span style="font-size:22px;font-weight:700;color:#111827;letter-spacing:-0.5px;">GovTrove</span>
+</td>
+</tr>
+
+<!-- Greeting -->
+<tr>
+<td style="padding:24px 32px 8px 32px;">
+<p style="margin:0 0 12px 0;font-size:18px;font-weight:600;color:#111827;">
+Hi {{.FirstName}},
+</p>
+<p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">
+Your data export is ready for download. This file contains all the personal data we have associated with your GovTrove account.
+</p>
+</td>
+</tr>
+
+<!-- CTA Button -->
+<tr>
+<td style="padding:24px 32px 8px 32px;">
+<table role="presentation" cellpadding="0" cellspacing="0">
+<tr>
+<td style="border-radius:6px;background-color:#2563eb;">
+<a href="{{.DownloadURL}}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">Download Your Data</a>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<!-- Expiry warning -->
+<tr>
+<td style="padding:16px 32px 8px 32px;">
+<p style="margin:0;font-size:13px;color:#6b7280;">
+This download link will expire in <strong>{{.ExpiryHours}} hours</strong>. After that, you'll need to request a new export.
+</p>
+</td>
+</tr>
+
+<!-- Footer -->
+<tr>
+<td style="padding:24px 32px 24px 32px;border-top:1px solid #e5e7eb;">
+<p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">
+If you didn't request this export, please contact us at <a href="mailto:support@govtrove.com" style="color:#2563eb;text-decoration:none;">support@govtrove.com</a>.
+</p>
+<p style="margin:0;font-size:12px;">
+<a href="https://govtrove.com" target="_blank" style="color:#6b7280;text-decoration:none;">govtrove.com</a>
+</p>
+</td>
+</tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

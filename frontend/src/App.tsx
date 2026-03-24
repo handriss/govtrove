@@ -20,6 +20,7 @@ const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
 const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
 const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
 const AdminObservabilityPage = lazy(() => import('./pages/AdminObservabilityPage'));
+const AdminDSARPage = lazy(() => import('./pages/AdminDSARPage'));
 const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
 const RedeemPage = lazy(() => import('./pages/RedeemPage'));
 const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
@@ -128,6 +129,7 @@ function AppRoutes() {
           <Route path="/admin/reconcile-dq" element={<AdminReconcileDQPage />} />
           <Route path="/admin/campaigns" element={<AdminCampaignsPage />} />
           <Route path="/admin/observability" element={<AdminObservabilityPage />} />
+          <Route path="/admin/dsar" element={<AdminDSARPage />} />
           <Route path="/snap/csv/:id" element={<SnapDetailPage source="csv" />} />
           <Route path="/snap/archived-csv/:id" element={<SnapDetailPage source="archived-csv" />} />
           <Route path="/snap/api/:id" element={<SnapDetailPage source="api" />} />

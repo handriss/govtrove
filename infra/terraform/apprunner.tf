@@ -171,6 +171,7 @@ resource "aws_apprunner_service" "api" {
           SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
           POSTHOG_HOST            = var.posthog_host
           MCP_INTERNAL_URL        = "https://${aws_apprunner_service.mcp.service_url}"
+          DSAR_S3_BUCKET          = aws_s3_bucket.dsar_exports.bucket
         }
       }
     }
