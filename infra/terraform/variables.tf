@@ -197,3 +197,43 @@ variable "posthog_host" {
   type        = string
   default     = "https://us.i.posthog.com"
 }
+
+# Grafana Cloud
+variable "grafana_cloud_access_token" {
+  description = "Grafana Cloud access policy token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "grafana_sa_token" {
+  description = "Grafana Cloud service account token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "grafana_stack_slug" {
+  description = "Grafana Cloud stack slug (e.g. govtrove)"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_neon_host" {
+  description = "Neon PostgreSQL host for Grafana datasource"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_neon_user" {
+  description = "Neon PostgreSQL user for Grafana (read-only)"
+  type        = string
+  default     = "grafana_readonly"
+}
+
+variable "grafana_neon_password" {
+  description = "Neon PostgreSQL password for Grafana read-only user"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
