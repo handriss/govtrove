@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ExternalLink,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { getOpportunity, getSolicitationHistory } from '../services/api';
 import { formatDescription } from '../utils/formatDescription';
+import { highlightKeywords } from '../components/search/OpportunityCard';
 import SolicitationTimeline from '../components/SolicitationTimeline';
 import SignupPromptModal from '../components/SignupPromptModal';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
@@ -200,6 +201,8 @@ function ContactCard({
 
 export default function OpportunityDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const keyword = searchParams.get('q') || undefined;
   const { isAuthenticated } = useAppAuth();
   const posthog = usePostHog();
   const { isSaved, toggleSave } = useSavedOpportunities();
@@ -330,7 +333,7 @@ export default function OpportunityDetail() {
           </div>
 
           {/* Title */}
-          <h1 className="text-2xl font-semibold text-dark-50 leading-relaxed mb-3">{opportunity.title}</h1>
+          <h1 className="text-2xl font-semibold text-dark-50 leading-relaxed mb-3">{highlightKeywords(opportunity.title, keyword)}</h1>
 
           {/* Solicitation Number */}
           <p className="font-mono text-sm text-dark-400 tracking-tight mb-6">
@@ -442,7 +445,10 @@ export default function OpportunityDetail() {
                 </button>
               </div>
               <div className="text-sm text-dark-300 leading-relaxed whitespace-pre-wrap">
-                {formatted ? formatDescription(opportunity.description) : opportunity.description}
+                {highlightKeywords(
+                  formatted ? formatDescription(opportunity.description) : opportunity.description,
+                  keyword,
+                )}
               </div>
             </Section>
           )}
