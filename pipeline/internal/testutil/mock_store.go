@@ -53,6 +53,15 @@ type MockStore struct {
 	RefreshCodeCorrelationsFn  func(ctx context.Context) error
 
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
+
+	GetNAICSVolumeDeltaFn  func(ctx context.Context) ([]database.NAICSVolume, error)
+	GetAgencyVolumeDeltaFn func(ctx context.Context) ([]database.AgencyVolume, error)
+	GetRecentTitlesFn      func(ctx context.Context) ([]database.TitleRow, error)
+	GetSetAsideCountsFn    func(ctx context.Context) ([]database.SetAsideCount, error)
+
+	GetSEOPageCountsFn         func(ctx context.Context, recentSince time.Time) ([]database.SEOPageCount, error)
+	GetSEOPageOpportunitiesFn  func(ctx context.Context, filterCol, filterVal string, limit int) ([]database.SEOOpportunity, error)
+	GetActiveAgenciesFn        func(ctx context.Context) ([]database.AgencyInfo, error)
 }
 
 var _ database.Store = (*MockStore)(nil)
@@ -294,4 +303,53 @@ func (m *MockStore) DeleteOldSearchEvents(ctx context.Context, days int) (int64,
 		return m.DeleteOldSearchEventsFn(ctx, days)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) GetNAICSVolumeDelta(ctx context.Context) ([]database.NAICSVolume, error) {
+	if m.GetNAICSVolumeDeltaFn != nil {
+		return m.GetNAICSVolumeDeltaFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetAgencyVolumeDelta(ctx context.Context) ([]database.AgencyVolume, error) {
+	if m.GetAgencyVolumeDeltaFn != nil {
+		return m.GetAgencyVolumeDeltaFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetRecentTitles(ctx context.Context) ([]database.TitleRow, error) {
+	if m.GetRecentTitlesFn != nil {
+		return m.GetRecentTitlesFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetSetAsideCounts(ctx context.Context) ([]database.SetAsideCount, error) {
+	if m.GetSetAsideCountsFn != nil {
+		return m.GetSetAsideCountsFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetSEOPageCounts(ctx context.Context, recentSince time.Time) ([]database.SEOPageCount, error) {
+	if m.GetSEOPageCountsFn != nil {
+		return m.GetSEOPageCountsFn(ctx, recentSince)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetSEOPageOpportunities(ctx context.Context, filterCol, filterVal string, limit int) ([]database.SEOOpportunity, error) {
+	if m.GetSEOPageOpportunitiesFn != nil {
+		return m.GetSEOPageOpportunitiesFn(ctx, filterCol, filterVal, limit)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetActiveAgencies(ctx context.Context) ([]database.AgencyInfo, error) {
+	if m.GetActiveAgenciesFn != nil {
+		return m.GetActiveAgenciesFn(ctx)
+	}
+	return nil, nil
 }

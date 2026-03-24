@@ -63,6 +63,17 @@ type Store interface {
 
 	// Analytics retention
 	DeleteOldSearchEvents(ctx context.Context, days int) (int64, error)
+
+	// SEO trend analysis
+	GetNAICSVolumeDelta(ctx context.Context) ([]NAICSVolume, error)
+	GetAgencyVolumeDelta(ctx context.Context) ([]AgencyVolume, error)
+	GetRecentTitles(ctx context.Context) ([]TitleRow, error)
+	GetSetAsideCounts(ctx context.Context) ([]SetAsideCount, error)
+
+	// SEO page generation
+	GetSEOPageCounts(ctx context.Context, recentSince time.Time) ([]SEOPageCount, error)
+	GetSEOPageOpportunities(ctx context.Context, filterCol, filterVal string, limit int) ([]SEOOpportunity, error)
+	GetActiveAgencies(ctx context.Context) ([]AgencyInfo, error)
 }
 
 // Verify *DB satisfies Store at compile time.
