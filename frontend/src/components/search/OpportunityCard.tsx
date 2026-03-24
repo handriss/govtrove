@@ -167,7 +167,7 @@ export default memo(function OpportunityCard({
         transition-all duration-200"
     >
       <Link
-        to={`/opportunity/${opp.id}`}
+        to={`/opportunity/${opp.id}${keyword?.trim() ? `?q=${encodeURIComponent(keyword.trim())}` : ''}`}
         className="block px-4 py-3.5"
       >
         {/* PRIMARY: Title row */}
