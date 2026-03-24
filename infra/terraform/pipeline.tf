@@ -3,7 +3,7 @@
 # =============================================================================
 
 locals {
-  lambda_functions = ["download-csvs", "ingest-active", "reconcile", "generate-alerts", "ingest-api"]
+  lambda_functions = ["download-csvs", "ingest-active", "reconcile", "generate-alerts", "ingest-api", "seo-trends", "seo-pages"]
 
   lambda_ephemeral_storage = {
     "download-csvs" = 2048
@@ -12,6 +12,7 @@ locals {
   lambda_memory_overrides = {
     "ingest-active" = 512
     "reconcile"     = 3008
+    "seo-pages"     = 1024
   }
 }
 
@@ -50,6 +51,8 @@ resource "aws_lambda_function" "pipeline" {
       UNSUBSCRIBE_SECRET_ARN   = aws_secretsmanager_secret.resend_webhook_secret.arn
       EMAIL_FROM               = "GovTrove <notifications@govtrove.com>"
       APP_BASE_URL             = "https://app.govtrove.com"
+      LANDING_S3_BUCKET        = var.domain_name != "" ? aws_s3_bucket.landing[0].id : ""
+      LANDING_DISTRIBUTION_ID  = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].id : ""
     }
   }
 
@@ -133,6 +136,46 @@ resource "aws_iam_role_policy" "lambda_pipeline_download_csvs" {
   })
 }
 
+resource "aws_iam_role_policy" "lambda_pipeline_seo_trends" {
+  name = "${var.project_name}-lambda-seo-trends"
+  role = aws_iam_role.lambda_pipeline.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3WriteSEO"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = ["${aws_s3_bucket.data.arn}/seo/*"]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_pipeline_seo_pages" {
+  name = "${var.project_name}-lambda-seo-pages"
+  role = aws_iam_role.lambda_pipeline.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "S3WriteLanding"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = ["${aws_s3_bucket.landing[0].arn}/contracts/*", "${aws_s3_bucket.landing[0].arn}/sitemap.xml"]
+      },
+      {
+        Sid      = "CloudFrontInvalidation"
+        Effect   = "Allow"
+        Action   = ["cloudfront:CreateInvalidation"]
+        Resource = [aws_cloudfront_distribution.landing[0].arn]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_role_policy" "lambda_pipeline_ingest" {
   name = "${var.project_name}-lambda-ingest"
   role = aws_iam_role.lambda_pipeline.id
@@ -173,6 +216,8 @@ resource "aws_sfn_state_machine" "pipeline" {
     reconcile_arn          = aws_lambda_function.pipeline["reconcile"].arn
     generate_alerts_arn    = aws_lambda_function.pipeline["generate-alerts"].arn
     ingest_api_arn         = aws_lambda_function.pipeline["ingest-api"].arn
+    seo_trends_arn         = aws_lambda_function.pipeline["seo-trends"].arn
+    seo_pages_arn          = aws_lambda_function.pipeline["seo-pages"].arn
     sns_notifications_arn  = aws_sns_topic.notifications.arn
     sqs_dlq_url            = aws_sqs_queue.pipeline_dlq.url
   })

@@ -313,7 +313,15 @@ frontend-build:
 # Build
 # ============================================================================
 
-LAMBDA_FUNCTIONS := download-csvs ingest-active reconcile generate-alerts ingest-api
+LAMBDA_FUNCTIONS := download-csvs ingest-active reconcile generate-alerts ingest-api seo-trends seo-pages
+
+seo-pages:
+	@if [ -z "$(NEON_DATABASE_URL)" ]; then \
+		echo "Error: NEON_DATABASE_URL environment variable is not set"; \
+		exit 1; \
+	fi
+	cd pipeline && NEON_DATABASE_URL="$(NEON_DATABASE_URL)" go run ./cmd/seo-pages/ -out ../landing/contracts
+	@echo "SEO pages generated in landing/contracts/"
 
 test:
 	cd pipeline && go test -v ./...
@@ -420,7 +428,7 @@ deploy-landing: minify-landing
 	@echo "Deploying landing page to S3/CloudFront..."
 	@BUCKET=$$(cd infra/terraform && terraform output -raw landing_bucket_name) && \
 	DIST_ID=$$(cd infra/terraform && terraform output -raw landing_distribution_id) && \
-	aws s3 sync landing-dist s3://$$BUCKET --delete --profile $(AWS_PROFILE) && \
+	aws s3 sync landing-dist s3://$$BUCKET --delete --exclude "contracts/*" --exclude "sitemap.xml" --profile $(AWS_PROFILE) && \
 	echo "Invalidating CloudFront cache..." && \
 	aws cloudfront create-invalidation --distribution-id $$DIST_ID --paths "/*" --profile $(AWS_PROFILE) && \
 	rm -rf landing-dist && \

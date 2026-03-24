@@ -161,6 +161,7 @@
         "search_alerts.$": "$.Payload.search_alerts",
         "opportunity_alerts.$": "$.Payload.opportunity_alerts"
       },
+      "ResultPath": "$.alerts_result",
       "Retry": [
         {
           "ErrorEquals": ["States.ALL"],
@@ -176,7 +177,81 @@
           "Next": "MarkFailedAlerts"
         }
       ],
+      "Next": "AnalyzeTrends"
+    },
+
+    "AnalyzeTrends": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${seo_trends_arn}",
+        "Payload": {
+          "execution_id.$": "$.execution_id"
+        }
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 1,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedTrends"
+        }
+      ],
+      "Next": "GeneratePages"
+    },
+
+    "GeneratePages": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${seo_pages_arn}",
+        "Payload": {
+          "execution_id.$": "$.execution_id"
+        }
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "MaxAttempts": 1,
+          "IntervalSeconds": 30,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "MarkFailedPages"
+        }
+      ],
       "Next": "NotifySuccess"
+    },
+
+    "MarkFailedPages": {
+      "Type": "Pass",
+      "Result": "GeneratePages",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
+    },
+
+    "MarkFailedTrends": {
+      "Type": "Pass",
+      "Result": "AnalyzeTrends",
+      "ResultPath": "$.failed_step",
+      "Next": "SendToDLQ"
     },
 
     "NotifySuccess": {

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federal Contract Opportunities by Set-Aside and NAICS Code | GovTrove</title>
+    <meta name="description" content="Browse federal contract opportunities by set-aside type (SDVOSB, 8(a), HUBZone, WOSB) and NAICS code. Updated daily from SAM.gov.">
+    <link rel="canonical" href="https://govtrove.com/contracts/">
+
+    
+    <meta property="og:title" content="Federal Contract Opportunities by Set-Aside and NAICS Code | GovTrove">
+    <meta property="og:description" content="Browse federal contract opportunities by set-aside type (SDVOSB, 8(a), HUBZone, WOSB) and NAICS code. Updated daily from SAM.gov.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://govtrove.com/contracts/">
+    <meta property="og:image" content="https://govtrove.com/og-image.png">
+    <meta property="og:site_name" content="GovTrove">
+
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Federal Contract Opportunities by Set-Aside and NAICS Code | GovTrove">
+    <meta name="twitter:description" content="Browse federal contract opportunities by set-aside type (SDVOSB, 8(a), HUBZone, WOSB) and NAICS code. Updated daily from SAM.gov.">
+    <meta name="twitter:image" content="https://govtrove.com/og-image.png">
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <script>document.documentElement.setAttribute('data-theme','dark')</script>
+    <link rel="preload" href="/theme.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/theme.css"></noscript>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"></noscript>
+
+    <style>
+    .seo-page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .seo-page h1 { font-size: 2rem; margin-bottom: 0.5rem; color: var(--text-primary); }
+    .seo-page .subtitle { color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem; }
+    .seo-page .stats { display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .seo-page .stat { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 8px; padding: 1rem 1.5rem; }
+    .seo-page .stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+    .seo-page .stat-label { font-size: 0.85rem; color: var(--text-secondary); }
+    .opp-list { list-style: none; padding: 0; }
+    .opp-item { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 8px; padding: 1.25rem; margin-bottom: 0.75rem; }
+    .opp-item:hover { border-color: var(--accent); }
+    .opp-title { font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem; }
+    .opp-title a { color: var(--text-primary); text-decoration: none; }
+    .opp-title a:hover { color: var(--accent); }
+    .opp-meta { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-secondary); }
+    .opp-meta span { white-space: nowrap; }
+    .cta-box { background: var(--accent-subtle); border: 1px solid var(--accent); border-radius: 12px; padding: 2rem; text-align: center; margin: 2rem 0; }
+    .cta-box h2 { color: var(--text-primary); margin-bottom: 0.5rem; }
+    .cta-box p { color: var(--text-secondary); margin-bottom: 1rem; }
+    .cta-btn { display: inline-block; background: var(--accent); color: white; padding: 0.75rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
+    .cta-btn:hover { background: var(--accent-hover); }
+    .breadcrumb { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+    .breadcrumb a { color: var(--text-secondary); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent); }
+    .source-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 2rem; text-align: center; }
+    .source-note a { color: var(--text-secondary); }
+    .explainer { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 8px; padding: 1.25rem; margin-bottom: 2rem; color: var(--text-secondary); line-height: 1.6; }
+    .index-section { margin-bottom: 2.5rem; }
+    .index-section h2 { color: var(--text-primary); margin-bottom: 1rem; }
+    .index-list { list-style: none; padding: 0; }
+    .index-list li { border-bottom: 1px solid var(--border-subtle); }
+    .index-list li:last-child { border-bottom: none; }
+    .index-list a { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.5rem; text-decoration: none; color: var(--text-primary); }
+    .index-list a:hover { color: var(--accent); }
+    .index-count { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 20px; padding: 0.2rem 0.75rem; font-size: 0.8rem; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <nav style="background: var(--nav-bg); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-subtle); padding: 1rem 1.5rem; position: sticky; top: 0; z-index: 100;">
+        <div style="max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between;">
+            <a href="/" style="text-decoration: none; font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">GovTrove</a>
+            <a href="https://app.govtrove.com" class="cta-btn" style="padding: 0.5rem 1.25rem; font-size: 0.9rem;">Search Contracts &rarr;</a>
+        </div>
+    </nav>
+
+    <main class="seo-page">
+        <div class="breadcrumb">
+            <a href="/">Home</a> / Federal Contracts
+        </div>
+
+        <h1>Federal Contract Opportunities</h1>
+        <p class="subtitle">Browse active federal contract opportunities by set-aside type and NAICS code. Updated daily from SAM.gov.</p>
+        <div class="index-section">
+            <h2>By Set-Aside Type</h2>
+            <ul class="index-list">
+                <li><a href="/contracts/set-aside/sba"><span>Total Small Business Set-Aside</span><span class="index-count">17,715 active</span></a></li>
+                <li><a href="/contracts/set-aside/sdvosb"><span>Service-Disabled Veteran-Owned Small Business (SDVOSB)</span><span class="index-count">2,712 active</span></a></li>
+                <li><a href="/contracts/set-aside/8a"><span>8(a) Business Development Program</span><span class="index-count">508 active</span></a></li>
+                <li><a href="/contracts/set-aside/hubzone"><span>HUBZone Set-Aside</span><span class="index-count">568 active</span></a></li>
+                <li><a href="/contracts/set-aside/wosb"><span>Women-Owned Small Business (WOSB)</span><span class="index-count">362 active</span></a></li>
+            </ul>
+        </div>
+
+        <div class="index-section">
+            <h2>By NAICS Code (Top 20 This Week)</h2>
+            <ul class="index-list">
+                <li><a href="/contracts/naics/336413"><span>NAICS 336413 – Other Aircraft Parts and Auxiliary Equipment Manufacturing</span><span class="index-count">3,038 active</span></a></li>
+                <li><a href="/contracts/naics/236220"><span>NAICS 236220 – Commercial and Institutional Building Construction</span><span class="index-count">3,351 active</span></a></li>
+                <li><a href="/contracts/naics/332510"><span>NAICS 332510 – Hardware Manufacturing</span><span class="index-count">845 active</span></a></li>
+                <li><a href="/contracts/naics/332722"><span>NAICS 332722 – Bolt, Nut, Screw, Rivet, and Washer Manufacturing</span><span class="index-count">945 active</span></a></li>
+                <li><a href="/contracts/naics/238220"><span>NAICS 238220 – Plumbing, Heating, and Air-Conditioning Contractors</span><span class="index-count">735 active</span></a></li>
+                <li><a href="/contracts/naics/333613"><span>NAICS 333613 – Mechanical Power Transmission Equipment Manufacturing</span><span class="index-count">492 active</span></a></li>
+                <li><a href="/contracts/naics/334419"><span>NAICS 334419 – Other Electronic Component Manufacturing</span><span class="index-count">685 active</span></a></li>
+                <li><a href="/contracts/naics/332911"><span>NAICS 332911 – Industrial Valve Manufacturing</span><span class="index-count">676 active</span></a></li>
+                <li><a href="/contracts/naics/339991"><span>NAICS 339991 – Gasket, Packing, and Sealing Device Manufacturing</span><span class="index-count">525 active</span></a></li>
+                <li><a href="/contracts/naics/811210"><span>NAICS 811210 – Electronic and Precision Equipment Repair and Maintenance</span><span class="index-count">511 active</span></a></li>
+                <li><a href="/contracts/naics/237990"><span>NAICS 237990 – Other Heavy and Civil Engineering Construction</span><span class="index-count">1,541 active</span></a></li>
+                <li><a href="/contracts/naics/336611"><span>NAICS 336611 – Ship Building and Repairing</span><span class="index-count">891 active</span></a></li>
+                <li><a href="/contracts/naics/334511"><span>NAICS 334511 – Search, Detection, Navigation, Guidance, Aeronautical, and Nautical System and Instrument Manufacturing</span><span class="index-count">650 active</span></a></li>
+                <li><a href="/contracts/naics/811310"><span>NAICS 811310 – Commercial and Industrial Machinery and Equipment (except Automotive and Electronic) Repair and Maintenance</span><span class="index-count">428 active</span></a></li>
+                <li><a href="/contracts/naics/334412"><span>NAICS 334412 – Bare Printed Circuit Board Manufacturing</span><span class="index-count">421 active</span></a></li>
+                <li><a href="/contracts/naics/332919"><span>NAICS 332919 – Other Metal Valve and Pipe Fitting Manufacturing</span><span class="index-count">599 active</span></a></li>
+                <li><a href="/contracts/naics/541330"><span>NAICS 541330 – Engineering Services</span><span class="index-count">1,259 active</span></a></li>
+                <li><a href="/contracts/naics/531120"><span>NAICS 531120 – Lessors of Nonresidential Buildings (except Miniwarehouses)</span><span class="index-count">280 active</span></a></li>
+                <li><a href="/contracts/naics/333998"><span>NAICS 333998 – All Other Miscellaneous General Purpose Machinery Manufacturing</span><span class="index-count">441 active</span></a></li>
+                <li><a href="/contracts/naics/561730"><span>NAICS 561730 – Landscaping Services</span><span class="index-count">730 active</span></a></li>
+            </ul>
+        </div>
+
+        <div class="cta-box">
+            <h2>Search All Federal Contracts</h2>
+            <p>Filter by keyword, NAICS, set-aside, agency, and more. Free to use.</p>
+            <a href="https://app.govtrove.com" class="cta-btn">Search on GovTrove &rarr;</a>
+        </div>
+
+        <p class="source-note">
+            Data sourced from <a href="https://sam.gov/content/opportunities" target="_blank" rel="noopener">SAM.gov</a>.
+            Updated daily. Last updated: March 19, 2026.
+        </p>
+    </main>
+
+    <script src="/posthog.js" defer></script>
+    <script src="/utm.js" defer></script>
+</body>
+</html>
