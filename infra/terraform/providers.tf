@@ -10,3 +10,9 @@ provider "aws" {
     }
   }
 }
+
+provider "grafana" {
+  cloud_access_policy_token = var.grafana_cloud_access_token
+  url                       = "https://${var.grafana_stack_slug}.grafana.net"
+  auth                      = var.grafana_sa_token
+}

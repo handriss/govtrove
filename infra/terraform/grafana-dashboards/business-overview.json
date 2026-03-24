@@ -1,0 +1,59 @@
+{
+  "title": "GovTrove Business Overview",
+  "uid": "govtrove-business",
+  "timezone": "utc",
+  "editable": true,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Search Volume",
+      "description": "Number of searches per 30-minute bucket",
+      "type": "barchart",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "postgres",
+        "uid": "${datasource_uid}"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT\n  $__timeGroup(created_at, '30m') AS time,\n  COUNT(*) AS searches\nFROM search_events\nWHERE event_type = 'search'\n  AND $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "axisCenteredZero": false,
+            "barAlignment": 0
+          },
+          "unit": "short",
+          "displayName": "Searches"
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}
