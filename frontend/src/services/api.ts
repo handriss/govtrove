@@ -1386,3 +1386,52 @@ export async function redeemGiftCode(token: string, code: string): Promise<{ gra
   }
   return response.json();
 }
+
+// DSAR / Account Requests
+export interface AccountRequest {
+  id: number;
+  user_id: number;
+  request_type: 'data_export' | 'account_deletion';
+  status: string;
+  created_at: string;
+  completed_at: string | null;
+  completed_by: string | null;
+  export_s3_key: string | null;
+  user_email: string;
+  user_name: string;
+}
+
+export async function getAdminAccountRequests(token: string, status?: string): Promise<AccountRequest[]> {
+  const params = status ? `?status=${status}` : '';
+  const response = await fetch(`${API_BASE}/admin/account-requests${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  checkAuth(response);
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
+export async function adminExecuteExport(token: string, requestId: number): Promise<{ download_url: string }> {
+  const response = await fetch(`${API_BASE}/admin/account-requests/${requestId}/execute-export`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  checkAuth(response);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+  return response.json();
+}
+
+export async function adminExecuteDeletion(token: string, requestId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/admin/account-requests/${requestId}/execute-deletion`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  checkAuth(response);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `${response.status}`);
+  }
+}

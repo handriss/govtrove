@@ -27,6 +27,7 @@ type Config struct {
 	PosthogKey           string `envconfig:"POSTHOG_KEY"`
 	PosthogHost          string `envconfig:"POSTHOG_HOST" default:"https://us.i.posthog.com"`
 	MCPInternalURL       string `envconfig:"MCP_INTERNAL_URL" default:"https://mcp.govtrove.com"`
+	DSARBucket           string `envconfig:"DSAR_S3_BUCKET"`
 }
 
 func Load() (*Config, error) {

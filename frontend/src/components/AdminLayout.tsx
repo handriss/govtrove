@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2, Gift } from 'lucide-react';
+import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2, Gift, Shield } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getAdminUsers, type AdminUser } from '../services/api';
 
@@ -40,6 +40,7 @@ const navGroups: NavGroup[] = [
       { label: 'Notifications', icon: Bell, path: '/admin', tab: 'notifications' },
       { label: 'Searches', icon: Search, path: '/admin', tab: 'searches' },
       { label: 'MCP Usage', icon: Plug, path: '/admin', tab: 'mcp-usage' },
+      { label: 'DSAR', icon: Shield, path: '/admin/dsar' },
     ],
   },
   {
