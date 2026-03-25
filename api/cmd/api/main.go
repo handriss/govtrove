@@ -385,6 +385,8 @@ func main() {
 				r.Put("/saved/searches/{id}", savedSearchHandler.Update)
 				r.Delete("/saved/searches/{id}", savedSearchHandler.Delete)
 				r.Post("/saved/searches/{id}/run", savedSearchHandler.Run)
+				r.Get("/saved/searches/{id}/history/timeline", savedSearchHandler.HistoryTimeline)
+				r.Get("/saved/searches/{id}/history/day", savedSearchHandler.HistoryDay)
 
 				r.Get("/notifications", notificationHandler.List)
 				r.Get("/notifications/count", notificationHandler.Count)

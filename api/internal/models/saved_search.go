@@ -29,3 +29,15 @@ type UpdateSavedSearchInput struct {
 	Filters      *json.RawMessage `json:"filters,omitempty"`
 	AlertEnabled *bool            `json:"alert_enabled,omitempty"`
 }
+
+type DayCount struct {
+	Date  string `json:"date"`
+	Count int    `json:"count"`
+}
+
+type HistoryTimelineResponse struct {
+	Search          SavedSearch `json:"search"`
+	Days            []DayCount  `json:"days"`
+	TotalNew        int         `json:"total_new"`
+	DaysWithMatches int         `json:"days_with_matches"`
+}

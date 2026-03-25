@@ -354,6 +354,47 @@ export async function runSavedSearch(
   return response.json();
 }
 
+// --- Search History ---
+
+export interface DayCount {
+  date: string;
+  count: number;
+}
+
+export interface HistoryTimelineResponse {
+  search: SavedSearch;
+  days: DayCount[];
+  total_new: number;
+  days_with_matches: number;
+}
+
+export async function getSearchHistoryTimeline(
+  token: string,
+  searchId: number,
+  days = 7,
+): Promise<HistoryTimelineResponse> {
+  const response = await fetch(`${API_BASE}/saved/searches/${searchId}/history/timeline?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch search history: ${response.statusText}`); }
+  return response.json();
+}
+
+export async function getSearchHistoryDay(
+  token: string,
+  searchId: number,
+  date: string,
+  page = 1,
+  limit = 25,
+): Promise<SearchResult> {
+  const params = new URLSearchParams({ date, page: String(page), limit: String(limit) });
+  const response = await fetch(`${API_BASE}/saved/searches/${searchId}/history/day?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) { checkAuth(response); throw new Error(`Failed to fetch search history day: ${response.statusText}`); }
+  return response.json();
+}
+
 // --- Notifications ---
 
 export async function getNotifications(

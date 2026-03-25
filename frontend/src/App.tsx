@@ -23,6 +23,7 @@ const AdminObservabilityPage = lazy(() => import('./pages/AdminObservabilityPage
 const AdminDSARPage = lazy(() => import('./pages/AdminDSARPage'));
 const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
 const RedeemPage = lazy(() => import('./pages/RedeemPage'));
+const SearchHistoryPage = lazy(() => import('./pages/SearchHistoryPage'));
 const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
 const SearchGuideInteractivePage = lazy(() => import('./pages/SearchGuideInteractivePage'));
 const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
@@ -117,6 +118,7 @@ function AppRoutes() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/saved" element={<SavedPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/search/:searchId/history" element={<SearchHistoryPage />} />
             <Route path="/guide" element={<SearchGuidePage />} />
             <Route path="/guide/interactive" element={<SearchGuideInteractivePage />} />
             <Route path="/glossary" element={<GlossaryPage />} />
