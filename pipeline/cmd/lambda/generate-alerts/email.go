@@ -56,6 +56,7 @@ type searchAlertData struct {
 	TotalResultCount int
 	SearchName       string
 	SearchURL        string
+	HistoryURL       string
 	TopOpportunities []oppLink
 	HasMore          bool
 	RemainingCount   int
@@ -161,10 +162,16 @@ func (e *EmailSender) buildSearchAlert(ctx context.Context, n notificationRow) (
 		matchCount = len(details.Matches)
 	}
 
+	historyURL := ""
+	if details.SearchID > 0 {
+		historyURL = fmt.Sprintf("%s/search/%d/history", e.baseURL, details.SearchID)
+	}
+
 	sa := searchAlertData{
 		MatchCount: matchCount,
 		SearchName: details.SearchName,
 		SearchURL:  searchURL,
+		HistoryURL: historyURL,
 	}
 
 	if details.SearchID > 0 && e.pool != nil {

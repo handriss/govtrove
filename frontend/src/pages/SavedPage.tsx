@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, Search, X, Loader2, Bell, BellOff, StickyNote, ArrowUpDown } from 'lucide-react';
+import { Star, Search, X, Loader2, Bell, BellOff, StickyNote, ArrowUpDown, Clock } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
 import { useSavedSearches } from '../hooks/useSavedSearches';
@@ -216,6 +216,14 @@ export default function SavedPage() {
                       </div>
                       <p className="text-xs text-dark-500 truncate mt-0.5">{filterSummary(search.filters)}</p>
                     </div>
+                    <Link
+                      to={`/search/${search.id}/history`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-dark-500 hover:text-dark-300 transition-colors p-1"
+                      title="View match history"
+                    >
+                      <Clock size={14} />
+                    </Link>
                     <button
                       onClick={(e) => { e.stopPropagation(); if (isPro) toggleAlert(search.id, !search.alert_enabled); }}
                       className={`transition-colors p-1 ${isPro ? 'text-dark-500 hover:text-dark-300' : 'text-dark-700 cursor-not-allowed'}`}

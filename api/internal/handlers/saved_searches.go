@@ -191,6 +191,83 @@ func (h *SavedSearchHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *SavedSearchHandler) HistoryTimeline(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	days := 7
+	if d, err := strconv.Atoi(r.URL.Query().Get("days")); err == nil && d > 0 {
+		days = d
+	}
+	if days > 30 {
+		days = 30
+	}
+
+	result, err := h.repo.HistoryTimeline(r.Context(), id, userID, days)
+	if err != nil {
+		h.logger.Error("failed to get history timeline", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if result == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *SavedSearchHandler) HistoryDay(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.resolveUserID(w, r)
+	if !ok {
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil || id <= 0 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	date := r.URL.Query().Get("date")
+	if date == "" || len(date) != 10 {
+		http.Error(w, "date parameter required (YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+
+	page := 1
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 0 {
+		page = p
+	}
+	limit := 25
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 && l <= 100 {
+		limit = l
+	}
+
+	search, result, err := h.repo.HistoryDay(r.Context(), id, userID, date, page, limit)
+	if err != nil {
+		h.logger.Error("failed to get history day", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if search == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
 func (h *SavedSearchHandler) Run(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.resolveUserID(w, r)
 	if !ok {
