@@ -28,7 +28,7 @@ export default function SimpleSearchPage() {
   const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch(authOptions);
   const posthog = usePostHog();
   const saved = useSavedOpportunities();
-  const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
+  const { savedSearches, loading: savedSearchesLoading, saveCurrentSearch, deleteSearch } = useSavedSearches();
   const [hasSearched, setHasSearched] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -300,7 +300,13 @@ export default function SimpleSearchPage() {
                 </button>
               </div>
 
-              {isAuthenticated && savedSearches.length > 0 ? (
+              {isAuthenticated && savedSearchesLoading ? (
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-8 rounded-full bg-dark-800/40 border border-dark-700/20 animate-pulse" style={{ width: `${80 + i * 20}px` }} />
+                  ))}
+                </div>
+              ) : isAuthenticated && savedSearches.length > 0 ? (
                 <div className="flex flex-wrap items-center justify-center gap-2">
                   {savedSearches.slice(0, 6).map((ss) => (
                     <button
@@ -321,9 +327,9 @@ export default function SimpleSearchPage() {
                     </button>
                   ))}
                 </div>
-              ) : (
+              ) : !isAuthenticated ? (
                 <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
-              )}
+              ) : null}
             </div>
           </>
         )}
