@@ -306,7 +306,7 @@ export default function SimpleSearchPage() {
                     <button
                       key={ss.id}
                       type="button"
-                      onClick={() => handleSavedSearchClick(ss.filters)}
+                      onClick={() => { handleSavedSearchClick(ss.filters); setTimeout(triggerSearch, 0); }}
                       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm
                         border border-dark-600/30 bg-dark-800/40 text-dark-300
                         hover:border-accent/30 hover:bg-accent/10 hover:text-accent transition-all duration-150"
