@@ -300,7 +300,30 @@ export default function SimpleSearchPage() {
                 </button>
               </div>
 
-              <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
+              {isAuthenticated && savedSearches.length > 0 ? (
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {savedSearches.slice(0, 6).map((ss) => (
+                    <button
+                      key={ss.id}
+                      type="button"
+                      onClick={() => handleSavedSearchClick(ss.filters)}
+                      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm
+                        border border-dark-600/30 bg-dark-800/40 text-dark-300
+                        hover:border-accent/30 hover:bg-accent/10 hover:text-accent transition-all duration-150"
+                    >
+                      <Bookmark size={12} strokeWidth={1.5} />
+                      {ss.name}
+                      {ss.last_match_count > 0 && (
+                        <span className="text-[10px] font-medium text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
+                          +{ss.last_match_count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <QuickFilterChips filters={fs.filters} setFilter={fs.setFilter} onSearch={triggerSearch} />
+              )}
             </div>
           </>
         )}
