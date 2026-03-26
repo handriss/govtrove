@@ -4,11 +4,11 @@ resource "grafana_data_source" "neon" {
   type = "postgres"
   name = "Neon PostgreSQL"
 
+  url             = "${var.grafana_neon_host}:5432"
+  username        = var.grafana_neon_user
+
   json_data_encoded = jsonencode({
-    host            = var.grafana_neon_host
-    port            = 5432
     database        = "neondb"
-    user            = var.grafana_neon_user
     sslmode         = "require"
     timescaledb     = false
     postgresVersion = 1500
