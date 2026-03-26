@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type RefObject } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -191,12 +191,188 @@ function EmptyDayCard() {
 
 function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl px-4 py-3">
-      <div className="flex items-center gap-2 text-dark-500 text-xs mb-1">
-        <Icon size={13} strokeWidth={1.5} />
+    <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3">
+      <div className="flex items-center gap-1.5 sm:gap-2 text-dark-500 text-[10px] sm:text-xs mb-0.5 sm:mb-1">
+        <Icon size={12} strokeWidth={1.5} className="shrink-0 hidden sm:block" />
         {label}
       </div>
-      <p className="text-lg font-semibold text-dark-100">{value}</p>
+      <p className="text-base sm:text-lg font-semibold text-dark-100">{value}</p>
+    </div>
+  );
+}
+
+// --- Mobile date strip ---
+
+function MobileDateStrip({ days, selectedIdx, onSelect }: {
+  days: DayCount[];
+  selectedIdx: number;
+  onSelect: (idx: number) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (selectedRef.current && scrollRef.current) {
+      const container = scrollRef.current;
+      const el = selectedRef.current;
+      const left = el.offsetLeft - container.offsetWidth / 2 + el.offsetWidth / 2;
+      container.scrollTo({ left, behavior: 'smooth' });
+    }
+  }, [selectedIdx]);
+
+  return (
+    <div className="md:hidden mb-4 -mx-4 sm:-mx-6">
+      <div
+        ref={scrollRef}
+        className="flex gap-1.5 overflow-x-auto px-4 sm:px-6 pb-2 scrollbar-none"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+      >
+        {days.map((day, idx) => {
+          const isEmpty = day.count === 0;
+          const isSelected = idx === selectedIdx;
+          const d = new Date(day.date + 'T00:00:00');
+          const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+          const dayNum = d.getDate();
+
+          return (
+            <button
+              key={day.date}
+              ref={isSelected ? selectedRef as RefObject<HTMLButtonElement> : undefined}
+              onClick={() => onSelect(idx)}
+              className={`flex flex-col items-center shrink-0 w-14 py-2 rounded-xl transition-all duration-200 ${
+                isSelected
+                  ? 'bg-accent text-white'
+                  : isEmpty
+                    ? 'bg-dark-900/30 text-dark-600'
+                    : 'bg-dark-800/40 text-dark-300'
+              }`}
+            >
+              <span className={`text-[10px] font-medium uppercase ${isSelected ? 'text-white/70' : ''}`}>
+                {weekday}
+              </span>
+              <span className={`text-lg font-semibold leading-tight ${isSelected ? 'text-white' : ''}`}>
+                {dayNum}
+              </span>
+              {!isEmpty && (
+                <span className={`text-[10px] font-medium mt-0.5 ${
+                  isSelected ? 'text-white/80' : 'text-accent'
+                }`}>
+                  {day.count}
+                </span>
+              )}
+              {isEmpty && (
+                <span className="text-[10px] mt-0.5">&mdash;</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --- Shared day content ---
+
+function DayContent({ selectedDay, dayOpps, dayTotal, dayLoading, dayLoadingMore, hasMore, showMore, selectedIdx, totalDays, onNavigate, showFullDate }: {
+  selectedDay: DayCount | null;
+  dayOpps: OpportunityListItem[];
+  dayTotal: number;
+  dayLoading: boolean;
+  dayLoadingMore: boolean;
+  hasMore: boolean;
+  showMore: () => void;
+  selectedIdx: number;
+  totalDays: number;
+  onNavigate: (idx: number) => void;
+  showFullDate: boolean;
+}) {
+  if (!selectedDay) return null;
+
+  return (
+    <div className="flex-1 min-w-0">
+      {/* Day header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-dark-200 min-w-0">
+          <Calendar size={16} strokeWidth={1.5} className="text-dark-400 shrink-0" />
+          <h2 className="text-base sm:text-lg font-medium truncate">{formatDayLabel(selectedDay.date)}</h2>
+          {showFullDate && (
+            <span className="text-sm text-dark-500 hidden lg:inline">{formatFullDate(selectedDay.date)}</span>
+          )}
+        </div>
+        {selectedDay.count > 0 && (
+          <span className="bg-accent/10 text-accent text-xs font-medium rounded-full px-2.5 py-1 shrink-0">
+            {selectedDay.count} new
+          </span>
+        )}
+      </div>
+
+      {/* Results */}
+      {selectedDay.count === 0 ? (
+        <EmptyDayCard />
+      ) : dayLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-accent/70" strokeWidth={1.5} />
+        </div>
+      ) : (
+        <>
+          {dayTotal > PAGE_SIZE && (
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex-1 h-1 rounded-full bg-dark-800/50 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent/40 transition-all duration-300"
+                  style={{ width: `${Math.min(100, (dayOpps.length / dayTotal) * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-dark-500 tabular-nums shrink-0">
+                {dayOpps.length} of {dayTotal}
+              </span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {dayOpps.map((opp) => (
+              <OpportunityRow key={opp.id} opp={opp} />
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              onClick={showMore}
+              disabled={dayLoadingMore}
+              className="w-full mt-4 py-3 rounded-xl border border-dark-700/50 bg-dark-800/30
+                text-sm font-medium text-dark-300 hover:text-dark-100 hover:border-dark-600/50
+                hover:bg-dark-800/50 disabled:opacity-50 transition-all duration-200"
+            >
+              {dayLoadingMore ? (
+                <Loader2 size={16} className="animate-spin mx-auto" />
+              ) : (
+                `Show more (${dayTotal - dayOpps.length} remaining)`
+              )}
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Navigation hint */}
+      <div className="mt-6 flex items-center justify-between text-xs text-dark-500">
+        <button
+          onClick={() => onNavigate(Math.min(selectedIdx + 1, totalDays - 1))}
+          disabled={selectedIdx >= totalDays - 1}
+          className="flex items-center gap-1 hover:text-dark-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft size={12} />
+          Older
+        </button>
+        <span>{selectedIdx + 1} of {totalDays} days</span>
+        <button
+          onClick={() => onNavigate(Math.max(selectedIdx - 1, 0))}
+          disabled={selectedIdx <= 0}
+          className="flex items-center gap-1 hover:text-dark-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Newer
+          <ChevronRight size={12} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -347,38 +523,46 @@ export default function SearchHistoryPage() {
     <div className="min-h-screen relative">
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-8">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Back link */}
         <Link
           to="/saved"
-          className="inline-flex items-center gap-1.5 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-6"
+          className="inline-flex items-center gap-1.5 text-sm text-dark-400 hover:text-dark-200 transition-colors mb-4 sm:mb-6"
         >
           <ArrowLeft size={14} strokeWidth={1.5} />
           Back to saved searches
         </Link>
 
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-              <Search size={20} className="text-accent" strokeWidth={1.5} />
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-start gap-3 mb-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+              <Search size={18} className="text-accent sm:hidden" strokeWidth={1.5} />
+              <Search size={20} className="text-accent hidden sm:block" strokeWidth={1.5} />
             </div>
-            <div>
-              <h1 className="text-xl font-semibold text-dark-50">{timeline.search.name}</h1>
-              <p className="text-sm text-dark-400 mt-0.5">{filterSummary(searchFilters)}</p>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold text-dark-50 leading-snug">{timeline.search.name}</h1>
+              <p className="text-xs sm:text-sm text-dark-400 mt-0.5 line-clamp-2">{filterSummary(searchFilters)}</p>
             </div>
           </div>
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
           <StatCard icon={TrendingUp} label="New this week" value={String(timeline.total_new)} />
           <StatCard icon={Calendar} label="Days with matches" value={`${timeline.days_with_matches} of ${days.length}`} />
           <StatCard icon={Clock} label="Avg per day" value={days.length > 0 ? (timeline.total_new / days.length).toFixed(1) : '0'} />
         </div>
 
-        {/* Timeline + Content */}
-        <div className="flex gap-6">
+        {/* Mobile: Horizontal date strip */}
+        <MobileDateStrip
+          days={days}
+          selectedIdx={selectedIdx}
+          onSelect={setSelectedIdx}
+        />
+
+        {/* Desktop: Timeline sidebar + Content */}
+        <div className="hidden md:flex gap-6">
           {/* Timeline sidebar */}
           <div className="w-48 shrink-0">
             <div className="sticky top-8">
@@ -438,96 +622,37 @@ export default function SearchHistoryPage() {
             </div>
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            {selectedDay && (
-              <>
-                {/* Day header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-dark-200">
-                      <Calendar size={16} strokeWidth={1.5} className="text-dark-400" />
-                      <h2 className="text-lg font-medium">{formatDayLabel(selectedDay.date)}</h2>
-                      <span className="text-sm text-dark-500">{formatFullDate(selectedDay.date)}</span>
-                    </div>
-                  </div>
-                  {selectedDay.count > 0 && (
-                    <span className="bg-accent/10 text-accent text-xs font-medium rounded-full px-2.5 py-1">
-                      {selectedDay.count} new
-                    </span>
-                  )}
-                </div>
+          {/* Desktop main content */}
+          <DayContent
+            selectedDay={selectedDay}
+            dayOpps={dayOpps}
+            dayTotal={dayTotal}
+            dayLoading={dayLoading}
+            dayLoadingMore={dayLoadingMore}
+            hasMore={hasMore}
+            showMore={showMore}
+            selectedIdx={selectedIdx}
+            totalDays={days.length}
+            onNavigate={setSelectedIdx}
+            showFullDate
+          />
+        </div>
 
-                {/* Results */}
-                {selectedDay.count === 0 ? (
-                  <EmptyDayCard />
-                ) : dayLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 size={24} className="animate-spin text-accent/70" strokeWidth={1.5} />
-                  </div>
-                ) : (
-                  <>
-                    {dayTotal > PAGE_SIZE && (
-                      <div className="mb-3 flex items-center gap-3">
-                        <div className="flex-1 h-1 rounded-full bg-dark-800/50 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-accent/40 transition-all duration-300"
-                            style={{ width: `${Math.min(100, (dayOpps.length / dayTotal) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-dark-500 tabular-nums shrink-0">
-                          {dayOpps.length} of {dayTotal}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      {dayOpps.map((opp) => (
-                        <OpportunityRow key={opp.id} opp={opp} />
-                      ))}
-                    </div>
-
-                    {hasMore && (
-                      <button
-                        onClick={showMore}
-                        disabled={dayLoadingMore}
-                        className="w-full mt-4 py-3 rounded-xl border border-dark-700/50 bg-dark-800/30
-                          text-sm font-medium text-dark-300 hover:text-dark-100 hover:border-dark-600/50
-                          hover:bg-dark-800/50 disabled:opacity-50 transition-all duration-200"
-                      >
-                        {dayLoadingMore ? (
-                          <Loader2 size={16} className="animate-spin mx-auto" />
-                        ) : (
-                          `Show more (${dayTotal - dayOpps.length} remaining)`
-                        )}
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {/* Navigation hint */}
-                <div className="mt-6 flex items-center justify-between text-xs text-dark-500">
-                  <button
-                    onClick={() => setSelectedIdx(Math.min(selectedIdx + 1, days.length - 1))}
-                    disabled={selectedIdx >= days.length - 1}
-                    className="flex items-center gap-1 hover:text-dark-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft size={12} />
-                    Older
-                  </button>
-                  <span>{selectedIdx + 1} of {days.length} days</span>
-                  <button
-                    onClick={() => setSelectedIdx(Math.max(selectedIdx - 1, 0))}
-                    disabled={selectedIdx <= 0}
-                    className="flex items-center gap-1 hover:text-dark-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Newer
-                    <ChevronRight size={12} />
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+        {/* Mobile: Content only (no sidebar) */}
+        <div className="md:hidden">
+          <DayContent
+            selectedDay={selectedDay}
+            dayOpps={dayOpps}
+            dayTotal={dayTotal}
+            dayLoading={dayLoading}
+            dayLoadingMore={dayLoadingMore}
+            hasMore={hasMore}
+            showMore={showMore}
+            selectedIdx={selectedIdx}
+            totalDays={days.length}
+            onNavigate={setSelectedIdx}
+            showFullDate={false}
+          />
         </div>
       </div>
     </div>
