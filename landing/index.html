@@ -1221,7 +1221,10 @@
       "description": "Search 100,000+ federal contract opportunities. A free SAM.gov search alternative with boolean search, smart filters, and deadline tracking.",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://app.govtrove.com/?q={search_term_string}",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://app.govtrove.com/?q={search_term_string}"
+        },
         "query-input": "required name=search_term_string"
       }
     }
