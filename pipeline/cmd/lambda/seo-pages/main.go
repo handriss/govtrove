@@ -678,7 +678,7 @@ const pageTmpl = `<!DOCTYPE html>
     <title>{{.SEOTitle}} | GovTrove</title>
     <meta name="description" content="{{.MetaDescription}}">
     {{- if not .IsIndex}}
-    <link rel="canonical" href="https://govtrove.com/contracts/{{.CanonicalPath}}">
+    <link rel="canonical" href="https://govtrove.com/contracts/{{.CanonicalPath}}.html">
     {{- else}}
     <link rel="canonical" href="https://govtrove.com/contracts/">
     {{- end}}
@@ -688,7 +688,7 @@ const pageTmpl = `<!DOCTYPE html>
     <meta property="og:description" content="{{.MetaDescription}}">
     <meta property="og:type" content="website">
     {{- if not .IsIndex}}
-    <meta property="og:url" content="https://govtrove.com/contracts/{{.CanonicalPath}}">
+    <meta property="og:url" content="https://govtrove.com/contracts/{{.CanonicalPath}}.html">
     {{- else}}
     <meta property="og:url" content="https://govtrove.com/contracts/">
     {{- end}}
@@ -794,7 +794,7 @@ const pageTmpl = `<!DOCTYPE html>
             <h2>By Set-Aside Type</h2>
             <ul class="index-list">
                 {{- range .SetAsidePages}}
-                <li><a href="/contracts/{{.Slug}}"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
                 {{- end}}
             </ul>
         </div>
@@ -803,7 +803,7 @@ const pageTmpl = `<!DOCTYPE html>
             <h2>By NAICS Code</h2>
             <ul class="index-list">
                 {{- range .NAICSPages}}
-                <li><a href="/contracts/{{.Slug}}"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
                 {{- end}}
             </ul>
         </div>
@@ -812,7 +812,7 @@ const pageTmpl = `<!DOCTYPE html>
             <h2>By Agency</h2>
             <ul class="index-list">
                 {{- range .AgencyPages}}
-                <li><a href="/contracts/{{.Slug}}"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
                 {{- end}}
             </ul>
         </div>
