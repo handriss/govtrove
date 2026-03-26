@@ -547,8 +547,8 @@ export default function SearchHistoryPage() {
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
+        {/* Stats bar — desktop only */}
+        <div className="hidden md:grid grid-cols-3 gap-3 mb-8">
           <StatCard icon={TrendingUp} label="New this week" value={String(timeline.total_new)} />
           <StatCard icon={Calendar} label="Days with matches" value={`${timeline.days_with_matches} of ${days.length}`} />
           <StatCard icon={Clock} label="Avg per day" value={days.length > 0 ? (timeline.total_new / days.length).toFixed(1) : '0'} />
