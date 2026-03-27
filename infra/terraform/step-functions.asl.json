@@ -131,6 +131,7 @@
       "ResultSelector": {
         "status.$": "$.Payload.status"
       },
+      "ResultPath": "$.reconcile_result",
       "Retry": [
         {
           "ErrorEquals": ["States.ALL"],
@@ -192,6 +193,7 @@
       "ResultSelector": {
         "status.$": "$.Payload.status"
       },
+      "ResultPath": "$.trends_result",
       "Retry": [
         {
           "ErrorEquals": ["States.ALL"],
@@ -222,6 +224,7 @@
       "ResultSelector": {
         "status.$": "$.Payload.status"
       },
+      "ResultPath": "$.pages_result",
       "Retry": [
         {
           "ErrorEquals": ["States.ALL"],
