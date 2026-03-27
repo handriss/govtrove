@@ -118,6 +118,34 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 	}, nil
 }
 
+func buildGeoCondition(params models.SearchParams, argNum *int, args *[]any) string {
+	var parts []string
+
+	if len(params.GeoStates) > 0 {
+		parts = append(parts, fmt.Sprintf("pop_state = ANY($%d)", *argNum))
+		*args = append(*args, params.GeoStates)
+		*argNum++
+	}
+
+	if len(params.GeoCities) > 0 {
+		parts = append(parts, fmt.Sprintf("pop_city ILIKE ANY($%d)", *argNum))
+		patterns := make([]string, len(params.GeoCities))
+		for i, c := range params.GeoCities {
+			patterns[i] = c + "%"
+		}
+		*args = append(*args, patterns)
+		*argNum++
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return "(" + strings.Join(parts, " OR ") + ")"
+}
+
 // buildCodeOrPrefixConditions builds an OR condition combining exact codes, a single prefix, and multiple prefixes.
 func buildCodeOrPrefixConditions(codes []string, prefix string, prefixes []string, column string, argNum *int, args *[]any) string {
 	var parts []string
@@ -162,6 +190,8 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	conditions = append(conditions, "is_latest = true")
 
 	if params.Query != "" {
+		var ftsConds []string
+
 		segments := splitOR(params.Query)
 		if len(segments) <= 1 {
 			phrases, ftsQuery := parseQuotedPhrases(params.Query)
@@ -173,11 +203,11 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 					argNum++
 				}
 				combined := strings.Join(phraseExprs, " || ")
-				conditions = append(conditions, fmt.Sprintf("search_vector @@ (%s)", combined))
+				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", combined))
 				ftsExpr = combined
 			}
 			if ftsQuery != "" {
-				conditions = append(conditions, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
+				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
 				args = append(args, ftsQuery)
 				ftsExpr = fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum)
 				argNum++
@@ -201,9 +231,20 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 
 			if len(ftsExprs) > 0 {
 				combined := strings.Join(ftsExprs, " || ")
-				conditions = append(conditions, fmt.Sprintf("search_vector @@ (%s)", combined))
+				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", combined))
 				ftsExpr = combined
 			}
+		}
+
+		geoCond := buildGeoCondition(params, &argNum, &args)
+		if geoCond != "" {
+			ftsConds = append(ftsConds, geoCond)
+		}
+
+		if len(ftsConds) == 1 {
+			conditions = append(conditions, ftsConds[0])
+		} else if len(ftsConds) > 1 {
+			conditions = append(conditions, "("+strings.Join(ftsConds, " OR ")+")")
 		}
 	}
 

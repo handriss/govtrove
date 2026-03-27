@@ -172,6 +172,7 @@ func main() {
 	giftCodeRepo := repository.NewGiftCodeRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
 	codeRepo := repository.NewCodeRepository(pool)
+	geoSynonymRepo := repository.NewGeoSynonymRepository(pool)
 
 	appURL := "https://app.govtrove.com"
 	if strings.Contains(cfg.AllowedOrigins, "localhost") {
@@ -190,7 +191,7 @@ func main() {
 	}
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
-	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo)
+	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo, geoSynonymRepo)
 	agencyHandler := handlers.NewAgencyHandler(agencyRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)

@@ -179,3 +179,71 @@ func TestBuildFilterConditions_NoQuery(t *testing.T) {
 		t.Errorf("expected 2 conditions (active + is_latest), got %d", len(conditions))
 	}
 }
+
+func TestBuildFilterConditions_GeoExpansion(t *testing.T) {
+	params := models.SearchParams{
+		Query:     "upper peninsula",
+		GeoStates: []string{"MI"},
+		Page:      1,
+		Limit:     20,
+	}
+	conditions, args, _, _ := buildFilterConditions(params, "", 1)
+
+	// active + is_latest + (FTS OR geo)
+	if len(conditions) != 3 {
+		t.Fatalf("expected 3 conditions, got %d: %v", len(conditions), conditions)
+	}
+	combined := conditions[2]
+	if !strings.Contains(combined, "search_vector") {
+		t.Errorf("expected search_vector in combined condition, got: %s", combined)
+	}
+	if !strings.Contains(combined, "pop_state") {
+		t.Errorf("expected pop_state in combined condition, got: %s", combined)
+	}
+	if !strings.Contains(combined, " OR ") {
+		t.Errorf("expected OR in combined condition, got: %s", combined)
+	}
+	// args: FTS query + geo states
+	if len(args) != 2 {
+		t.Fatalf("expected 2 args, got %d: %v", len(args), args)
+	}
+}
+
+func TestBuildFilterConditions_GeoWithCities(t *testing.T) {
+	params := models.SearchParams{
+		Query:     "hampton roads",
+		GeoStates: []string{"VA"},
+		GeoCities: []string{"Norfolk", "Virginia Beach", "Newport News"},
+		Page:      1,
+		Limit:     20,
+	}
+	conditions, args, _, _ := buildFilterConditions(params, "", 1)
+
+	combined := conditions[2]
+	if !strings.Contains(combined, "pop_state") {
+		t.Errorf("expected pop_state in condition, got: %s", combined)
+	}
+	if !strings.Contains(combined, "pop_city") {
+		t.Errorf("expected pop_city in condition, got: %s", combined)
+	}
+	// args: FTS query + geo states + geo city patterns
+	if len(args) != 3 {
+		t.Fatalf("expected 3 args, got %d: %v", len(args), args)
+	}
+}
+
+func TestBuildFilterConditions_NoGeo(t *testing.T) {
+	params := models.SearchParams{Query: "logistics", Page: 1, Limit: 20}
+	conditions, args, _, _ := buildFilterConditions(params, "", 1)
+
+	// No geo expansion: active + is_latest + FTS only
+	if len(conditions) != 3 {
+		t.Fatalf("expected 3 conditions, got %d: %v", len(conditions), conditions)
+	}
+	if strings.Contains(conditions[2], "pop_state") {
+		t.Errorf("unexpected pop_state in condition: %s", conditions[2])
+	}
+	if len(args) != 1 {
+		t.Fatalf("expected 1 arg, got %d: %v", len(args), args)
+	}
+}

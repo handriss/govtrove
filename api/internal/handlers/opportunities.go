@@ -23,10 +23,11 @@ type OpportunityHandler struct {
 	renderer *ogimage.Renderer
 	eventLog *EventLogger
 	userRepo *repository.UserRepository
+	geoRepo  *repository.GeoSynonymRepository
 }
 
-func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository) *OpportunityHandler {
-	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo}
+func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository, geoRepo *repository.GeoSynonymRepository) *OpportunityHandler {
+	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo, geoRepo: geoRepo}
 }
 
 func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
@@ -41,8 +42,24 @@ func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
 	return &user.ID
 }
 
+func (h *OpportunityHandler) expandGeoSynonyms(r *http.Request, params *models.SearchParams) {
+	if params.Query == "" || h.geoRepo == nil {
+		return
+	}
+	matches, err := h.geoRepo.Lookup(r.Context(), params.Query)
+	if err != nil {
+		h.logger.Warn("geo synonym lookup failed", "error", err)
+		return
+	}
+	for _, m := range matches {
+		params.GeoStates = append(params.GeoStates, m.States...)
+		params.GeoCities = append(params.GeoCities, m.Cities...)
+	}
+}
+
 func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	params := h.parseSearchParams(r)
+	h.expandGeoSynonyms(r, &params)
 
 	start := time.Now()
 	result, err := h.repo.Search(r.Context(), params)
@@ -84,6 +101,7 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 func (h *OpportunityHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
 	params := h.parseSearchParams(r)
+	h.expandGeoSynonyms(r, &params)
 	result, err := h.repo.GetFacetCounts(r.Context(), params)
 	if err != nil {
 		h.logger.Error("get facets failed", "error", err)

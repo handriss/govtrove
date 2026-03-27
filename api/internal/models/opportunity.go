@@ -95,6 +95,9 @@ type SearchParams struct {
 	Order        string
 	Page         int
 	Limit        int
+
+	GeoStates []string
+	GeoCities []string
 }
 
 type SearchResult struct {
