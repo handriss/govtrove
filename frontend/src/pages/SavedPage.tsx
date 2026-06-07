@@ -5,6 +5,7 @@ import { useAppAuth } from '../contexts/AuthContext';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
 import { useSavedSearches } from '../hooks/useSavedSearches';
 import { getSavedOpportunitiesWithDetails, updateSavedOpportunityNotes } from '../services/api';
+import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 import type { SavedOpportunityDetail } from '../types/api';
 
 function getAgency(filters: Record<string, unknown>): string[] {
@@ -68,7 +69,7 @@ function deadlineColor(deadline?: string): string {
 
 export default function SavedPage() {
   const { isAuthenticated, getAccessToken, govtroveUser } = useAppAuth();
-  const isPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
+  const isPro = PRO_FEATURES_FREE_FOR_ALL || govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
   const saved = useSavedOpportunities();
   const { savedSearches, loading: searchesLoading, deleteSearch, toggleAlert, renameSearch } = useSavedSearches();
   const navigate = useNavigate();

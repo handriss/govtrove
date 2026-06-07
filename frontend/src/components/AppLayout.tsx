@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Gift } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { SidebarProvider, useSidebar } from '../contexts/SidebarContext';
+import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 import AppSidebar from './AppSidebar';
 import BottomTabBar from './BottomTabBar';
 import AuthButton from './AuthButton';
@@ -10,7 +11,7 @@ import Footer from './Footer';
 function PromoBanner() {
   const { isAuthenticated, signUp, govtroveUser } = useAppAuth();
   const hasPromo = sessionStorage.getItem('govtrove_promo_code');
-  const hasPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever || (govtroveUser?.gift_expires_at && new Date(govtroveUser.gift_expires_at) > new Date());
+  const hasPro = PRO_FEATURES_FREE_FOR_ALL || govtroveUser?.plan === 'pro' || govtroveUser?.free_forever || (govtroveUser?.gift_expires_at && new Date(govtroveUser.gift_expires_at) > new Date());
 
   if (!hasPromo || hasPro) return null;
 

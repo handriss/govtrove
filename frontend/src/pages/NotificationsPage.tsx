@@ -4,6 +4,7 @@ import { Search, FileText, Bell, Zap, CheckCheck, Loader2, Trash2, Mail } from '
 import type { OpportunityListItem, Notification } from '../types/api';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAppAuth } from '../contexts/AuthContext';
+import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 
 // --- Local utils (duplicated from OpportunityCard to avoid coupling) ---
 
@@ -577,7 +578,7 @@ function CollapsibleSection<T extends NotificationItem>({
 
 export default function NotificationsPage() {
   const { govtroveUser } = useAppAuth();
-  const hasPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
+  const hasPro = PRO_FEATURES_FREE_FOR_ALL || govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
   const { notifications: rawNotifications, loading, hasMore, markRead, markAllRead, remove, loadMore } = useNotifications();
 
   const items: NotificationItem[] = rawNotifications

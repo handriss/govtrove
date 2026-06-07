@@ -13,9 +13,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
-import { usePostHog } from '@posthog/react';
 import { createAccountRequest, getEmailPreferences, updateEmailPreferences, createCheckoutSession, createPortalSession } from '../services/api';
-import { trackUpgradeClicked } from '../lib/analytics';
+import { PRO_FEATURES_FREE_FOR_ALL, DONATION_URL } from '../lib/billing';
 
 function formatMemberSince(dateStr: string) {
   const d = new Date(dateStr);
@@ -29,7 +28,6 @@ function formatDate(dateStr: string) {
 
 export default function ProfilePage() {
   const { user, govtroveUser, isLoading, isAuthenticated, getAccessToken } = useAppAuth();
-  const posthog = usePostHog();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -110,6 +108,7 @@ export default function ProfilePage() {
   const giftExpiresAt = govtroveUser?.gift_expires_at;
   const hasActiveGift = !!giftExpiresAt && new Date(giftExpiresAt) > new Date();
   const hasPro = plan === 'pro' || freeForever || hasActiveGift;
+  const hasProFeatures = PRO_FEATURES_FREE_FOR_ALL || hasPro;
   const subStatus = govtroveUser?.subscription_status;
   const cancelAtPeriodEnd = govtroveUser?.cancel_at_period_end ?? false;
   const periodEnd = govtroveUser?.current_period_end;
@@ -172,7 +171,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {promoCode && !hasPro && (
+        {promoCode && !hasPro && !PRO_FEATURES_FREE_FOR_ALL && (
           <div className="mb-6 rounded-xl bg-accent/10 border-2 border-accent/30 p-6 text-center">
             <p className="text-lg font-semibold text-dark-50 mb-2">You have a special offer for GovTrove Pro!</p>
             <p className="text-sm text-dark-400 mb-5">Click below to upgrade with your exclusive discount.</p>
@@ -250,17 +249,18 @@ export default function ProfilePage() {
             </div>
           ) : (
             <div>
-              <p className="text-dark-100 font-medium text-lg mb-3">Free</p>
-              <button
-                onClick={() => { trackUpgradeClicked(posthog, 'profile_plan_card'); handleBilling('checkout'); }}
-                disabled={billingLoading}
+              <p className="text-dark-100 font-medium text-lg mb-1">Free</p>
+              <p className="text-sm text-dark-400 mb-3">GovTrove is free. If it's useful, chip in to help cover server costs.</p>
+              <a
+                href={DONATION_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
                            border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
-                           transition-all duration-200 disabled:opacity-50"
+                           transition-all duration-200"
               >
-                {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
-                Upgrade to Pro — $30/mo
-              </button>
+                Support GovTrove
+              </a>
             </div>
           )}
         </div>
@@ -270,27 +270,12 @@ export default function ProfilePage() {
           <h2 className="text-sm font-medium text-dark-300 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Mail size={14} strokeWidth={1.5} />
             Email Notifications
-            {!hasPro && (
-              <span className="text-[10px] font-semibold text-accent bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded uppercase tracking-wide">Pro</span>
-            )}
           </h2>
-          {!hasPro ? (
+          {!hasProFeatures ? (
             <div className="bg-dark-900/30 border border-dark-800/50 rounded-xl p-5">
               <div className="flex items-start gap-3">
                 <Lock size={16} className="text-dark-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm text-dark-300">Upgrade to Pro to receive daily email alerts when new opportunities match your saved searches.</p>
-                  <button
-                    onClick={() => { trackUpgradeClicked(posthog, 'email_notifications'); handleBilling('checkout'); }}
-                    disabled={billingLoading}
-                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
-                               border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
-                               transition-all duration-200 disabled:opacity-50"
-                  >
-                    {billingLoading ? <Loader2 size={12} className="animate-spin" /> : null}
-                    Upgrade to Pro
-                  </button>
-                </div>
+                <p className="text-sm text-dark-300">Email digest notifications are not currently available on this plan.</p>
               </div>
             </div>
           ) : prefsLoading ? (

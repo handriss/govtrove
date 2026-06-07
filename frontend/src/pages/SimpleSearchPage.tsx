@@ -17,6 +17,7 @@ import { useAppAuth } from '../contexts/AuthContext';
 import { usePostHog } from '@posthog/react';
 import { getFacetCounts } from '../services/api';
 import { trackSearch, trackSavedSearchCreated } from '../lib/analytics';
+import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
 
@@ -194,7 +195,7 @@ export default function SimpleSearchPage() {
       trackSavedSearchCreated(posthog, filterData);
       setSaveSearchOpen(false);
       setSaveSearchName('');
-      const hasPro = govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
+      const hasPro = PRO_FEATURES_FREE_FOR_ALL || govtroveUser?.plan === 'pro' || govtroveUser?.free_forever === true;
       if (!hasPro) {
         setShowProTip(true);
         setTimeout(() => setShowProTip(false), 6000);
