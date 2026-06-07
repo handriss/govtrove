@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { createAccountRequest, getEmailPreferences, updateEmailPreferences, createCheckoutSession, createPortalSession } from '../services/api';
-import { PRO_FEATURES_FREE_FOR_ALL, DONATION_URL } from '../lib/billing';
+import { PRO_FEATURES_FREE_FOR_ALL, DONATION_URL, trackDonationClick } from '../lib/billing';
 
 function formatMemberSince(dateStr: string) {
   const d = new Date(dateStr);
@@ -255,6 +255,7 @@ export default function ProfilePage() {
                 href={DONATION_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={async () => trackDonationClick('profile_plan_card', await getAccessToken().catch(() => undefined))}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent
                            border border-accent/30 rounded-lg bg-accent/10 hover:bg-accent/20
                            transition-all duration-200"

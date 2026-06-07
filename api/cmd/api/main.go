@@ -196,6 +196,7 @@ func main() {
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
 	accountRequestHandler := handlers.NewAccountRequestHandler(accountRequestRepo, userRepo, snsClient, cfg.SNSTopicARN, logger)
+	donationHandler := handlers.NewDonationHandler(userRepo, snsClient, cfg.SNSTopicARN, logger)
 	adminHandler := handlers.NewAdminHandler(userRepo, notificationRepo, pipelineRepo, emailPrefsRepo, sentEmailsRepo, promoRepo, inviteLinkRepo, giftCodeRepo, accountRequestRepo, emailSvc, stripeClient, s3Client, s3PresignClient, cfg.DSARBucket, cfg.StripePromoCouponID, appURL, cfg.WorkOSAPIKey, logger)
 	giftHandler := handlers.NewGiftHandler(giftCodeRepo, userRepo, logger)
 	userHandler := handlers.NewUserHandler(userRepo, logger)
@@ -309,6 +310,14 @@ func main() {
 		r.Route("/contact", func(r chi.Router) {
 			r.Use(httprate.LimitByIP(5, time.Hour))
 			r.Post("/", contactHandler.Create)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(httprate.LimitByIP(20, time.Hour))
+			if jwks != nil {
+				r.Use(authmw.OptionalAuth(jwks))
+			}
+			r.Post("/track-donation-click", donationHandler.TrackClick)
 		})
 
 		if jwks != nil {
