@@ -340,7 +340,7 @@ export default function SimpleSearchPage() {
       {!showResults && (
         <div className="absolute bottom-20 md:bottom-6 left-0 right-0 z-10 text-center">
           <p className="text-dark-600 text-xs tracking-wide">
-            Data sourced from SAM.gov &middot; Press <kbd className="px-1.5 py-0.5 rounded bg-dark-800/60 border border-dark-700/30 text-dark-500 font-mono text-[10px]">/</kbd> to search
+            Press <kbd className="px-1.5 py-0.5 rounded bg-dark-800/60 border border-dark-700/30 text-dark-500 font-mono text-[10px]">/</kbd> to search
           </p>
           <Link to="/guide" className="inline-block mt-2 text-dark-500 hover:text-dark-300 text-xs transition-colors">
             New here? Check out the Search Guide &rarr;
