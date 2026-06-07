@@ -337,6 +337,7 @@ export default function SimpleSearchPage() {
       </div>
 
       {/* Empty state footer hint */}
+      {/* Hidden for now — kept for future re-enable
       {!showResults && (
         <div className="absolute bottom-20 md:bottom-6 left-0 right-0 z-10 text-center">
           <p className="text-dark-600 text-xs tracking-wide">
@@ -347,6 +348,7 @@ export default function SimpleSearchPage() {
           </Link>
         </div>
       )}
+      */}
 
       {/* Results mode: compact FilterBar + SearchResults */}
       {showResults && (

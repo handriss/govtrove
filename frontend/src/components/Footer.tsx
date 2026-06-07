@@ -51,12 +51,6 @@ export default function Footer() {
               Support GovTrove
             </a>
           </div>
-          <span className="text-xs text-dark-500">
-            Built by Andrew &middot;{' '}
-            <a href="mailto:andrew@govtrove.com" className="underline hover:text-dark-300">
-              andrew@govtrove.com
-            </a>
-          </span>
         </div>
 
         <div className="py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-dark-600">
