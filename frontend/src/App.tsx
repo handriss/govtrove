@@ -27,6 +27,7 @@ const SearchHistoryPage = lazy(() => import('./pages/SearchHistoryPage'));
 const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
 const SearchGuideInteractivePage = lazy(() => import('./pages/SearchGuideInteractivePage'));
 const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
+const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -41,7 +42,7 @@ function ExternalRedirect({ to }: { to: string }) {
 // Lightweight callback page that doesn't interfere with URL params.
 // AuthKit's createClient reads window.location.search to extract the OAuth
 // code. If we render SimpleSearchPage here, useFilterState strips the code
-// from the URL before AuthKit can read it (its createClient runs in a
+// from the URL befo redirect is a act as a callbackre AuthKit can read it (its createClient runs in a
 // setTimeout inside useEffect, which fires after child effects).
 function AuthCallback() {
   const { isLoading } = useAppAuth();
@@ -122,6 +123,7 @@ function AppRoutes() {
             <Route path="/guide" element={<SearchGuidePage />} />
             <Route path="/guide/interactive" element={<SearchGuideInteractivePage />} />
             <Route path="/glossary" element={<GlossaryPage />} />
+            <Route path="/thanks" element={<ThankYouPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
           {/* Admin routes — keep AdminLayout */}

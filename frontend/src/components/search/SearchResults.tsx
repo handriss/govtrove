@@ -3,7 +3,6 @@ import {
   Loader2,
   SearchX,
   Star,
-  Lock,
   X,
   ChevronLeft,
   ChevronRight,
@@ -547,16 +546,6 @@ function BulkActionBar({
           >
             <Star size={14} />
             Save All
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Upgrade to Pro"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
-              bg-dark-800 border border-dark-700/50 text-dark-500 cursor-not-allowed"
-          >
-            <Lock size={14} />
-            Export CSV
           </button>
           <button
             type="button"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { usePostHog, useFeatureFlagVariantKey } from '@posthog/react';
 import { getStatus } from '../services/api';
 import { trackFounderCtaClicked } from '../lib/analytics';
+import { DONATION_URL } from '../lib/billing';
 
 const FOUNDER_CTA_COPY: Record<string, { prefix: string; suffix: string }> = {
   'read-every-email': { prefix: 'Feedback? I read every email', suffix: '' },
@@ -76,6 +77,9 @@ export default function Footer() {
             </a>
             <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
               Report a Problem
+            </a>
+            <a href={DONATION_URL} target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+              Support GovTrove
             </a>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Star, Bell, Building2, User, LogIn, Shield } from 'lucide-react';
+import { Search, Star, Bell, User, LogIn, Shield } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { useNotificationsCount } from '../hooks/useNotifications';
 import { useIsAdmin } from '../hooks/useIsAdmin';
@@ -24,9 +24,7 @@ export default function BottomTabBar() {
         { label: 'Search', icon: Search, path: '/' },
         { label: 'Saved', icon: Star, path: '/saved' },
         { label: 'Updates', icon: Bell, path: '/notifications', badge: count.unread },
-        ...(isAdmin
-          ? [{ label: 'Admin', icon: Shield, path: '/admin' } as Tab]
-          : [{ label: 'Company', icon: Building2, path: '/company', disabled: true } as Tab]),
+        ...(isAdmin ? [{ label: 'Admin', icon: Shield, path: '/admin' } as Tab] : []),
         { label: 'Profile', icon: User, path: '/profile' },
       ]
     : [
