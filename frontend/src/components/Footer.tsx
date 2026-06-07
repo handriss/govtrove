@@ -59,7 +59,7 @@ export default function Footer() {
           </span>
         </div>
 
-        <div className="py-3 border-t border-dark-800/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-dark-600">
+        <div className="py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-dark-600">
           <span>
             Data sourced from{' '}
             <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
