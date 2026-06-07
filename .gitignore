@@ -77,3 +77,8 @@ pipeline/ingest-api
 pipeline/reconcile
 pipeline/generate-alerts
 pipeline/cleanup-versions
+pipeline/seo-pages
+pipeline/seo-trends
+
+# Vite dependency cache
+.vite/
