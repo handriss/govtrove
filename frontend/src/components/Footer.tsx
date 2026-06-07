@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Heart } from 'lucide-react';
-import { usePostHog, useFeatureFlagVariantKey } from '@posthog/react';
 import { getStatus } from '../services/api';
-import { trackFounderCtaClicked } from '../lib/analytics';
 import { DONATION_URL, trackDonationClick } from '../lib/billing';
 import { useAppAuth } from '../contexts/AuthContext';
-
-const FOUNDER_CTA_COPY: Record<string, { prefix: string; suffix: string }> = {
-  'read-every-email': { prefix: 'Feedback? I read every email', suffix: '' },
-  'something-off': { prefix: 'Something off? Tell me directly', suffix: '' },
-  'i-reply': { prefix: 'Questions?', suffix: '— I reply to everything' },
-};
 
 function formatSyncTime(iso: string): string {
   const date = new Date(iso);
@@ -27,16 +19,12 @@ function formatSyncTime(iso: string): string {
 
 export default function Footer() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
-  const posthog = usePostHog();
   const { isAuthenticated, getAccessToken } = useAppAuth();
 
   async function handleDonationClick() {
     const token = isAuthenticated ? await getAccessToken().catch(() => undefined) : undefined;
     trackDonationClick('footer', token);
   }
-  const ctaVariant = useFeatureFlagVariantKey('founder-cta-variant');
-  const variant = typeof ctaVariant === 'string' ? ctaVariant : 'read-every-email';
-  const cta = FOUNDER_CTA_COPY[variant] || FOUNDER_CTA_COPY['read-every-email'];
 
   useEffect(() => {
     getStatus()
@@ -51,7 +39,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="py-6 flex flex-col items-center gap-2.5">
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <span className="text-sm text-dark-200">Do you find this app useful? Please support it</span>
+            <span className="text-sm text-dark-200">GovTrove is independent and free to use.</span>
             <a
               href={DONATION_URL}
               target="_blank"
@@ -64,15 +52,10 @@ export default function Footer() {
             </a>
           </div>
           <span className="text-xs text-dark-500">
-            {cta.prefix}{' '}
-            <a
-              href="mailto:andrew@govtrove.com"
-              className="underline hover:text-dark-300"
-              onClick={() => trackFounderCtaClicked(posthog, variant)}
-            >
-              {variant === 'i-reply' ? 'andrew@govtrove.com' : '\u2192 andrew@govtrove.com'}
+            Built by Andrew &middot;{' '}
+            <a href="mailto:andrew@govtrove.com" className="underline hover:text-dark-300">
+              andrew@govtrove.com
             </a>
-            {cta.suffix && ` ${cta.suffix}`}
           </span>
         </div>
 
