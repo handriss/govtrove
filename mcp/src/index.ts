@@ -856,6 +856,59 @@ Provide a plain-English analysis:
     }
   );
 
+  server.registerTool(
+    "data_status",
+    {
+      title: "Data Freshness Status",
+      description:
+        "Check when GovTrove's opportunity data was last updated from SAM.gov. Returns the timestamp of the last successful pipeline sync, how long it took, and how many opportunities were processed.",
+      inputSchema: {},
+    },
+    async () => {
+      const result = await pool.query(`
+        SELECT completed_at, duration_ms, stats
+        FROM pipeline.pipeline_steps
+        WHERE step_name = 'reconcile' AND status = 'completed'
+        ORDER BY completed_at DESC LIMIT 1
+      `);
+
+      if (result.rows.length === 0) {
+        return {
+          content: [{
+            type: "text" as const,
+            text: "No completed pipeline runs found.",
+          }],
+        };
+      }
+
+      const row = result.rows[0];
+      const completedAt = new Date(row.completed_at);
+      const agoMs = Date.now() - completedAt.getTime();
+      const agoHours = Math.floor(agoMs / 3600000);
+      const agoMinutes = Math.floor((agoMs % 3600000) / 60000);
+
+      const stats = row.stats || {};
+      const status = {
+        last_synced_at: completedAt.toISOString(),
+        ago: `${agoHours}h ${agoMinutes}m ago`,
+        duration_seconds: row.duration_ms ? Math.round(row.duration_ms / 1000) : null,
+        opportunities_updated: stats.upserted ?? null,
+        opportunities_unchanged: stats.touched ?? null,
+        total_opportunities: (stats.upserted != null && stats.touched != null)
+          ? stats.upserted + stats.touched
+          : null,
+        source: "SAM.gov",
+      };
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify(status, null, 2),
+        }],
+      };
+    }
+  );
+
   return server;
 }
 
@@ -980,6 +1033,12 @@ app.get("/schema", (_req, res) => {
         parameters: {
           id: { type: "string", required: true, description: "Opportunity ID (numeric) or notice_id (alphanumeric)" },
         },
+      },
+      {
+        name: "data_status",
+        title: "Data Freshness Status",
+        description: "Check when opportunity data was last updated from SAM.gov",
+        parameters: {},
       },
     ],
     set_aside_aliases: SET_ASIDE_ALIASES,
