@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Heart } from 'lucide-react';
 import { usePostHog, useFeatureFlagVariantKey } from '@posthog/react';
 import { getStatus } from '../services/api';
 import { trackFounderCtaClicked } from '../lib/analytics';
@@ -85,7 +86,14 @@ export default function Footer() {
             <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
               Report a Problem
             </a>
-            <a href={DONATION_URL} target="_blank" rel="noopener noreferrer" onClick={handleDonationClick} className="hover:text-dark-300">
+            <a
+              href={DONATION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDonationClick}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded text-accent bg-accent/10 hover:bg-accent/20 transition-colors font-medium"
+            >
+              <Heart size={12} strokeWidth={2} />
               Support GovTrove
             </a>
           </div>

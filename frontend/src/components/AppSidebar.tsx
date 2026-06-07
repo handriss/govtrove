@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Star, Bell, BookOpen, BookText, PanelLeftClose, PanelLeftOpen, Shield } from 'lucide-react';
+import { Search, Star, Bell, BookOpen, BookText, PanelLeftClose, PanelLeftOpen, Shield, Heart } from 'lucide-react';
 import { useNotificationsCount } from '../hooks/useNotifications';
 import { useSidebar } from '../contexts/SidebarContext';
 import { useIsAdmin } from '../hooks/useIsAdmin';
+import { useAppAuth } from '../contexts/AuthContext';
+import { DONATION_URL, trackDonationClick } from '../lib/billing';
 
 interface NavItem {
   label: string;
@@ -18,6 +20,12 @@ export default function AppSidebar() {
   const { count } = useNotificationsCount();
   const isAdmin = useIsAdmin();
   const location = useLocation();
+  const { getAccessToken } = useAppAuth();
+
+  async function handleSupportClick() {
+    const token = await getAccessToken().catch(() => undefined);
+    trackDonationClick('sidebar', token);
+  }
 
   const navItems: NavItem[] = [
     { label: 'Search', icon: Search, path: '/' },
@@ -109,6 +117,20 @@ export default function AppSidebar() {
           })}
         </div>
       </nav>
+
+      <div className="px-2 py-3 border-t border-dark-700/50">
+        <a
+          href={DONATION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={handleSupportClick}
+          title={collapsed ? 'Support GovTrove' : undefined}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-accent bg-accent/10 hover:bg-accent/20 transition-colors"
+        >
+          <Heart size={18} className="shrink-0" />
+          {!collapsed && <span className="truncate">Support</span>}
+        </a>
+      </div>
 
       {isAdmin && (
         <div className="px-2 py-3 border-t border-dark-700/50">
