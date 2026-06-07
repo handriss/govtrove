@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { usePostHog, useFeatureFlagVariantKey } from '@posthog/react';
 import { getStatus } from '../services/api';
 import { trackFounderCtaClicked } from '../lib/analytics';
-import { DONATION_URL } from '../lib/billing';
+import { DONATION_URL, trackDonationClick } from '../lib/billing';
+import { useAppAuth } from '../contexts/AuthContext';
 
 const FOUNDER_CTA_COPY: Record<string, { prefix: string; suffix: string }> = {
   'read-every-email': { prefix: 'Feedback? I read every email', suffix: '' },
@@ -26,6 +27,12 @@ function formatSyncTime(iso: string): string {
 export default function Footer() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const posthog = usePostHog();
+  const { isAuthenticated, getAccessToken } = useAppAuth();
+
+  async function handleDonationClick() {
+    const token = isAuthenticated ? await getAccessToken().catch(() => undefined) : undefined;
+    trackDonationClick('footer', token);
+  }
   const ctaVariant = useFeatureFlagVariantKey('founder-cta-variant');
   const variant = typeof ctaVariant === 'string' ? ctaVariant : 'read-every-email';
   const cta = FOUNDER_CTA_COPY[variant] || FOUNDER_CTA_COPY['read-every-email'];
@@ -78,7 +85,7 @@ export default function Footer() {
             <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
               Report a Problem
             </a>
-            <a href={DONATION_URL} target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            <a href={DONATION_URL} target="_blank" rel="noopener noreferrer" onClick={handleDonationClick} className="hover:text-dark-300">
               Support GovTrove
             </a>
           </div>
