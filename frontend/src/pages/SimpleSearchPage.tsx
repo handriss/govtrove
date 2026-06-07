@@ -225,7 +225,7 @@ export default function SimpleSearchPage() {
   const showResults = hasSearched || results.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col relative">
+    <div className="flex-1 flex flex-col relative">
       <a href="#search-results" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg">Skip to search results</a>
       {/* Ambient glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-accent/[0.03] rounded-full blur-3xl pointer-events-none" />
