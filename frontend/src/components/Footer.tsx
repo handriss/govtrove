@@ -47,57 +47,56 @@ export default function Footer() {
   }, []);
 
   return (
-    <footer className="bg-dark-950 border-t border-dark-800 px-4 py-4 text-xs text-dark-500">
-      <div className="max-w-7xl mx-auto flex flex-col items-center gap-3">
-        <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-dark-200">
-          <span>Do you find this app useful? Please support it</span>
-          <a
-            href={DONATION_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleDonationClick}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent bg-accent/10 hover:bg-accent/20 border border-accent/20 transition-colors font-medium"
-          >
-            <Heart size={14} strokeWidth={2} />
-            Support GovTrove
-          </a>
-        </div>
-        <span className="text-dark-400">
-          {cta.prefix}{' '}
-          <a
-            href="mailto:andrew@govtrove.com"
-            className="underline hover:text-dark-200"
-            onClick={() => trackFounderCtaClicked(posthog, variant)}
-          >
-            {variant === 'i-reply' ? 'andrew@govtrove.com' : '\u2192 andrew@govtrove.com'}
-          </a>
-          {cta.suffix && ` ${cta.suffix}`}
-        </span>
-        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-3">
-            <span>
-              Data sourced from{' '}
-              <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="underline hover:text-dark-300">
-                SAM.gov
-              </a>
-              . GovTrove is not affiliated with the U.S. Government.
-            </span>
-            {lastSynced && (
-              <span className="text-dark-600">Last updated: {formatSyncTime(lastSynced)}</span>
-            )}
+    <footer className="bg-dark-950 border-t border-dark-800">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="py-6 flex flex-col items-center gap-2.5">
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <span className="text-sm text-dark-200">Do you find this app useful? Please support it</span>
+            <a
+              href={DONATION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleDonationClick}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent bg-accent/10 hover:bg-accent/20 border border-accent/20 transition-colors text-sm font-medium"
+            >
+              <Heart size={14} strokeWidth={2} />
+              Support GovTrove
+            </a>
           </div>
+          <span className="text-xs text-dark-500">
+            {cta.prefix}{' '}
+            <a
+              href="mailto:andrew@govtrove.com"
+              className="underline hover:text-dark-300"
+              onClick={() => trackFounderCtaClicked(posthog, variant)}
+            >
+              {variant === 'i-reply' ? 'andrew@govtrove.com' : '\u2192 andrew@govtrove.com'}
+            </a>
+            {cta.suffix && ` ${cta.suffix}`}
+          </span>
+        </div>
+
+        <div className="py-3 border-t border-dark-800/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-dark-600">
+          <span>
+            Data sourced from{' '}
+            <a href="https://sam.gov" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
+              SAM.gov
+            </a>
+            {' \u00b7 '}Not affiliated with the U.S. Government
+            {lastSynced && <> {' \u00b7 '}Updated {formatSyncTime(lastSynced)}</>}
+          </span>
           <div className="flex items-center gap-3">
-            <a href="https://govtrove.com/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            <a href="https://govtrove.com/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
               Terms
             </a>
-            <a href="https://govtrove.com/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            <a href="https://govtrove.com/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
               Privacy
             </a>
-            <a href="https://govtrove.com/contact.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
+            <a href="https://govtrove.com/contact.html" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
               Contact
             </a>
-            <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
-              Report a Problem
+            <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-400">
+              Report
             </a>
           </div>
         </div>
