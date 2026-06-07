@@ -48,7 +48,20 @@ export default function Footer() {
 
   return (
     <footer className="bg-dark-950 border-t border-dark-800 px-4 py-4 text-xs text-dark-500">
-      <div className="max-w-7xl mx-auto flex flex-col items-center gap-2">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-dark-200">
+          <span>Do you find this app useful? Please support it</span>
+          <a
+            href={DONATION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleDonationClick}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent bg-accent/10 hover:bg-accent/20 border border-accent/20 transition-colors font-medium"
+          >
+            <Heart size={14} strokeWidth={2} />
+            Support GovTrove
+          </a>
+        </div>
         <span className="text-dark-400">
           {cta.prefix}{' '}
           <a
@@ -85,16 +98,6 @@ export default function Footer() {
             </a>
             <a href="https://govtrove.com/contact.html?subject=bug" target="_blank" rel="noopener noreferrer" className="hover:text-dark-300">
               Report a Problem
-            </a>
-            <a
-              href={DONATION_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleDonationClick}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-accent bg-accent/10 hover:bg-accent/20 transition-colors font-medium"
-            >
-              <Heart size={12} strokeWidth={2} />
-              Support GovTrove
             </a>
           </div>
         </div>
