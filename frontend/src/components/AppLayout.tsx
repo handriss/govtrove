@@ -76,6 +76,7 @@ function formatSyncTime(iso: string): string {
 }
 
 function StaleDataBanner() {
+  const { isAuthenticated } = useAppAuth();
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -105,34 +106,38 @@ function StaleDataBanner() {
   };
 
   return (
-    <div className="border-b border-amber-500/20 bg-amber-500/[0.08] px-4 py-2.5">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13px] leading-relaxed">
-        <AlertTriangle size={15} className="shrink-0 text-amber-400" />
-        <span className="text-amber-100/85">
+    <div
+      className={`pointer-events-none fixed inset-x-0 z-30 flex justify-center px-3 ${
+        isAuthenticated ? 'bottom-20 md:bottom-4' : 'bottom-4'
+      }`}
+    >
+      <div className="pointer-events-auto flex w-full max-w-xl items-start gap-2.5 rounded-xl border border-amber-500/30 bg-dark-900/95 px-3.5 py-3 shadow-xl shadow-black/40 backdrop-blur-sm">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
+        <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-amber-100/90">
           Opportunity data hasn&apos;t updated
           {lastSynced ? (
             <> since <span className="font-semibold text-amber-50">{formatSyncTime(lastSynced)}</span></>
           ) : (
             ' recently'
           )}
-          . This may be a temporary SAM.gov outage or an issue on our end &mdash; existing opportunities remain fully searchable.
-        </span>
-        <a
-          href="https://sam.gov/alerts"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 font-medium text-amber-300 underline decoration-amber-400/40 underline-offset-[3px] transition-colors hover:text-amber-200 hover:decoration-amber-300"
-        >
-          Check SAM.gov status
-          <ExternalLink size={12} className="shrink-0" />
-        </a>
+          . Possibly a temporary SAM.gov outage or an issue on our end.{' '}
+          <a
+            href="https://sam.gov/alerts"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-nowrap font-medium text-amber-300 underline decoration-amber-400/40 underline-offset-2 transition-colors hover:text-amber-200 hover:decoration-amber-300"
+          >
+            Check SAM.gov status
+            <ExternalLink size={11} className="ml-0.5 inline align-baseline" />
+          </a>
+        </p>
         <button
           type="button"
           onClick={handleDismiss}
           aria-label="Dismiss notice"
-          className="ml-0.5 inline-flex shrink-0 items-center rounded p-0.5 text-amber-400/70 transition-colors hover:bg-amber-400/10 hover:text-amber-200"
+          className="-mr-1 -mt-0.5 shrink-0 rounded p-1 text-amber-400/70 transition-colors hover:bg-amber-400/10 hover:text-amber-200"
         >
-          <X size={14} />
+          <X size={15} />
         </button>
       </div>
     </div>
