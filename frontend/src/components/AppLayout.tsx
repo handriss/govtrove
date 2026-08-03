@@ -105,7 +105,7 @@ function StaleDataBanner() {
   };
 
   return (
-    <div className="relative border-b border-amber-500/20 bg-amber-500/[0.08] py-2.5 pl-4 pr-11">
+    <div className="border-b border-amber-500/20 bg-amber-500/[0.08] px-4 py-2.5">
       <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13px] leading-relaxed">
         <AlertTriangle size={15} className="shrink-0 text-amber-400" />
         <span className="text-amber-100/85">
@@ -126,15 +126,15 @@ function StaleDataBanner() {
           Check SAM.gov status
           <ExternalLink size={12} className="shrink-0" />
         </a>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Dismiss notice"
+          className="ml-0.5 inline-flex shrink-0 items-center rounded p-0.5 text-amber-400/70 transition-colors hover:bg-amber-400/10 hover:text-amber-200"
+        >
+          <X size={14} />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={handleDismiss}
-        aria-label="Dismiss notice"
-        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-amber-400/60 transition-colors hover:bg-amber-400/10 hover:text-amber-200"
-      >
-        <X size={15} />
-      </button>
     </div>
   );
 }
