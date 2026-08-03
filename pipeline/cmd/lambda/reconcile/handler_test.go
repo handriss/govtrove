@@ -39,6 +39,37 @@ var _ = Describe("Reconcile Handler", func() {
 		return b
 	}
 
+	Context("upstream-data safeguard", func() {
+		It("aborts before any deactivation when the active CSV is anomalously small", func() {
+			activeRunID := uuid.New()
+			deactivated := false
+
+			store.GetSnapCSVRawDataFn = func(_ context.Context, _ uuid.UUID) ([]map[string]string, error) {
+				return []map[string]string{
+					{"NoticeId": "OPP-001", "Title": "Only one row", "ArchiveDate": "2026-12-01"},
+				}, nil
+			}
+			store.MarkDisappearedInactiveFn = func(_ context.Context, _ uuid.UUID) (int, error) {
+				deactivated = true
+				return 0, nil
+			}
+			store.DeactivateExpiredOpportunitiesFn = func(_ context.Context) (int, int, error) {
+				deactivated = true
+				return 0, 0, nil
+			}
+			h.MinActiveCSVRows = 100 // fixture has 1 row, far below the floor
+
+			event := buildEvent([]IngestionResult{
+				{Status: "ok", RunID: activeRunID.String(), JobType: "snapshot-csv"},
+			}, nil)
+
+			_, err := h.Handle(ctx, event)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("aborting reconcile"))
+			Expect(deactivated).To(BeFalse(), "no deactivation should run when the active CSV is anomalous")
+		})
+	})
+
 	Context("with active ingestion results", func() {
 		var activeRunID uuid.UUID
 

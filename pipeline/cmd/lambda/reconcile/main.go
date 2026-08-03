@@ -100,6 +100,10 @@ type Output struct {
 type Handler struct {
 	Store  database.Store
 	Logger *slog.Logger
+	// MinActiveCSVRows aborts reconcile if the active CSV has fewer rows than this,
+	// guarding against an empty/corrupt upstream file mass-deactivating the catalog.
+	// 0 disables the check (used in tests, which run with small fixtures).
+	MinActiveCSVRows int
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
@@ -190,6 +194,16 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			csvOpps[opp.NoticeID] = opp
 		}
 		h.Logger.Info("active CSV loaded", "run_id", activeRunID, "count", len(opps))
+
+		// Safeguard against upstream data corruption. SAM.gov's active CSV is
+		// consistently ~70-80k rows; an anomalously small or empty file signals an
+		// upstream problem — as on 2026-07-29, when an empty extract made reconcile
+		// treat the whole catalog as "disappeared" and deactivated ~78k opportunities.
+		// Abort BEFORE any deactivation so a bad upstream file can never wipe the
+		// catalog again. The error surfaces via the Step Functions SNS failure alert.
+		if h.MinActiveCSVRows > 0 && len(opps) < h.MinActiveCSVRows {
+			return nil, fmt.Errorf("active CSV has only %d rows (expected ~78k, min %d) — likely a SAM.gov upstream data issue; aborting reconcile to protect the catalog from mass-deactivation", len(opps), h.MinActiveCSVRows)
+		}
 	}
 
 	// 4. Load API opps
@@ -417,6 +431,6 @@ func (h *Handler) loadCSVOpps(ctx context.Context, runID uuid.UUID, snapshotDate
 }
 
 func main() {
-	h := &Handler{Store: db, Logger: logger}
+	h := &Handler{Store: db, Logger: logger, MinActiveCSVRows: 20000}
 	lambda.Start(h.Handle)
 }
