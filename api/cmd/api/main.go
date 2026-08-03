@@ -68,11 +68,23 @@ func main() {
 	// Log that we're starting (helps debug container startup issues)
 	logger.Info("starting database connection", "url_length", len(cfg.DatabaseURL))
 
+	// Tune idle-connection lifetimes so the pool drains when idle: MaxConnIdleTime
+	// is kept well under Neon's 5-minute autosuspend, so the compute can scale to
+	// zero and the pool never reuses a connection a suspend already severed.
+	var poolCfg *pgxpool.Config
+	poolCfg, err = pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("failed to parse database url", "error", err)
+		os.Exit(1)
+	}
+	poolCfg.MaxConnIdleTime = 30 * time.Second
+	poolCfg.MaxConnLifetime = 30 * time.Minute
+
 	// Retry database connection with exponential backoff
 	var pool *pgxpool.Pool
 	for attempt := 1; attempt <= 5; attempt++ {
 		connCtx, connCancel := context.WithTimeout(ctx, 30*time.Second)
-		pool, err = pgxpool.New(connCtx, cfg.DatabaseURL)
+		pool, err = pgxpool.NewWithConfig(connCtx, poolCfg)
 		connCancel()
 		if err != nil {
 			logger.Error("failed to create pool", "error", err, "attempt", attempt)
@@ -243,6 +255,7 @@ func main() {
 	}))
 
 	r.Get("/health", healthHandler.Check)
+	r.Get("/health/db", healthHandler.CheckDB)
 	r.Get("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte("User-agent: *\nDisallow: /\n"))
