@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Gift } from 'lucide-react';
+import { AlertTriangle, Gift } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
+import { getStatus } from '../services/api';
 import { SidebarProvider, useSidebar } from '../contexts/SidebarContext';
 import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 import AppSidebar from './AppSidebar';
@@ -52,6 +54,68 @@ function PromoBanner() {
   );
 }
 
+// Data-freshness notice driven by the same last_synced_at signal as the staleness
+// watcher: shown whenever opportunity data hasn't refreshed within STALE_THRESHOLD_HOURS.
+// The cause is intentionally hedged (SAM.gov outage vs. a problem on our side) since the
+// banner can't know which, and it discloses the last-updated date (same format as the
+// footer). Threshold-based, so it covers any future staleness and auto-hides once a fresh
+// sync lands. 48h tolerates SAM.gov's daily cadence + weekends without false alarms.
+const STALE_THRESHOLD_HOURS = 48;
+
+function formatSyncTime(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    timeZoneName: 'short',
+  });
+}
+
+function StaleDataBanner() {
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    getStatus()
+      .then((data) => setLastSynced(data.last_synced_at))
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  if (!loaded) return null;
+  const staleMs = STALE_THRESHOLD_HOURS * 60 * 60 * 1000;
+  const isStale = !lastSynced || Date.now() - new Date(lastSynced).getTime() > staleMs;
+  if (!isStale) return null;
+
+  return (
+    <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3">
+      <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 flex-wrap text-center">
+        <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+        <p className="text-sm text-dark-200">
+          Opportunity data hasn&apos;t updated
+          {lastSynced ? (
+            <> since <span className="text-dark-100 font-medium">{formatSyncTime(lastSynced)}</span></>
+          ) : (
+            ' recently'
+          )}
+          . This could be a temporary SAM.gov data outage or an issue on our end &mdash; we&apos;re looking into it. Existing opportunities remain fully searchable.{' '}
+          <a
+            href="https://sam.gov/alerts"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-400 hover:text-amber-300 underline underline-offset-2 font-medium"
+          >
+            Check SAM.gov status
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AppLayoutInner() {
   const { isAuthenticated } = useAppAuth();
   const { collapsed } = useSidebar();
@@ -59,6 +123,7 @@ function AppLayoutInner() {
 
   return (
     <>
+      <StaleDataBanner />
       <PromoBanner />
       {isAuthenticated && (
         <>
