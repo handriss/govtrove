@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { AlertTriangle, Gift } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Gift, X } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getStatus } from '../services/api';
 import { SidebarProvider, useSidebar } from '../contexts/SidebarContext';
@@ -61,6 +61,7 @@ function PromoBanner() {
 // footer). Threshold-based, so it covers any future staleness and auto-hides once a fresh
 // sync lands. 48h tolerates SAM.gov's daily cadence + weekends without false alarms.
 const STALE_THRESHOLD_HOURS = 48;
+const STALE_DISMISS_KEY = 'govtrove_stale_dismissed';
 
 function formatSyncTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -77,41 +78,63 @@ function formatSyncTime(iso: string): string {
 function StaleDataBanner() {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     getStatus()
-      .then((data) => setLastSynced(data.last_synced_at))
+      .then((data) => {
+        setLastSynced(data.last_synced_at);
+        // Stay dismissed only for the exact stale state the user dismissed; if a
+        // later/different stale state occurs (last_synced_at changes), show again.
+        if (sessionStorage.getItem(STALE_DISMISS_KEY) === (data.last_synced_at ?? 'null')) {
+          setDismissed(true);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoaded(true));
   }, []);
 
-  if (!loaded) return null;
+  if (!loaded || dismissed) return null;
   const staleMs = STALE_THRESHOLD_HOURS * 60 * 60 * 1000;
   const isStale = !lastSynced || Date.now() - new Date(lastSynced).getTime() > staleMs;
   if (!isStale) return null;
 
+  const handleDismiss = () => {
+    sessionStorage.setItem(STALE_DISMISS_KEY, lastSynced ?? 'null');
+    setDismissed(true);
+  };
+
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-3">
-      <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 flex-wrap text-center">
-        <AlertTriangle size={16} className="text-amber-400 shrink-0" />
-        <p className="text-sm text-dark-200">
+    <div className="relative border-b border-amber-500/20 bg-amber-500/[0.08] py-2.5 pl-4 pr-11">
+      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13px] leading-relaxed">
+        <AlertTriangle size={15} className="shrink-0 text-amber-400" />
+        <span className="text-amber-100/85">
           Opportunity data hasn&apos;t updated
           {lastSynced ? (
-            <> since <span className="text-dark-100 font-medium">{formatSyncTime(lastSynced)}</span></>
+            <> since <span className="font-semibold text-amber-50">{formatSyncTime(lastSynced)}</span></>
           ) : (
             ' recently'
           )}
-          . This could be a temporary SAM.gov data outage or an issue on our end &mdash; we&apos;re looking into it. Existing opportunities remain fully searchable.{' '}
-          <a
-            href="https://sam.gov/alerts"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-400 hover:text-amber-300 underline underline-offset-2 font-medium"
-          >
-            Check SAM.gov status
-          </a>
-        </p>
+          . This may be a temporary SAM.gov outage or an issue on our end &mdash; existing opportunities remain fully searchable.
+        </span>
+        <a
+          href="https://sam.gov/alerts"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 font-medium text-amber-300 underline decoration-amber-400/40 underline-offset-[3px] transition-colors hover:text-amber-200 hover:decoration-amber-300"
+        >
+          Check SAM.gov status
+          <ExternalLink size={12} className="shrink-0" />
+        </a>
       </div>
+      <button
+        type="button"
+        onClick={handleDismiss}
+        aria-label="Dismiss notice"
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-amber-400/60 transition-colors hover:bg-amber-400/10 hover:text-amber-200"
+      >
+        <X size={15} />
+      </button>
     </div>
   );
 }
