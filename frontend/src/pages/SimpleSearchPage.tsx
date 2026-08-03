@@ -172,8 +172,11 @@ export default function SimpleSearchPage() {
   }, [fs.dataReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(() => {
-    if (hasActiveFilters) triggerSearch();
-  }, [hasActiveFilters, triggerSearch]);
+    // Always trigger — the auto-search effect no-ops when there are no active
+    // filters. Gating on hasActiveFilters here dropped the search when a keyword
+    // was committed in the same click (stale value, before the state update applied).
+    triggerSearch();
+  }, [triggerSearch]);
 
   const handleQuerySuggestion = useCallback((suggested: string) => {
     fs.setFilter('keyword', suggested);

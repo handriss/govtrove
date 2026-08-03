@@ -13,10 +13,10 @@ interface KeywordChipInputProps {
 }
 
 const PLACEHOLDER_HINTS = [
-  'Search contracts, solicitations, awards...',
-  'Try: cybersecurity, cloud migration',
-  'Tip: press Enter to add multiple keywords',
-  'Try: IT services, construction',
+  'Search contracts & awards…',
+  'Try: cybersecurity, cloud',
+  'Press Enter to add keywords',
+  'Try: construction, staffing',
 ];
 
 // Strip surrounding quotes for display
@@ -79,14 +79,20 @@ const KeywordChipInput = forwardRef<HTMLInputElement, KeywordChipInputProps>(
       return () => clearInterval(interval);
     }, [chips.length, inputText]);
 
+    const submit = () => {
+      // Commit any text the user typed but didn't press Enter on, so the
+      // magnifying-glass button searches that term instead of dropping it.
+      if (inputText.trim()) {
+        addChip(inputText);
+        setInputText('');
+      }
+      onSubmit?.();
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (inputText.trim()) {
-          addChip(inputText);
-          setInputText('');
-        }
-        onSubmit?.();
+        submit();
       } else if (e.key === 'Backspace' && !inputText && chips.length > 0) {
         removeChip(chips.length - 1);
       }
@@ -188,7 +194,7 @@ const KeywordChipInput = forwardRef<HTMLInputElement, KeywordChipInputProps>(
             />
             {chips.length === 0 && !inputText && (
               <span
-                className={`absolute left-0 top-1/2 -translate-y-1/2 text-dark-400 pointer-events-none
+                className={`absolute inset-x-0 top-1/2 -translate-y-1/2 truncate pr-8 text-dark-400 pointer-events-none
                   transition-opacity duration-300 ${hintFading ? 'opacity-0' : 'opacity-100'}
                   ${isLarge ? 'text-lg' : 'text-sm'}`}
               >
@@ -214,7 +220,7 @@ const KeywordChipInput = forwardRef<HTMLInputElement, KeywordChipInputProps>(
         )}
         {hasSubmit && (
           <button
-            onClick={onSubmit}
+            onClick={submit}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl
               text-dark-500 hover:text-dark-300 transition-colors"
             aria-label="Search"
