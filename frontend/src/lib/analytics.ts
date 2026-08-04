@@ -76,3 +76,37 @@ export function trackSignUp(ph: PostHog | undefined) {
 export function trackFounderCtaClicked(ph: PostHog | undefined, variant: string) {
   ph?.capture('founder_cta_clicked', { variant });
 }
+
+// --- Code-finder flow (cookieless: flow_id arrives via the ?fid= URL param) ---
+
+export function registerFlowId(ph: PostHog | undefined, flowId: string) {
+  // Super-property: every subsequent event in this page load carries flow_id,
+  // so the finder→app funnel can be aggregated by it without cookies.
+  ph?.register({ flow_id: flowId });
+}
+
+export function trackCodeFinderLanding(
+  ph: PostHog | undefined,
+  flowId: string,
+  codeType: string | null,
+  code: string | null,
+) {
+  ph?.capture('code_finder_app_landing', { flow_id: flowId, code_type: codeType, code });
+}
+
+export function trackCodeFinderZeroOpportunities(
+  ph: PostHog | undefined,
+  codeType: string | null,
+  code: string | null,
+) {
+  ph?.capture('code_finder_zero_opportunities', { code_type: codeType, code });
+}
+
+export function trackAlertCreated(
+  ph: PostHog | undefined,
+  source: string,
+  codeType?: string | null,
+  code?: string | null,
+) {
+  ph?.capture('alert_created', { source, code_type: codeType ?? null, code: code ?? null });
+}

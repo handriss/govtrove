@@ -6,10 +6,11 @@ type CodeMatchRequest struct {
 }
 
 type CodeMatch struct {
-	Code       string  `json:"code"`
-	Title      string  `json:"title"`
-	Level      int     `json:"level"`
-	Similarity float64 `json:"similarity"`
+	Code        string  `json:"code"`
+	Title       string  `json:"title"`
+	Level       int     `json:"level"`
+	Similarity  float64 `json:"similarity"`
+	ActiveCount int     `json:"active_count"`
 }
 
 type CodeCorrelation struct {

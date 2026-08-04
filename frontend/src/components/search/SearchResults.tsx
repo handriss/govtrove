@@ -16,6 +16,8 @@ import SortDropdown from './SortDropdown';
 import SignupPromptModal, { type SignupPromptContext } from '../SignupPromptModal';
 import type { OpportunityListItem, FacetResult } from '../../types/api';
 import type { FilterState } from '../../hooks/useFilterState';
+import { usePostHog } from '@posthog/react';
+import { trackCodeFinderZeroOpportunities } from '../../lib/analytics';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
 
@@ -43,6 +45,7 @@ interface SearchResultsProps {
   error?: string | null;
   onRetry?: () => void;
   isAuthenticated?: boolean;
+  onCreateAlert?: () => void;
 }
 
 export default function SearchResults({
@@ -69,7 +72,15 @@ export default function SearchResults({
   error,
   onRetry,
   isAuthenticated,
+  onCreateAlert,
 }: SearchResultsProps) {
+  const codeFilter = useMemo((): { type: 'naics' | 'psc'; code: string } | null => {
+    const naics = ((filters.naics as string[] | undefined) || []);
+    const psc = ((filters.psc as string[] | undefined) || []);
+    if (naics.length === 1 && psc.length === 0) return { type: 'naics', code: naics[0] };
+    if (psc.length === 1 && naics.length === 0) return { type: 'psc', code: psc[0] };
+    return null;
+  }, [filters.naics, filters.psc]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -212,6 +223,9 @@ export default function SearchResults({
           querySuggestion={querySuggestion}
           onQuerySuggestionClick={onQuerySuggestionClick}
           onClearAll={clearAllFilters}
+          codeFilter={codeFilter}
+          isAuthenticated={isAuthenticated}
+          onCreateAlert={onCreateAlert}
         />
       )}
 
@@ -305,13 +319,25 @@ function ZeroResults({
   querySuggestion,
   onQuerySuggestionClick,
   onClearAll,
+  codeFilter,
+  isAuthenticated,
+  onCreateAlert,
 }: {
   keyword?: string;
   suggestion: string | null;
   querySuggestion?: string | null;
   onQuerySuggestionClick?: (suggestion: string) => void;
   onClearAll: () => void;
+  codeFilter?: { type: 'naics' | 'psc'; code: string } | null;
+  isAuthenticated?: boolean;
+  onCreateAlert?: () => void;
 }) {
+  const posthog = usePostHog();
+  const [alertDone, setAlertDone] = useState(false);
+  useEffect(() => {
+    if (codeFilter) trackCodeFinderZeroOpportunities(posthog, codeFilter.type, codeFilter.code);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeFilter?.type, codeFilter?.code]);
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="w-16 h-16 rounded-2xl bg-dark-800/50 border border-dark-700/30 flex items-center justify-center mb-6">
@@ -341,13 +367,35 @@ function ZeroResults({
       {suggestion && (
         <p className="text-dark-400 text-sm mb-4">{suggestion}</p>
       )}
+
+      {codeFilter && (
+        <div className="w-full max-w-md mb-5 rounded-xl border border-accent/25 bg-accent/5 p-5">
+          <p className="text-sm text-dark-300 mb-3">
+            No open opportunities under{' '}
+            <span className="font-mono text-dark-100">{codeFilter.type.toUpperCase()} {codeFilter.code}</span>{' '}
+            right now — but new ones are posted daily. Get an email the moment one appears.
+          </p>
+          {alertDone ? (
+            <p className="text-sm text-accent font-medium">✓ Alert created — we&rsquo;ll email you when new opportunities match.</p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { onCreateAlert?.(); if (isAuthenticated) setAlertDone(true); }}
+              className="px-4 py-2 text-sm rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors font-medium"
+            >
+              {isAuthenticated ? 'Notify me when opportunities appear' : 'Sign in to set an alert'}
+            </button>
+          )}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={onClearAll}
         className="px-4 py-2 text-sm rounded-lg bg-accent/10 text-accent
           hover:bg-accent/20 transition-colors"
       >
-        Clear all filters
+        {codeFilter ? 'Or clear all filters' : 'Clear all filters'}
       </button>
 
       <div className="mt-8 text-left bg-dark-900/50 border border-dark-800/50 rounded-xl p-5 max-w-sm">

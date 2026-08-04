@@ -567,6 +567,12 @@
 
     <script>
     var API_URL = 'https://api.govtrove.com';
+    // Ephemeral, in-memory flow id (no cookie/storage) — links this session's finder
+    // events to the app landing for a privacy-preserving funnel. Gone when the tab closes.
+    var FLOW_ID = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+    function appUrl(param, code) {
+        return 'https://app.govtrove.com/?' + param + '=' + encodeURIComponent(code) + '&fid=' + FLOW_ID;
+    }
 
     async function findCodes() {
         var desc = document.getElementById('description').value.trim();
@@ -632,6 +638,13 @@
 
         data.matches.forEach(function(m) {
             var pct = Math.round(m.similarity * 100);
+            var count = m.active_count || 0;
+            var countHtml = count > 0
+                ? '<span style="color:var(--accent);font-weight:600">' + count + ' active</span>'
+                : '<span style="color:var(--text-muted)">no active opportunities</span>';
+            var linkHtml = count > 0
+                ? '<a href="' + appUrl('psc', m.code) + '" class="search-link">Search contracts &rarr;</a>'
+                : '<a href="' + appUrl('psc', m.code) + '" class="search-link">Set an alert &rarr;</a>';
             var card = document.createElement('div');
             card.className = 'code-card';
             card.innerHTML =
@@ -641,8 +654,8 @@
                     '<div class="score-bar-container"><div class="score-bar" style="width:' + pct + '%"></div></div>' +
                 '</div>' +
                 '<div class="code-card-meta">' +
-                    '<span class="score-label">' + pct + '% match</span>' +
-                    '<a href="https://app.govtrove.com/?psc=' + encodeURIComponent(m.code) + '" class="search-link">Search contracts &rarr;</a>' +
+                    '<span class="score-label">' + pct + '% match &middot; ' + countHtml + '</span>' +
+                    linkHtml +
                 '</div>';
             matchesGrid.appendChild(card);
         });
@@ -652,7 +665,7 @@
             data.correlations.forEach(function(c) {
                 var chip = document.createElement('a');
                 chip.className = 'correlation-chip';
-                chip.href = 'https://app.govtrove.com/?naics=' + encodeURIComponent(c.code);
+                chip.href = appUrl('naics', c.code);
                 chip.innerHTML =
                     '<span class="chip-code">' + escHtml(c.code) + '</span>' +
                     '<span class="chip-count">' + c.co_occurrence_count + ' contracts</span>';
@@ -665,7 +678,7 @@
 
         resultsEl.classList.add('visible');
         ctaEl.style.display = '';
-        document.getElementById('cta-link').href = 'https://app.govtrove.com/?psc=' + encodeURIComponent(topCode);
+        document.getElementById('cta-link').href = appUrl('psc', topCode);
         resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -682,8 +695,19 @@
     });
 
     function capturePH(event, props) {
-        try { if (window.posthog) window.posthog.capture(event, props); } catch (e) {}
+        try {
+            if (window.posthog) window.posthog.capture(event, Object.assign({ flow_id: FLOW_ID }, props || {}));
+        } catch (e) {}
     }
+
+    // PostHog loads async; run cb once it's ready (capped retry).
+    function whenPosthog(cb, tries) {
+        tries = tries || 0;
+        if (window.posthog && window.posthog.capture) { cb(); return; }
+        if (tries > 50) return;
+        setTimeout(function () { whenPosthog(cb, tries + 1); }, 100);
+    }
+    whenPosthog(function () { capturePH('code_finder_view', { code_type: 'psc' }); });
 
     document.addEventListener('click', function(e) {
         var link = e.target.closest ? e.target.closest('a.search-link, a.correlation-chip, #cta-link') : null;

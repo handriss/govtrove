@@ -16,7 +16,7 @@ import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
 import { usePostHog } from '@posthog/react';
 import { getFacetCounts } from '../services/api';
-import { trackSearch, trackSavedSearchCreated } from '../lib/analytics';
+import { trackSearch, trackSavedSearchCreated, registerFlowId, trackCodeFinderLanding, trackAlertCreated } from '../lib/analytics';
 import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
@@ -50,6 +50,19 @@ export default function SimpleSearchPage() {
     getFacetCounts({})
       .then((r) => setHeroTotal(r.total))
       .catch(() => {});
+  }, []);
+
+  // Cookieless finder→app flow: pick up the ephemeral flow_id from ?fid= and register
+  // it so app events join the finder funnel. Runs once on mount.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fid = params.get('fid');
+    if (!fid) return;
+    registerFlowId(posthog, fid);
+    const naics = params.get('naics');
+    const psc = params.get('psc');
+    trackCodeFinderLanding(posthog, fid, naics ? 'naics' : psc ? 'psc' : null, naics || psc || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [pageSize, setPageSize] = useState(() => {
@@ -188,6 +201,21 @@ export default function SimpleSearchPage() {
     localStorage.setItem(PAGE_SIZE_KEY, String(size));
     fs.setFilter('page', 1);
   }, [fs]);
+
+  // Empty-state alert CTA: create a saved-search alert for the current (code) filter.
+  const handleCreateCodeAlert = useCallback(async () => {
+    if (!isAuthenticated) { setSignupPrompt('save-search'); return; }
+    const naics = (fs.filters.naics as string[] | undefined) || [];
+    const psc = (fs.filters.psc as string[] | undefined) || [];
+    const code = naics.length === 1 ? { type: 'naics' as const, value: naics[0] }
+      : psc.length === 1 ? { type: 'psc' as const, value: psc[0] } : null;
+    const { sort, sortDir, page: _page, ...filterData } = fs.filters;
+    const name = code ? `${code.type.toUpperCase()} ${code.value} alerts` : 'Opportunity alert';
+    try {
+      await saveCurrentSearch(name, filterData, true);
+      trackAlertCreated(posthog, 'zero_results_finder', code?.type ?? null, code?.value ?? null);
+    } catch { /* ignore */ }
+  }, [isAuthenticated, fs.filters, saveCurrentSearch, posthog]);
 
   const handleSaveSearch = useCallback(async () => {
     if (!saveSearchName.trim()) return;
@@ -516,6 +544,7 @@ export default function SimpleSearchPage() {
             error={error}
             onRetry={handleSubmit}
             isAuthenticated={isAuthenticated}
+            onCreateAlert={handleCreateCodeAlert}
           />
           <SearchMobileFilters
             open={mobileFiltersOpen}

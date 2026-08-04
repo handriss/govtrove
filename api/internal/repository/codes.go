@@ -37,6 +37,59 @@ func (r *CodeRepository) LogLookup(ctx context.Context, codeType, description st
 	return nil
 }
 
+// defaultFinderNoticeTypes mirrors the frontend DEFAULT_NOTICE_TYPES so finder counts
+// match what an app search shows by default. Keep in sync with
+// frontend/src/components/filters/constants.ts.
+var defaultFinderNoticeTypes = []string{
+	"Solicitation",
+	"Presolicitation",
+	"Combined Synopsis/Solicitation",
+	"Sources Sought",
+	"Special Notice",
+}
+
+// ActiveCountsByCode returns, per code, the number of open opportunities an app search
+// for that code shows by default. It reproduces the app's default filters exactly:
+// active + latest version + default notice types + "Active Only" (response_deadline
+// >= today), and prefix matching so a category code (e.g. PSC "S") expands to its
+// children just like the app does on ?psc=S. This keeps the finder's counts consistent
+// with the click-through (fixes the page-vs-app count drift).
+func (r *CodeRepository) ActiveCountsByCode(ctx context.Context, codeType string, codes []string) (map[string]int, error) {
+	counts := make(map[string]int, len(codes))
+	if len(codes) == 0 {
+		return counts, nil
+	}
+	col := "naics_code"
+	if codeType == "psc" {
+		col = "classification_code"
+	}
+	query := fmt.Sprintf(`
+		SELECT c.code, COALESCE(sub.cnt, 0)
+		FROM unnest($1::text[]) AS c(code)
+		LEFT JOIN LATERAL (
+			SELECT count(*) AS cnt
+			FROM opportunities o
+			WHERE o.active = true AND o.is_latest = true
+			  AND o.type = ANY($2)
+			  AND o.response_deadline >= CURRENT_DATE
+			  AND o.%s LIKE c.code || '%%'
+		) sub ON true`, col)
+	rows, err := r.pool.Query(ctx, query, codes, defaultFinderNoticeTypes)
+	if err != nil {
+		return nil, fmt.Errorf("counting active opportunities by code: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var code string
+		var n int
+		if err := rows.Scan(&code, &n); err != nil {
+			return nil, fmt.Errorf("scanning code count: %w", err)
+		}
+		counts[code] = n
+	}
+	return counts, rows.Err()
+}
+
 func (r *CodeRepository) FindSimilar(ctx context.Context, codeType string, embedding []float32, limit int) ([]models.CodeMatch, error) {
 	vec := formatVector(embedding)
 	query := `

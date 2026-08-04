@@ -80,6 +80,16 @@ func (h *CodeHandler) matchCodes(w http.ResponseWriter, r *http.Request, codeTyp
 		matchedCodes[i] = m.Code
 	}
 
+	// Active-opportunity count per matched code (same predicate as an app search for
+	// that code), so users can see which codes actually have opportunities before clicking.
+	if counts, err := h.repo.ActiveCountsByCode(r.Context(), codeType, matchedCodes); err != nil {
+		h.logger.Error("failed to count active opportunities", "error", err)
+	} else {
+		for i := range matches {
+			matches[i].ActiveCount = counts[matches[i].Code]
+		}
+	}
+
 	correlations, err := h.repo.GetCorrelations(r.Context(), codeType, matchedCodes, 10)
 	if err != nil {
 		h.logger.Error("failed to get correlations", "error", err)
