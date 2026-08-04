@@ -6,6 +6,7 @@ import { AuthProvider, useAppAuth } from './contexts/AuthContext';
 import SimpleSearchPage from './pages/SimpleSearchPage';
 import NotFoundPage from './pages/NotFoundPage';
 import useUTMCapture from './hooks/useUTMCapture';
+import useTawk from './hooks/useTawk';
 import AppLayout from './components/AppLayout';
 
 const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage'));
@@ -95,6 +96,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 function AppRoutes() {
   useUTMCapture();
+  useTawk();
 
   // Persist promo code across auth redirects
   useEffect(() => {
