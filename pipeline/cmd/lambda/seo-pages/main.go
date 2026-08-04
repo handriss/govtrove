@@ -344,6 +344,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?naics=%s", code),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
+			NoIndex:         c.TotalCount == 0,
 			IsNAICS:         true,
 		}
 
@@ -357,7 +358,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		key := fmt.Sprintf("contracts/naics/%s.html", code)
 		uploads <- uploadItem{key: key, body: body, contentType: "text/html; charset=utf-8"}
 		naicsCount++
-		sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/naics/%s.html", code))
+		// Thin (0-opportunity) pages are noindex'd — keep them out of the sitemap too.
+		if c.TotalCount > 0 {
+			sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/naics/%s.html", code))
+		}
 
 		if c.TotalCount > 0 {
 			naicsEntries = append(naicsEntries, indexEntry{
@@ -664,6 +668,7 @@ type pageData struct {
 	CTALink         string
 	CTACountLabel   string
 	UpdatedDate     string
+	NoIndex         bool
 	IsSetAside      bool
 	IsNAICS         bool
 	IsAgency        bool
@@ -686,6 +691,9 @@ const pageTmpl = `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.SEOTitle}} | GovTrove</title>
     <meta name="description" content="{{.MetaDescription}}">
+    {{- if .NoIndex}}
+    <meta name="robots" content="noindex,follow">
+    {{- end}}
     {{- if not .IsIndex}}
     <link rel="canonical" href="https://govtrove.com/contracts/{{.CanonicalPath}}.html">
     {{- else}}
