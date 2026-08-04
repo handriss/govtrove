@@ -244,7 +244,6 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	staticPages := []string{
 		"https://govtrove.com/",
 		"https://govtrove.com/blog/",
-		"https://govtrove.com/pricing.html",
 		"https://govtrove.com/naics-code-finder/",
 		"https://govtrove.com/psc-code-finder/",
 		"https://govtrove.com/contracts/",

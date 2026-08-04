@@ -4,7 +4,6 @@
 
 ## Key Pages
 - [Homepage](https://govtrove.com)
-- [Pricing](https://govtrove.com/pricing.html)
 - [Search Opportunities](https://app.govtrove.com)
 
 ## Tools
