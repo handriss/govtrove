@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://govtrove.com/sitemap.xml
+Sitemap: https://govtrove.com/blog-sitemap.xml
