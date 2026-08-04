@@ -73,8 +73,12 @@ func (db *DB) GetSEOPageOpportunities(ctx context.Context, filterCol, filterVal 
 		return nil, fmt.Errorf("invalid filter column: %s", filterCol)
 	}
 
+	// COALESCE the non-nilable text columns: department (and defensively title) can be
+	// NULL for some opportunities, which crashes the row scan into a *string and made
+	// whole NAICS pages fail to generate.
 	query := fmt.Sprintf(`
-		SELECT notice_id, title, department, naics_code, set_aside_code,
+		SELECT notice_id, COALESCE(title, '') AS title, COALESCE(department, '') AS department,
+		       naics_code, set_aside_code,
 		       posted_date, response_deadline, pop_state, solicitation_number
 		FROM opportunities
 		WHERE %s = $1 AND active = true AND is_latest = true
