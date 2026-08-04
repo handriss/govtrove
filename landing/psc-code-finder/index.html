@@ -593,6 +593,15 @@
             if (!resp.ok) throw new Error('Request failed (' + resp.status + ')');
 
             var data = await resp.json();
+            var m = data.matches || [];
+            capturePH('code_finder_search', {
+                code_type: 'psc',
+                result_count: m.length,
+                has_results: m.length > 0,
+                top_code: m.length ? m[0].code : null,
+                top_score: m.length ? Math.round(m[0].similarity * 100) / 100 : null,
+                query: desc
+            });
             renderResults(data);
         } catch (err) {
             errEl.textContent = 'Something went wrong. Please try again.';
@@ -670,6 +679,20 @@
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             findCodes();
         }
+    });
+
+    function capturePH(event, props) {
+        try { if (window.posthog) window.posthog.capture(event, props); } catch (e) {}
+    }
+
+    document.addEventListener('click', function(e) {
+        var link = e.target.closest ? e.target.closest('a.search-link, a.correlation-chip, #cta-link') : null;
+        if (!link) return;
+        capturePH('code_finder_result_click', {
+            code_type: 'psc',
+            target: link.classList.contains('correlation-chip') ? 'correlated-naics' : 'search-contracts',
+            href: link.getAttribute('href')
+        });
     });
     </script>
     <script src="/posthog.js"></script>

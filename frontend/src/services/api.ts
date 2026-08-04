@@ -654,6 +654,49 @@ export async function getAdminSearchEvents(
   return response.json();
 }
 
+// --- Code Finder (NAICS/PSC) analytics ---
+
+export interface CodeLookupStats {
+  total: number;
+  naics: number;
+  psc: number;
+  zero_results: number;
+  last_30d: number;
+  last_7d: number;
+  avg_top_score: number;
+}
+
+export interface CodeLookupAgg {
+  description: string;
+  code_type: string;
+  count: number;
+}
+
+export interface CodeLookupRow {
+  id: number;
+  code_type: string;
+  description: string;
+  result_count: number;
+  top_code: string | null;
+  top_score: number | null;
+  created_at: string;
+}
+
+export interface CodeLookupAnalytics {
+  stats: CodeLookupStats;
+  popular: CodeLookupAgg[];
+  zero_result: CodeLookupAgg[];
+  recent: CodeLookupRow[];
+}
+
+export async function getAdminCodeLookups(token: string): Promise<CodeLookupAnalytics> {
+  const response = await fetch(`${API_BASE}/admin/code-lookups`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(`${response.status}`);
+  return response.json();
+}
+
 // --- MCP Usage ---
 
 export interface McpUsageEvent {

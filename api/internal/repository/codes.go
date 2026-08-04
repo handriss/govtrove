@@ -18,6 +18,25 @@ func NewCodeRepository(pool *pgxpool.Pool) *CodeRepository {
 	return &CodeRepository{pool: pool}
 }
 
+// LogLookup records one code-finder request for usage analytics. topCode/topScore
+// are stored NULL when a lookup returns no matches.
+func (r *CodeRepository) LogLookup(ctx context.Context, codeType, description string, resultCount int, topCode string, topScore float64) error {
+	var tc *string
+	var ts *float64
+	if topCode != "" {
+		tc = &topCode
+		ts = &topScore
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO code_lookups (code_type, description, result_count, top_code, top_score)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		codeType, description, resultCount, tc, ts)
+	if err != nil {
+		return fmt.Errorf("logging code lookup: %w", err)
+	}
+	return nil
+}
+
 func (r *CodeRepository) FindSimilar(ctx context.Context, codeType string, embedding []float32, limit int) ([]models.CodeMatch, error) {
 	vec := formatVector(embedding)
 	query := `

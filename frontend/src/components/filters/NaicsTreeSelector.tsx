@@ -382,6 +382,18 @@ export default function NaicsTreeSelector({
 
       {/* Selected chips */}
       {chips}
+
+      {/* Not sure which code? Link to the standalone finder */}
+      <a
+        href="https://govtrove.com/naics-code-finder/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`flex items-center gap-1.5 text-dark-500 hover:text-accent transition-colors
+          ${inline ? 'mt-2 text-xs' : 'px-2 py-1.5 border-t border-dark-700/30 text-[11px]'}`}
+      >
+        <Search size={inline ? 12 : 10} className="shrink-0" />
+        <span>Not sure? Try the NAICS Code Finder &rarr;</span>
+      </a>
     </>
   );
 

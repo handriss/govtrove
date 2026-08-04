@@ -302,6 +302,18 @@ func (h *AdminHandler) ListSearchEvents(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (h *AdminHandler) ListCodeLookups(w http.ResponseWriter, r *http.Request) {
+	analytics, err := h.pipelineRepo.CodeLookupAnalytics(r.Context(), 100)
+	if err != nil {
+		h.logger.Error("code lookup analytics failed", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(analytics)
+}
+
 func (h *AdminHandler) ListMcpUsage(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	if p := r.URL.Query().Get("page"); p != "" {

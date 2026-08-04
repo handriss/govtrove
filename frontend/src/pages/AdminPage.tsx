@@ -12,6 +12,7 @@ import {
   getAdminInviteLinks, adminCreateInviteLink, getAdminInviteLinkDetail, adminUpdateInviteLink, adminDeactivateInviteLink,
   getAdminGiftCodes, adminCreateGiftCode, getAdminGiftCodeDetail, adminUpdateGiftCode, adminDeactivateGiftCode,
   getAdminMcpUsage, adminSetFreeForever,
+  getAdminCodeLookups, type CodeLookupAnalytics,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
   type UsageBucket, type PipelineExecution, type AdminSearchEvent,
@@ -837,6 +838,129 @@ function PipelineRunsTab({ getToken }: { getToken: () => Promise<string> }) {
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+function CodeFinderTab({ getToken }: { getToken: () => Promise<string> }) {
+  const [data, setData] = useState<CodeLookupAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const token = await getToken();
+        const d = await getAdminCodeLookups(token);
+        if (!cancelled) setData(d);
+      } catch {
+        if (!cancelled) setData(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  if (loading) return <p className="text-dark-400 text-sm py-4 text-center">Loading...</p>;
+  if (!data) return <p className="text-dark-400 text-sm py-4 text-center">No data.</p>;
+
+  const s = data.stats;
+  const zeroRate = s.total > 0 ? Math.round((s.zero_results / s.total) * 100) : 0;
+  const avgScorePct = Math.round(s.avg_top_score * 100);
+
+  const stat = (label: string, value: string | number, sub?: string) => (
+    <div className="rounded-xl border border-dark-700/50 p-4 bg-dark-800/20">
+      <p className="text-xs text-dark-400 mb-1">{label}</p>
+      <p className="text-2xl font-semibold text-dark-100">{value}</p>
+      {sub && <p className="text-xs text-dark-500 mt-1">{sub}</p>}
+    </div>
+  );
+
+  const badge = (t: string) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono uppercase ${t === 'naics' ? 'bg-accent/15 text-accent' : 'bg-purple-500/15 text-purple-300'}`}>{t}</span>
+  );
+
+  return (
+    <section className="space-y-8">
+      <div>
+        <h2 className="text-lg font-medium text-dark-200 mb-4">Code Finder Analytics</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {stat('Total lookups', s.total.toLocaleString())}
+          {stat('NAICS / PSC', `${s.naics.toLocaleString()} / ${s.psc.toLocaleString()}`)}
+          {stat('Last 7d / 30d', `${s.last_7d.toLocaleString()} / ${s.last_30d.toLocaleString()}`)}
+          {stat('Zero-result rate', `${zeroRate}%`, `${s.zero_results.toLocaleString()} of ${s.total.toLocaleString()}`)}
+          {stat('Avg top match', `${avgScorePct}%`)}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div>
+          <h3 className="text-sm font-medium text-dark-300 mb-3">Popular Descriptions</h3>
+          {data.popular.length === 0 ? (
+            <p className="text-dark-500 text-sm">No lookups yet.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {data.popular.slice(0, 15).map((p, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  {badge(p.code_type)}
+                  <span className="text-dark-300 truncate flex-1">{p.description}</span>
+                  <span className="text-dark-400 tabular-nums">{p.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h3 className="text-sm font-medium text-dark-300 mb-3">Zero-Result Descriptions</h3>
+          {data.zero_result.length === 0 ? (
+            <p className="text-dark-500 text-sm">None — every lookup matched something.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {data.zero_result.slice(0, 15).map((p, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  {badge(p.code_type)}
+                  <span className="text-dark-300 truncate flex-1">{p.description}</span>
+                  <span className="text-red-400 tabular-nums">{p.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-medium text-dark-300 mb-3">Recent Lookups</h3>
+        {data.recent.length === 0 ? (
+          <p className="text-dark-500 text-sm">No lookups yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-dark-700/50">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-dark-500 border-b border-dark-700/50">
+                  <th className="px-4 py-2 font-medium">Type</th>
+                  <th className="px-4 py-2 font-medium">Description</th>
+                  <th className="px-4 py-2 font-medium">Results</th>
+                  <th className="px-4 py-2 font-medium">Top match</th>
+                  <th className="px-4 py-2 font-medium">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.recent.map((r) => (
+                  <tr key={r.id} className="border-b border-dark-800/50">
+                    <td className="px-4 py-2">{badge(r.code_type)}</td>
+                    <td className="px-4 py-2 text-dark-300 max-w-[420px] truncate">{r.description}</td>
+                    <td className={`px-4 py-2 tabular-nums ${r.result_count === 0 ? 'text-red-400' : 'text-dark-400'}`}>{r.result_count}</td>
+                    <td className="px-4 py-2 font-mono text-dark-400">{r.top_code ? `${r.top_code} (${Math.round((r.top_score || 0) * 100)}%)` : '—'}</td>
+                    <td className="px-4 py-2 text-xs text-dark-500 tabular-nums">{new Date(r.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -2507,7 +2631,7 @@ function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'gift-codes' | 'mcp-usage';
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'code-finders' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'gift-codes' | 'mcp-usage';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -2532,6 +2656,7 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'usage' && <UsageChartTab getToken={getToken} />}
       {activeTab === 'pipeline' && <PipelineRunsTab getToken={getToken} />}
       {activeTab === 'searches' && <SearchAnalyticsTab getToken={getToken} />}
+      {activeTab === 'code-finders' && <CodeFinderTab getToken={getToken} />}
       {activeTab === 'email-prefs' && <EmailPrefsTab getToken={getToken} />}
       {activeTab === 'sent-emails' && <SentEmailsTab getToken={getToken} />}
       {activeTab === 'promo-codes' && <PromoCodesTab users={users} getToken={getToken} />}

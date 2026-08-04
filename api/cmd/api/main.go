@@ -358,6 +358,7 @@ func main() {
 					r.Get("/pipeline-runs", adminHandler.ListPipelineRuns)
 					r.Get("/pipeline-runs/{id}", adminHandler.GetPipelineRunDetail)
 					r.Get("/search-events", adminHandler.ListSearchEvents)
+				r.Get("/code-lookups", adminHandler.ListCodeLookups)
 					r.Get("/mcp-usage", adminHandler.ListMcpUsage)
 					r.Get("/data-quality", adminHandler.ListDataQualityIssues)
 					r.Get("/data-quality/summary", adminHandler.DataQualitySummary)

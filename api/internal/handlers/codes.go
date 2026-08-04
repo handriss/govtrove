@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,6 +92,21 @@ func (h *CodeHandler) matchCodes(w http.ResponseWriter, r *http.Request, codeTyp
 	if correlations == nil {
 		correlations = []models.CodeCorrelation{}
 	}
+
+	// Fire-and-forget usage logging — never block or fail the response on it.
+	go func(desc string, ms []models.CodeMatch) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var topCode string
+		var topScore float64
+		if len(ms) > 0 {
+			topCode = ms[0].Code
+			topScore = ms[0].Similarity
+		}
+		if err := h.repo.LogLookup(ctx, codeType, desc, len(ms), topCode, topScore); err != nil {
+			h.logger.Warn("failed to log code lookup", "error", err)
+		}
+	}(req.Description, matches)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.CodeMatchResponse{
