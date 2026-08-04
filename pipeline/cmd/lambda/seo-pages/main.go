@@ -322,13 +322,22 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			}
 		}
 
+		seoTitle := fmt.Sprintf("NAICS %s: %s — %d Active Federal Contracts (2026)", code, label, c.TotalCount)
+		metaDesc := fmt.Sprintf("Browse %d active federal contract opportunities under NAICS %s (%s), updated daily from SAM.gov. Filter by set-aside, agency, and deadline — free.", c.TotalCount, code, label)
+		subtitle := fmt.Sprintf("Browse %d active federal contract opportunities classified under NAICS %s.", c.TotalCount, code)
+		if c.TotalCount == 0 {
+			seoTitle = fmt.Sprintf("NAICS %s – %s: Federal Contracting Guide (2026)", code, label)
+			metaDesc = fmt.Sprintf("What NAICS %s (%s) covers and how to find matching federal contracts on SAM.gov — free, daily-updated opportunity search from GovTrove.", code, label)
+			subtitle = fmt.Sprintf("What NAICS %s (%s) means for federal contracting, and how to find matching opportunities.", code, label)
+		}
+
 		data := pageData{
-			SEOTitle:        fmt.Sprintf("NAICS %s – %s Federal Contracts — %d+ Active", code, label, c.TotalCount),
-			MetaDescription: fmt.Sprintf("Browse %d+ active federal contract opportunities under NAICS %s (%s). Filter by set-aside, agency, keyword, and deadline.", c.TotalCount, code, label),
+			SEOTitle:        seoTitle,
+			MetaDescription: metaDesc,
 			CanonicalPath:   fmt.Sprintf("naics/%s", code),
 			Breadcrumb:      fmt.Sprintf("NAICS %s – %s", code, label),
 			H1:              fmt.Sprintf("NAICS %s – %s", code, label),
-			Subtitle:        fmt.Sprintf("Browse %d+ active federal contract opportunities classified under NAICS %s.", c.TotalCount, code),
+			Subtitle:        subtitle,
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
 			Opportunities:   toTemplateOpps(opps),
