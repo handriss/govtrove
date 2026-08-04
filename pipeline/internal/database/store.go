@@ -64,6 +64,9 @@ type Store interface {
 	// Analytics retention
 	DeleteOldSearchEvents(ctx context.Context, days int) (int64, error)
 
+	// Snapshot retention (append-only audit tables)
+	DeleteOldSnapshots(ctx context.Context, snapDays, dqDays int) (int64, error)
+
 	// SEO trend analysis
 	GetNAICSVolumeDelta(ctx context.Context) ([]NAICSVolume, error)
 	GetAgencyVolumeDelta(ctx context.Context) ([]AgencyVolume, error)

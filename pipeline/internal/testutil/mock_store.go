@@ -53,6 +53,7 @@ type MockStore struct {
 	RefreshCodeCorrelationsFn  func(ctx context.Context) error
 
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
+	DeleteOldSnapshotsFn    func(ctx context.Context, snapDays, dqDays int) (int64, error)
 
 	GetNAICSVolumeDeltaFn  func(ctx context.Context) ([]database.NAICSVolume, error)
 	GetAgencyVolumeDeltaFn func(ctx context.Context) ([]database.AgencyVolume, error)
@@ -301,6 +302,13 @@ func (m *MockStore) FailPipelineStep(ctx context.Context, id uuid.UUID, errMsg s
 func (m *MockStore) DeleteOldSearchEvents(ctx context.Context, days int) (int64, error) {
 	if m.DeleteOldSearchEventsFn != nil {
 		return m.DeleteOldSearchEventsFn(ctx, days)
+	}
+	return 0, nil
+}
+
+func (m *MockStore) DeleteOldSnapshots(ctx context.Context, snapDays, dqDays int) (int64, error) {
+	if m.DeleteOldSnapshotsFn != nil {
+		return m.DeleteOldSnapshotsFn(ctx, snapDays, dqDays)
 	}
 	return 0, nil
 }

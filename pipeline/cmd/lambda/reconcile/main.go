@@ -401,6 +401,15 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Info("old search events deleted", "count", deleted)
 	}
 
+	// Prune append-only audit snapshots so they don't grow unbounded (raw CSV/API
+	// payloads + reconcile discrepancies the live app never reads). Keep 14d of raw
+	// snapshots, 30d of the DQ log. Runs after fresh snapshots are written this cycle.
+	if pruned, err := h.Store.DeleteOldSnapshots(ctx, 14, 30); err != nil {
+		h.Logger.Error("failed to prune old snapshots", "error", err)
+	} else if pruned > 0 {
+		h.Logger.Info("old snapshots pruned", "rows", pruned)
+	}
+
 	return &Output{Status: "ok"}, nil
 }
 
