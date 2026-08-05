@@ -15,6 +15,9 @@ import (
 
 var quotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
 
+// The same fields search_vector is built from, for literal phrase re-checks.
+const searchableText = `(COALESCE(title,'') || ' ' || COALESCE(description,'') || ' ' || COALESCE(solicitation_number,''))`
+
 func parseQuotedPhrases(query string) (phrases []string, remainder string) {
 	matches := quotedPhraseRe.FindAllStringSubmatch(query, -1)
 	for _, m := range matches {
@@ -192,47 +195,62 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	if params.Query != "" {
 		var ftsConds []string
 
-		segments := splitOR(params.Query)
-		if len(segments) <= 1 {
-			phrases, ftsQuery := parseQuotedPhrases(params.Query)
-			if len(phrases) > 0 {
-				var phraseExprs []string
-				for _, phrase := range phrases {
-					phraseExprs = append(phraseExprs, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
-					args = append(args, phrase)
-					argNum++
-				}
-				combined := strings.Join(phraseExprs, " || ")
-				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", combined))
-				ftsExpr = combined
-			}
-			if ftsQuery != "" {
-				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum))
-				args = append(args, ftsQuery)
-				ftsExpr = fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum)
+		// A query is a list of OR-segments. Within a segment every term must
+		// match (AND); segments match if any one does (OR). Spaces narrow,
+		// "quotes" are literal, OR broadens — the behaviour every search box has.
+		// This used to OR everything, so adding a word widened the result set.
+		var segConds []string
+		var segExprs []string
+		anyLiteral := false
+
+		for _, seg := range splitOR(params.Query) {
+			phrases, ftsQuery := parseQuotedPhrases(seg)
+
+			var tsParts []string
+			var literalConds []string
+
+			for _, phrase := range phrases {
+				tsParts = append(tsParts, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
+				args = append(args, phrase)
+				argNum++
+
+				// phraseto_tsquery drops stopwords, so "IT services" silently
+				// degrades to "services". Re-assert the literal string so a
+				// quoted phrase stays exact.
+				literalConds = append(literalConds, fmt.Sprintf("%s ILIKE $%d", searchableText, argNum))
+				args = append(args, "%"+phrase+"%")
 				argNum++
 			}
-		} else {
-			var ftsExprs []string
 
-			for _, seg := range segments {
-				phrases, ftsQuery := parseQuotedPhrases(seg)
-				for _, phrase := range phrases {
-					ftsExprs = append(ftsExprs, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
-					args = append(args, phrase)
-					argNum++
-				}
-				if ftsQuery != "" {
-					ftsExprs = append(ftsExprs, fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum))
-					args = append(args, ftsQuery)
-					argNum++
-				}
+			if ftsQuery != "" {
+				tsParts = append(tsParts, fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum))
+				args = append(args, ftsQuery)
+				argNum++
 			}
 
-			if len(ftsExprs) > 0 {
-				combined := strings.Join(ftsExprs, " || ")
-				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", combined))
-				ftsExpr = combined
+			if len(tsParts) == 0 {
+				continue
+			}
+
+			tsExpr := strings.Join(tsParts, " && ")
+			segExprs = append(segExprs, "("+tsExpr+")")
+
+			segCond := fmt.Sprintf("search_vector @@ (%s)", tsExpr)
+			if len(literalConds) > 0 {
+				anyLiteral = true
+				segCond = "(" + segCond + " AND " + strings.Join(literalConds, " AND ") + ")"
+			}
+			segConds = append(segConds, segCond)
+		}
+
+		if len(segConds) > 0 {
+			ftsExpr = strings.Join(segExprs, " || ")
+			if anyLiteral {
+				// Literal re-checks are per-segment, so the OR has to happen in SQL.
+				ftsConds = append(ftsConds, "("+strings.Join(segConds, " OR ")+")")
+			} else {
+				// One tsquery keeps this to a single GIN index scan.
+				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", ftsExpr))
 			}
 		}
 
