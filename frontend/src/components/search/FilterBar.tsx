@@ -100,9 +100,8 @@ export default function FilterBar({
         setFilter('activeOnly', true);
         return;
       }
-      if (key === 'keyword' && value) {
-        const terms = filters.keyword.split(' OR ').filter(t => t !== value);
-        setFilter('keyword', terms.join(' OR '));
+      if (key === 'keyword') {
+        setFilter('keyword', '');
         return;
       }
       if (value && (key === 'naics' || key === 'psc' || key === 'setAside' || key === 'noticeType' || key === 'agency')) {
@@ -276,16 +275,20 @@ function SearchHelpButton() {
               <h3 className="text-dark-200 font-medium text-xs uppercase tracking-wide mb-1.5">Search tips</h3>
               <ul className="space-y-1 text-dark-400">
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">Enter</kbd>
-                  <span>add keyword &mdash; each is an exact phrase match</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">space</kbd>
+                  <span>all words must appear (e.g. <span className="text-dark-300">cybersecurity training</span>)</span>
                 </li>
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">,</kbd>
-                  <span>add multiple keywords at once (e.g. cyber, cloud)</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">&quot;&nbsp;&quot;</kbd>
+                  <span>exact phrase (e.g. <span className="text-dark-300">&ldquo;zero trust&rdquo;</span>)</span>
                 </li>
                 <li className="flex gap-2">
-                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">Backspace</kbd>
-                  <span>remove the last keyword</span>
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">OR</kbd>
+                  <span>either word (e.g. <span className="text-dark-300">cyber OR cloud</span>)</span>
+                </li>
+                <li className="flex gap-2">
+                  <kbd className="shrink-0 px-1.5 py-0.5 bg-dark-700 rounded text-dark-300 font-mono text-xs">-</kbd>
+                  <span>exclude a word (e.g. <span className="text-dark-300">cloud -training</span>)</span>
                 </li>
               </ul>
             </div>

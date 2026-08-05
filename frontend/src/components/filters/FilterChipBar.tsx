@@ -36,18 +36,15 @@ export default function FilterChipBar({ filters, onRemoveFilter, onClearAll }: F
   const chips = useMemo<Chip[]>(() => {
     const result: Chip[] = [];
 
+    // The query is one string shown verbatim. It used to be split on " OR " and
+    // re-wrapped in quotes, which displayed quotes the user never typed.
     if (filters.keyword) {
-      const terms = filters.keyword.split(' OR ');
-      for (const term of terms) {
-        if (!term) continue;
-        const display = term.replace(/^"|"$/g, '');
-        result.push({
-          id: `keyword:${term}`,
-          filterKey: 'keyword',
-          value: term,
-          label: `"${display}"`,
-        });
-      }
+      result.push({
+        id: 'keyword',
+        filterKey: 'keyword',
+        value: filters.keyword,
+        label: filters.keyword,
+      });
     }
 
     for (const code of filters.naics) {

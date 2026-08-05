@@ -139,7 +139,7 @@ export default function SearchGuideInteractivePage() {
             id="keyword"
             icon={Search}
             title="Keyword Search"
-            description='Search by title, description, or solicitation number. Press "/" anywhere to focus the search bar.'
+            description='Searches title, description, and solicitation number. Several words means all of them must appear, so each extra word narrows the results. Use "quotes" for an exact phrase, OR for either word, and -word to exclude. Press "/" anywhere to focus the search bar.'
             searchUrl={keyword.trim() ? buildUrl({ q: keyword.trim() }) : undefined}
           >
             <div className="flex gap-2">

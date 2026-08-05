@@ -27,12 +27,16 @@ export default function NoResults({ query }: NoResultsProps) {
         <p className="text-xs font-medium text-dark-300 mb-3 uppercase tracking-wider">Search tips</p>
         <ul className="space-y-2.5 text-sm text-dark-400">
           <li className="flex items-start gap-2">
+            <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">space</kbd>
+            <span>All words must appear &mdash; more words, fewer results</span>
+          </li>
+          <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">"..."</kbd>
-            <span>Use quotes for exact phrases</span>
+            <span>Exact phrase, e.g. &ldquo;zero trust&rdquo;</span>
           </li>
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">OR</kbd>
-            <span>Find alternatives</span>
+            <span>Either word, e.g. cyber OR cloud</span>
           </li>
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">-</kbd>

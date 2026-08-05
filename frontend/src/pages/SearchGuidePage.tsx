@@ -21,9 +21,9 @@ const sections: GuideSection[] = [
     icon: Search,
     title: 'Keyword Search',
     description:
-      'Search by title, description, or solicitation number. Tip: press "/" anywhere on the page to focus the search bar instantly.',
-    tryLink: '/?q=cybersecurity',
-    tryLabel: 'Try "cybersecurity"',
+      'Searches title, description, and solicitation number. Type several words and all of them must appear, so each extra word narrows the results. Wrap words in "quotes" to match that exact phrase, use OR for either word, and put a minus in front of a word to exclude it. Tip: press "/" anywhere on the page to focus the search bar instantly.',
+    tryLink: '/?q=cybersecurity+training',
+    tryLabel: 'Try cybersecurity training',
   },
   {
     id: 'naics',

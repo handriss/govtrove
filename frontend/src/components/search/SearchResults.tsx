@@ -21,6 +21,13 @@ import { trackCodeFinderZeroOpportunities } from '../../lib/analytics';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
 
+// True when the whole query is a single quoted phrase, i.e. the strictest
+// possible search and the most common reason for an unexpected zero.
+function isExactPhraseQuery(q?: string) {
+  const t = (q ?? '').trim();
+  return t.length > 2 && t.startsWith('"') && t.endsWith('"') && t.indexOf('"', 1) === t.length - 1;
+}
+
 interface SearchResultsProps {
   results: OpportunityListItem[];
   total: number;
@@ -85,9 +92,9 @@ export default function SearchResults({
   const [signupPrompt, setSignupPrompt] = useState<SignupPromptContext | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const anySelected = selectedIds.size > 0;
-  const displayKeyword = keyword
-    ? keyword.split(' OR ').map(t => t.replace(/^"|"$/g, '')).join(', ')
-    : keyword;
+  // Show the query exactly as typed. Joining on ", " used to imply AND while
+  // the backend was ORing, which described the results incorrectly.
+  const displayKeyword = keyword;
 
   // Clear selection when results change
   useEffect(() => {
@@ -147,6 +154,9 @@ export default function SearchResults({
   // Filter suggestion for zero results
   const filterSuggestion = useMemo(() => {
     if (results.length > 0 || !facets) return null;
+    // An exact-phrase query is the likelier culprit, and the empty state offers
+    // a one-click way out of it — don't send people chasing unrelated filters.
+    if (isExactPhraseQuery(filters.keyword)) return null;
     const activeFilters: { key: string; label: string }[] = [];
     if (filters.naics.length) activeFilters.push({ key: 'naics', label: 'NAICS' });
     if (filters.setAside.length) activeFilters.push({ key: 'setAside', label: 'Set-Aside' });
@@ -348,7 +358,20 @@ function ZeroResults({
       </h3>
       {keyword && (
         <p className="text-dark-400 text-sm mb-2">
-          No results for &ldquo;<span className="text-dark-300">{keyword?.split(' OR ').map(t => t.replace(/^"|"$/g, '')).join(', ')}</span>&rdquo;
+          No results for &ldquo;<span className="text-dark-300">{keyword}</span>&rdquo;
+        </p>
+      )}
+      {isExactPhraseQuery(keyword) && onQuerySuggestionClick && (
+        <p className="text-dark-400 text-sm mb-4">
+          That searched for the exact phrase.{' '}
+          <button
+            type="button"
+            onClick={() => onQuerySuggestionClick((keyword ?? '').trim().slice(1, -1))}
+            className="text-accent font-medium underline underline-offset-4 decoration-accent/40
+              hover:decoration-accent transition-colors"
+          >
+            Match all these words instead
+          </button>
         </p>
       )}
       {querySuggestion && onQuerySuggestionClick && (
@@ -405,15 +428,21 @@ function ZeroResults({
         <ul className="space-y-2.5 text-sm text-dark-400">
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">
+              space
+            </kbd>
+            <span>All words must appear &mdash; more words, fewer results</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">
               &quot;...&quot;
             </kbd>
-            <span>Match exact phrases (e.g. &ldquo;IT services&rdquo;)</span>
+            <span>Match an exact phrase (e.g. &ldquo;zero trust&rdquo;)</span>
           </li>
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">
               OR
             </kbd>
-            <span>Find alternatives</span>
+            <span>Either word (e.g. cyber OR cloud)</span>
           </li>
           <li className="flex items-start gap-2">
             <kbd className="px-1.5 py-0.5 bg-dark-800/50 rounded text-[10px] text-dark-400 font-mono mt-0.5">
