@@ -18,6 +18,8 @@ const (
 	defaultLimit   = 1000
 	pageDelay      = 1 * time.Second
 	requestTimeout = 30 * time.Second
+	// defaultPtypes is the full set of procurement types the daily pipeline requests.
+	defaultPtypes = "o,p,k,r,s,g,a,i,u"
 )
 
 // SearchResponse is the top-level SAM.gov opportunities search response.
@@ -145,15 +147,24 @@ func NewAPIClient(apiKey string, logger *slog.Logger, recorder RequestRecorder) 
 	}
 }
 
-// FetchPage fetches a single page from the SAM.gov opportunities search API.
+// FetchPage fetches a single page from the SAM.gov opportunities search API,
+// requesting the full default set of procurement types.
 func (c *APIClient) FetchPage(ctx context.Context, offset, limit int, postedFrom, postedTo string) (*SearchResponse, []json.RawMessage, error) {
+	return c.FetchPagePtype(ctx, offset, limit, postedFrom, postedTo, defaultPtypes)
+}
+
+// FetchPagePtype fetches a single page filtered to the given ptype value(s)
+// (comma-separated). SAM.gov caps any single query at 1000 retrievable results
+// regardless of totalRecords, so backfill code slices a large window into per-day,
+// per-ptype sub-queries that each stay under the cap.
+func (c *APIClient) FetchPagePtype(ctx context.Context, offset, limit int, postedFrom, postedTo, ptype string) (*SearchResponse, []json.RawMessage, error) {
 	params := url.Values{}
 	params.Set("api_key", c.apiKey)
 	params.Set("limit", fmt.Sprintf("%d", limit))
 	params.Set("offset", fmt.Sprintf("%d", offset))
 	params.Set("postedFrom", postedFrom)
 	params.Set("postedTo", postedTo)
-	params.Set("ptype", "o,p,k,r,s,g,a,i,u")
+	params.Set("ptype", ptype)
 
 	reqURL := baseURL + "?" + params.Encode()
 
