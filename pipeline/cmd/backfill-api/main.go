@@ -130,9 +130,10 @@ func main() {
 	}
 
 	fmt.Printf("\n✅ Wrote %d snap_api rows under run_id %s\n", inserted, runID)
-	fmt.Printf("\nNEXT — upsert into the catalog (API-only reconcile; leaves activeRunID nil so NO deactivation runs). Run:\n\n")
-	fmt.Printf("  aws lambda invoke --function-name %s --profile govtrove \\\n    --cli-binary-format raw-in-base64-out \\\n    --payload '{\"api_result\":{\"status\":\"ok\",\"run_id\":\"%s\",\"job_type\":\"snapshot-api\"}}' /dev/stdout\n",
+	fmt.Printf("\nNEXT — upsert into the catalog (API-only reconcile; activeRunID stays nil so the\ndisappearance/mass-deactivation path is skipped). Use an ASYNC invoke: a synchronous one\ncan exceed the CLI's 60s read timeout and get RETRIED, running reconcile concurrently.\n\n")
+	fmt.Printf("  aws lambda invoke --function-name %s --profile govtrove --invocation-type Event \\\n    --cli-binary-format raw-in-base64-out \\\n    --payload '{\"api_result\":{\"status\":\"ok\",\"run_id\":\"%s\",\"job_type\":\"snapshot-api\"}}' /dev/stdout\n",
 		reconcileFn(), runID)
+	fmt.Printf("\nIt returns 202 immediately and runs reconcile exactly once (~2-3 min). Then verify:\n  SELECT count(*) FILTER (WHERE active) FROM opportunities WHERE is_latest=true;  -- should rise\n")
 }
 
 func hashRaw(d json.RawMessage) string {

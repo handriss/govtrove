@@ -61,13 +61,21 @@ go run ./cmd/backfill-api -from 07/29/2026 -to 08/05/2026 -write
 `-from 07/29/2026` (leave `-to` off to mean "through today").
 
 The `-write` run prints a ready-to-paste reconcile command. Run it to upsert the
-snapshot into the catalog:
+snapshot into the catalog. **Use an async invoke** (`--invocation-type Event`):
+reconcile takes 1–3 min, and a synchronous invoke can exceed the AWS CLI's 60s
+read timeout and get **retried**, running reconcile concurrently (deadlocks on the
+expired-deactivation UPDATE — harmless but messy). Async runs it exactly once.
 
 ```bash
-aws lambda invoke --function-name govtrove-reconcile --profile govtrove \
+aws lambda invoke --function-name govtrove-reconcile --profile govtrove --invocation-type Event \
   --cli-binary-format raw-in-base64-out \
   --payload '{"api_result":{"status":"ok","run_id":"<RUN_ID>","job_type":"snapshot-api"}}' /dev/stdout
 ```
+
+It returns `202` immediately; reconcile finishes in the background (~2–3 min).
+Then verify with the queries below. (Note: API-only reconcile logs many harmless
+`snap_reconcile_dq ... foreign key` WARNings — it's the DQ audit skipping rows for
+a run with no CSV side; the catalog upsert is unaffected.)
 
 ## Verify
 
