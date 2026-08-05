@@ -69,8 +69,14 @@ expired-deactivation UPDATE — harmless but messy). Async runs it exactly once.
 ```bash
 aws lambda invoke --function-name govtrove-reconcile --profile govtrove --invocation-type Event \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"api_result":{"status":"ok","run_id":"<RUN_ID>","job_type":"snapshot-api"}}' /dev/stdout
+  --payload '{"execution_id":"<ANY_UUID>","api_result":{"status":"ok","run_id":"<RUN_ID>","job_type":"snapshot-api"}}' /dev/stdout
 ```
+
+The `execution_id` (any fresh UUID — the command prints one) makes reconcile
+record a completed `reconcile` pipeline step. `/api/status` reads that step's
+`completed_at` as `last_synced_at`, so including it **advances the freshness
+marker and clears the "data hasn't updated" banner**. Omit it and the data still
+lands, but the banner stays stale.
 
 It returns `202` immediately; reconcile finishes in the background (~2–3 min).
 Then verify with the queries below. (Note: API-only reconcile logs many harmless

@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/handriss/govtrove/pipeline/internal/database"
 	"github.com/handriss/govtrove/pipeline/internal/samgov"
 )
@@ -130,10 +131,11 @@ func main() {
 	}
 
 	fmt.Printf("\n✅ Wrote %d snap_api rows under run_id %s\n", inserted, runID)
-	fmt.Printf("\nNEXT — upsert into the catalog (API-only reconcile; activeRunID stays nil so the\ndisappearance/mass-deactivation path is skipped). Use an ASYNC invoke: a synchronous one\ncan exceed the CLI's 60s read timeout and get RETRIED, running reconcile concurrently.\n\n")
-	fmt.Printf("  aws lambda invoke --function-name %s --profile govtrove --invocation-type Event \\\n    --cli-binary-format raw-in-base64-out \\\n    --payload '{\"api_result\":{\"status\":\"ok\",\"run_id\":\"%s\",\"job_type\":\"snapshot-api\"}}' /dev/stdout\n",
-		reconcileFn(), runID)
-	fmt.Printf("\nIt returns 202 immediately and runs reconcile exactly once (~2-3 min). Then verify:\n  SELECT count(*) FILTER (WHERE active) FROM opportunities WHERE is_latest=true;  -- should rise\n")
+	execID := uuid.NewString()
+	fmt.Printf("\nNEXT — upsert into the catalog (API-only reconcile; activeRunID stays nil so the\ndisappearance/mass-deactivation path is skipped). The execution_id makes reconcile record a\ncompleted 'reconcile' pipeline step, which advances the /api/status freshness marker and clears\nthe stale-data banner. Use an ASYNC invoke: a synchronous one can exceed the CLI's 60s read\ntimeout and get RETRIED, running reconcile concurrently.\n\n")
+	fmt.Printf("  aws lambda invoke --function-name %s --profile govtrove --invocation-type Event \\\n    --cli-binary-format raw-in-base64-out \\\n    --payload '{\"execution_id\":\"%s\",\"api_result\":{\"status\":\"ok\",\"run_id\":\"%s\",\"job_type\":\"snapshot-api\"}}' /dev/stdout\n",
+		reconcileFn(), execID, runID)
+	fmt.Printf("\nIt returns 202 immediately and runs reconcile once (~2-3 min). Then verify:\n  SELECT count(*) FILTER (WHERE active) FROM opportunities WHERE is_latest=true;  -- should rise\n")
 }
 
 func hashRaw(d json.RawMessage) string {
