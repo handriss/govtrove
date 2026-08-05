@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/ogimage"
@@ -65,6 +67,19 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 	result, err := h.repo.Search(r.Context(), params)
 	durationMs := int(time.Since(start).Milliseconds())
 	if err != nil {
+		// 57014 = query_canceled, i.e. the statement timeout fired. Almost always a
+		// quoted phrase whose only real word is very common. Say so, so the user can
+		// act, instead of returning a bare 500 they can do nothing with.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "57014" {
+			h.logger.Warn("search timed out", "query", params.Query)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "That search was too broad to finish. Try adding a word, or narrowing with a NAICS or deadline filter.",
+			})
+			return
+		}
 		h.logger.Error("search failed", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

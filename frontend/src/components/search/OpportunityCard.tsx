@@ -80,18 +80,39 @@ function getDeadlineColor(days: number | null): string {
 
 // --- Keyword highlighting ---
 
-export function highlightKeywords(text: string, keyword: string | undefined): ReactNode {
-  if (!keyword || !keyword.trim()) return text;
+// Pull the highlightable terms out of a raw query: quoted phrases stay whole,
+// bare words stand alone, `OR` is syntax, and `-excluded` terms are not matches
+// so highlighting them would be a lie. Longest first so a phrase wins over the
+// words inside it.
+export function parseQueryTerms(keyword: string | undefined): string[] {
+  if (!keyword || !keyword.trim()) return [];
+  const terms: string[] = [];
+  const phraseRe = /"([^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = phraseRe.exec(keyword)) !== null) {
+    const phrase = m[1].trim();
+    if (phrase) terms.push(phrase);
+  }
+  for (const word of keyword.replace(phraseRe, ' ').split(/\s+/)) {
+    if (!word || word === 'OR' || word.startsWith('-') || word.length < 2) continue;
+    terms.push(word);
+  }
+  return terms.sort((a, b) => b.length - a.length);
+}
 
-  const cleaned = keyword.replace(/"/g, '');
-  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2 && t !== 'OR');
+export function highlightKeywords(text: string, keyword: string | undefined): ReactNode {
+  const terms = parseQueryTerms(keyword);
   if (terms.length === 0) return text;
+
   const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const regex = new RegExp(`(${escaped.join('|')})`, 'gi');
+  // Word boundaries: without them "ai" lights up inside "details" and "Air".
+  const regex = new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi');
   const parts = text.split(regex);
   if (parts.length === 1) return text;
+  // split() with one capture group alternates [text, match, text, ...], so odd
+  // indices are matches. Re-testing with a /g regex would skip every other hit.
   return parts.map((part, i) =>
-    regex.test(part) ? (
+    i % 2 === 1 ? (
       <mark key={i} className="bg-yellow-500/20 text-yellow-200 rounded-sm px-0.5">
         {part}
       </mark>
@@ -106,12 +127,12 @@ export function extractSnippet(description: string | undefined, keyword: string 
   const text = description.replace(/\s+/g, ' ').trim();
   if (!keyword || !keyword.trim()) return text.slice(0, maxLen) + (text.length > maxLen ? '...' : '');
 
-  const lower = text.toLowerCase();
-  const cleaned = keyword.replace(/"/g, '');
-  const terms = cleaned.trim().split(/\s+/).filter((t) => t.length >= 2 && t !== 'OR');
+  // Match on word boundaries for the same reason highlighting does — otherwise
+  // the snippet centres on "ai" inside "details" rather than the real hit.
   let bestIdx = -1;
-  for (const term of terms) {
-    const idx = lower.indexOf(term.toLowerCase());
+  for (const term of parseQueryTerms(keyword)) {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const idx = text.search(new RegExp(`\\b${escaped}\\b`, 'i'));
     if (idx !== -1 && (bestIdx === -1 || idx < bestIdx)) bestIdx = idx;
   }
 

@@ -62,7 +62,13 @@ export async function searchOpportunities(params: SearchParams = {}, token?: str
     headers,
   });
   if (!response.ok) {
-    throw new Error(`Search failed: ${response.statusText}`);
+    // The API explains actionable failures (e.g. a query too broad to finish) in
+    // an `error` field — surface that rather than a bare status line.
+    const message = await response
+      .json()
+      .then((body) => (body && typeof body.error === 'string' ? body.error : null))
+      .catch(() => null);
+    throw new Error(message ?? `Search failed: ${response.statusText}`);
   }
   return response.json();
 }

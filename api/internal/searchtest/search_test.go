@@ -72,7 +72,8 @@ func TestMain(m *testing.M) {
 	eventRepo := repository.NewEventRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
-	oppHandler := handlers.NewOpportunityHandler(oppRepo, nil, logger, eventLog, userRepo)
+	geoRepo := repository.NewGeoSynonymRepository(pool)
+	oppHandler := handlers.NewOpportunityHandler(oppRepo, nil, logger, eventLog, userRepo, geoRepo)
 
 	r := chi.NewRouter()
 	r.Get("/api/opportunities", oppHandler.Search)

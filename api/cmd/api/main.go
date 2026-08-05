@@ -80,6 +80,15 @@ func main() {
 	poolCfg.MaxConnIdleTime = 30 * time.Second
 	poolCfg.MaxConnLifetime = 30 * time.Minute
 
+	// Cap query time below the 60s edge timeout. A quoted phrase built around a
+	// stopword ("IT services") degrades to a single common lexeme and scans tens
+	// of thousands of rows; without this the request burns a full minute and the
+	// user gets an opaque 502 instead of a fast, explainable failure.
+	if poolCfg.ConnConfig.RuntimeParams == nil {
+		poolCfg.ConnConfig.RuntimeParams = map[string]string{}
+	}
+	poolCfg.ConnConfig.RuntimeParams["statement_timeout"] = "20000"
+
 	// Retry database connection with exponential backoff
 	var pool *pgxpool.Pool
 	for attempt := 1; attempt <= 5; attempt++ {
