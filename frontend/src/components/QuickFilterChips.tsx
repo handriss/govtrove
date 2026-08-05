@@ -7,8 +7,9 @@ type QuickFilter =
   | { type: 'deadline'; label: string; preset: string };
 
 const CHIPS: QuickFilter[] = [
-  // Quoted: "IT" is a stopword, so unquoted this collapses to plain "services".
-  { type: 'keyword', label: 'IT Services', value: '"IT services"' },
+  // Not "IT services": "IT" is a stopword, so the phrase degrades to a literal
+  // scan that is both slow and thin (4 hits). Two real words AND cleanly.
+  { type: 'keyword', label: 'IT Services', value: 'information technology' },
   { type: 'keyword', label: 'Cybersecurity', value: 'cybersecurity' },
   { type: 'keyword', label: 'Construction', value: 'construction' },
   { type: 'keyword', label: 'Professional Services', value: 'professional services' },
