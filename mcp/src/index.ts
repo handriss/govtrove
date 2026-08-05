@@ -528,7 +528,7 @@ Provide a plain-English analysis:
           .max(500)
           .optional()
           .describe(
-            'Free text search across title, description, and solicitation number. Use quotes for exact phrases (e.g. "cyber security")'
+            'Free text search across title, description, and solicitation number. Multiple words are ANDed, so every word must appear and each extra word narrows the results. Use quotes for an exact phrase (e.g. "zero trust"), OR for either term, and -word to exclude'
           ),
         naics_code: z
           .string()
@@ -1014,7 +1014,7 @@ app.get("/schema", (_req, res) => {
         title: "Search Federal Contract Opportunities",
         description: "Search federal contract opportunities from SAM.gov with filters",
         parameters: {
-          keywords: { type: "string", required: false, description: "Free text search (supports quotes for exact phrases)" },
+          keywords: { type: "string", required: false, description: "Free text search. All words must appear; use \"quotes\" for an exact phrase, OR for either term, -word to exclude" },
           naics_code: { type: "string", required: false, description: "6-digit NAICS code" },
           set_aside: { type: "string", required: false, description: "Set-aside code or plain English (e.g. 'small business', 'SBA', '8a', 'hubzone')" },
           department: { type: "string", required: false, description: "Department/agency name (partial match)" },
