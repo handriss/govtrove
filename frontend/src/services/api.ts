@@ -528,12 +528,6 @@ export async function getAdminSamgovRequests(
   return response.json();
 }
 
-export interface UsageBucket {
-  timestamp: string;
-  success: number;
-  failed: number;
-}
-
 // --- Pipeline Runs ---
 
 export interface PipelineStep {
@@ -771,18 +765,6 @@ export async function getAdminAnalytics(
   return response.json();
 }
 
-export async function getAdminApiKeyUsage(
-  token: string,
-  keyHash: string,
-  days: number,
-): Promise<{ buckets: UsageBucket[] }> {
-  const response = await fetch(
-    `${API_BASE}/admin/api-key-usage?key_hash=${encodeURIComponent(keyHash)}&days=${days}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!response.ok) throw new Error(`${response.status}`);
-  return response.json();
-}
 
 // --- Data Quality ---
 

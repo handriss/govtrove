@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Shield, Bell, Search, ChevronLeft, ChevronRight, RotateCw, Plus, Download, Trash2, Loader2, ExternalLink, Copy, Send as SendIcon, Edit3, X } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AdminLayout, { useAdminContext } from '../components/AdminLayout';
 import {
   getAdminNotifications, getAdminApiKeys, getAdminSamgovRequests,
-  getAdminApiKeyUsage, getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
+  getAdminPipelineRuns, getAdminSearchEvents, getAdminAnalytics,
   getAdminEmailPreferences, updateAdminEmailPreference, getAdminSentEmails, adminResendEmail,
   adminSendNewEmail, adminExportUserData, adminDeleteUser,
   getAdminPromoCodes, adminCreatePromoCode, adminSendPromoInvite, adminRevokePromoCode,
@@ -15,7 +14,7 @@ import {
   getAdminCodeLookups, type CodeLookupAnalytics,
   type AdminSendNewEmailInput,
   type AdminUser, type AdminApiKey, type AdminSamgovRequest,
-  type UsageBucket, type PipelineExecution, type AdminSearchEvent,
+  type PipelineExecution, type AdminSearchEvent,
   type SearchAnalytics, type AdminEmailPreference, type AdminSentEmail,
   type AdminPromoCode, type McpUsageEvent,
   type AdminInviteLink, type AdminInviteLinkRedemption,
@@ -536,184 +535,6 @@ function SamgovRequestsTab({ getToken }: { getToken: () => Promise<string> }) {
             </tbody>
           </table>
         </div>
-      )}
-    </section>
-  );
-}
-
-function UsageChartTab({ getToken }: { getToken: () => Promise<string> }) {
-  const [keys, setKeys] = useState<AdminApiKey[]>([]);
-  const [selectedKey, setSelectedKey] = useState('');
-  const [days, setDays] = useState(7);
-  const [buckets, setBuckets] = useState<UsageBucket[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = await getToken();
-        const k = await getAdminApiKeys(token);
-        setKeys(k);
-        if (k.length > 0) setSelectedKey(k[0].key_hash);
-      } catch { /* empty */ }
-    })();
-  }, [getToken]);
-
-  useEffect(() => {
-    if (!selectedKey) return;
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const token = await getToken();
-        const res = await getAdminApiKeyUsage(token, selectedKey, days);
-        if (!cancelled) setBuckets(res.buckets || []);
-      } catch {
-        if (!cancelled) setBuckets([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedKey, days, getToken]);
-
-  const selectedKeyData = keys.find(k => k.key_hash === selectedKey);
-
-  const chartData = buckets.map(b => ({
-    ts: b.timestamp,
-    success: b.success,
-    failed: b.failed,
-  }));
-
-  const periodOptions = [
-    { value: 7, label: '7d' },
-    { value: 14, label: '14d' },
-    { value: 30, label: '30d' },
-  ];
-
-  return (
-    <section>
-      <h2 className="text-lg font-medium text-dark-200 mb-4">API Usage (Rolling 24h)</h2>
-
-      <div className="flex flex-wrap items-end gap-4 mb-6">
-        <div>
-          <label className="block text-sm text-dark-400 mb-2">API Key</label>
-          <select
-            value={selectedKey}
-            onChange={(e) => setSelectedKey(e.target.value)}
-            className="w-full max-w-sm px-3 py-2 text-sm bg-dark-800/50 border border-dark-700/50 rounded-lg
-                       text-dark-100 focus:outline-none focus:border-accent/50"
-          >
-            {keys.map((k) => (
-              <option key={k.key_hash} value={k.key_hash}>
-                {k.email} ({k.key_hash})
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex gap-1">
-          {periodOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDays(opt.value)}
-              className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                days === opt.value
-                  ? 'border-accent/50 bg-accent/10 text-accent'
-                  : 'border-dark-700/50 text-dark-400 hover:text-dark-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading && <p className="text-dark-400 text-sm py-8 text-center">Loading...</p>}
-
-      {!loading && chartData.length > 0 && (
-        <div className="rounded-xl border border-dark-700/50 p-4 bg-dark-800/20">
-          <ResponsiveContainer width="100%" height={350}>
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }} stackOffset="none">
-              <defs>
-                <linearGradient id="successGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="failedGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis
-                dataKey="ts"
-                tickLine={false}
-                interval="preserveStartEnd"
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                tick={(props: any) => {
-                  const { x, y, payload, index } = props;
-                  const d = new Date(payload.value);
-                  const time = d.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' });
-                  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                  const prevDate = index > 0 ? new Date(chartData[index - 1].ts).toDateString() : '';
-                  const showDate = index === 0 || d.toDateString() !== prevDate;
-                  return (
-                    <g transform={`translate(${x},${y})`}>
-                      <text x={0} y={12} textAnchor="middle" fill="#6b7280" fontSize={11}>{time}</text>
-                      {showDate && <text x={0} y={26} textAnchor="middle" fill="#9ca3af" fontSize={10}>{dateStr}</text>}
-                    </g>
-                  );
-                }}
-              />
-              <YAxis
-                tick={{ fill: '#6b7280', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip
-                labelFormatter={(val) => new Date(String(val)).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                contentStyle={{
-                  backgroundColor: '#1f2937',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: '#e5e7eb',
-                }}
-              />
-              {selectedKeyData && (
-                <ReferenceLine
-                  y={selectedKeyData.daily_limit}
-                  stroke="#ef4444"
-                  strokeDasharray="6 3"
-                  label={{ value: `Daily limit: ${selectedKeyData.daily_limit}`, fill: '#ef4444', fontSize: 11, position: 'right' }}
-                />
-              )}
-              <Area
-                type="monotone"
-                dataKey="success"
-                stackId="1"
-                stroke="#10b981"
-                fill="url(#successGradient)"
-                strokeWidth={2}
-                name="Success"
-              />
-              <Area
-                type="monotone"
-                dataKey="failed"
-                stackId="1"
-                stroke="#ef4444"
-                fill="url(#failedGradient)"
-                strokeWidth={2}
-                name="Failed"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {!loading && chartData.length === 0 && selectedKey && (
-        <p className="text-dark-500 text-sm py-8 text-center">No usage data for this key.</p>
       )}
     </section>
   );
@@ -2631,7 +2452,7 @@ function McpUsageTab({ getToken }: { getToken: () => Promise<string> }) {
   );
 }
 
-type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'usage' | 'pipeline' | 'searches' | 'code-finders' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'gift-codes' | 'mcp-usage';
+type Tab = 'users' | 'notifications' | 'api-keys' | 'samgov-requests' | 'pipeline' | 'searches' | 'code-finders' | 'email-prefs' | 'sent-emails' | 'promo-codes' | 'invite-links' | 'gift-codes' | 'mcp-usage';
 
 export default function AdminPage() {
   const [searchParams] = useSearchParams();
@@ -2653,7 +2474,6 @@ function AdminPageContent({ activeTab }: { activeTab: Tab }) {
       {activeTab === 'notifications' && <NotificationsTab users={users} getToken={getToken} />}
       {activeTab === 'api-keys' && <ApiKeysTab getToken={getToken} />}
       {activeTab === 'samgov-requests' && <SamgovRequestsTab getToken={getToken} />}
-      {activeTab === 'usage' && <UsageChartTab getToken={getToken} />}
       {activeTab === 'pipeline' && <PipelineRunsTab getToken={getToken} />}
       {activeTab === 'searches' && <SearchAnalyticsTab getToken={getToken} />}
       {activeTab === 'code-finders' && <CodeFinderTab getToken={getToken} />}

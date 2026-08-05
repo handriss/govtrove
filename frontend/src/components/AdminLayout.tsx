@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Users, Bell, Key, Globe, BarChart3, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2, Gift, Shield, Tags } from 'lucide-react';
+import { Users, Bell, Key, Globe, Activity, Search, AlertCircle, Megaphone, ArrowLeft, PanelLeftClose, PanelLeftOpen, Mail, Send, Ticket, Plug, Eye, Link2, Gift, Shield, Tags } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
 import { getAdminUsers, type AdminUser } from '../services/api';
 
@@ -60,7 +60,6 @@ const navGroups: NavGroup[] = [
       { label: 'Pipeline', icon: Activity, path: '/admin', tab: 'pipeline' },
       { label: 'API Keys', icon: Key, path: '/admin', tab: 'api-keys' },
       { label: 'SAM.gov Requests', icon: Globe, path: '/admin', tab: 'samgov-requests' },
-      { label: 'Usage Chart', icon: BarChart3, path: '/admin', tab: 'usage' },
     ],
   },
   {
