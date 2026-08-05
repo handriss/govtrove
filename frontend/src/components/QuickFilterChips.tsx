@@ -7,7 +7,8 @@ type QuickFilter =
   | { type: 'deadline'; label: string; preset: string };
 
 const CHIPS: QuickFilter[] = [
-  { type: 'keyword', label: 'IT Services', value: 'IT services' },
+  // Quoted: "IT" is a stopword, so unquoted this collapses to plain "services".
+  { type: 'keyword', label: 'IT Services', value: '"IT services"' },
   { type: 'keyword', label: 'Cybersecurity', value: 'cybersecurity' },
   { type: 'keyword', label: 'Construction', value: 'construction' },
   { type: 'keyword', label: 'Professional Services', value: 'professional services' },
@@ -21,14 +22,12 @@ const ICONS = {
   deadline: Clock,
 } as const;
 
-function unquote(s: string) { return s.replace(/^"|"$/g, ''); }
-
 function isActive(chip: QuickFilter, filters: FilterState): boolean {
   switch (chip.type) {
-    case 'keyword': {
-      const terms = filters.keyword.split(' OR ').map(t => unquote(t).toLowerCase());
-      return terms.includes(chip.value.toLowerCase());
-    }
+    // The query is a plain string now, so a keyword chip is on when it *is*
+    // the query. It used to be one OR-term among several.
+    case 'keyword':
+      return filters.keyword.trim().toLowerCase() === chip.value.toLowerCase();
     case 'setAside':
       return filters.setAside.includes(chip.value);
     case 'deadline':
@@ -46,16 +45,9 @@ export default function QuickFilterChips({ filters, setFilter, onSearch }: Quick
   const toggle = (chip: QuickFilter) => {
     const active = isActive(chip, filters);
     switch (chip.type) {
-      case 'keyword': {
-        const terms = filters.keyword.split(' OR ').filter(Boolean);
-        const quoted = `"${chip.value}"`;
-        if (active) {
-          setFilter('keyword', terms.filter(t => unquote(t).toLowerCase() !== chip.value.toLowerCase()).join(' OR '));
-        } else {
-          setFilter('keyword', terms.length > 0 ? terms.join(' OR ') + ' OR ' + quoted : quoted);
-        }
+      case 'keyword':
+        setFilter('keyword', active ? '' : chip.value);
         break;
-      }
       case 'setAside':
         setFilter(
           'setAside',
