@@ -382,6 +382,15 @@ func (db *DB) DeactivateExpiredOpportunities(ctx context.Context) (expired int, 
 	return expired, stale, nil
 }
 
+// AnalyzeOpportunities refreshes planner statistics on the opportunities table.
+// Neon suspends the compute when idle, so autovacuum/autoanalyze rarely get a
+// window; after a large reconcile upsert the planner is left with stale stats,
+// which pushed search COUNT queries into multi-second timeouts (Aug 2026). Cheap.
+func (db *DB) AnalyzeOpportunities(ctx context.Context) error {
+	_, err := db.pool.Exec(ctx, "ANALYZE opportunities")
+	return err
+}
+
 // GetSnapCSVRawData loads raw_data for all rows of a given run from snap_csv.
 func (db *DB) GetSnapCSVRawData(ctx context.Context, runID uuid.UUID) ([]map[string]string, error) {
 	rows, err := db.pool.Query(ctx, `

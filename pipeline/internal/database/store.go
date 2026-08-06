@@ -37,6 +37,7 @@ type Store interface {
 	UpsertOpportunities(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
 	MarkDisappearedInactive(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunities(ctx context.Context) (int, int, error)
+	AnalyzeOpportunities(ctx context.Context) error
 
 	// API snapshot operations
 	BulkInsertSnapAPI(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []SnapAPIRow) (int64, error)

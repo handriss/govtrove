@@ -357,6 +357,13 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Info("expired opportunities deactivated", "expired", expired, "stale", stale)
 	}
 
+	// Refresh planner stats after the upserts/deactivations. Neon suspends the
+	// compute when idle so autoanalyze lags badly; without this a large reconcile
+	// leaves search COUNT queries on stale stats (seen: 13s+ timeouts, Aug 2026).
+	if err := h.Store.AnalyzeOpportunities(ctx); err != nil {
+		h.Logger.Warn("failed to ANALYZE opportunities", "error", err)
+	}
+
 	durationMs := int(time.Since(start).Milliseconds())
 
 	h.Logger.Info("reconcile complete",
