@@ -278,7 +278,11 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 	}
 
-	if len(reconcileDQ) > 0 {
+	// Reconcile DQ is a CSV-vs-API comparison; it's only meaningful (and FK-valid)
+	// when both sources ran. During an API-only reconcile (CSV outage) every record
+	// is a "missing_csv" mismatch with no csv_run_id — skip instead of spamming
+	// thousands of FK violations per run.
+	if len(reconcileDQ) > 0 && activeRunID != uuid.Nil && apiRunID != uuid.Nil {
 		h.Logger.Warn("reconcile mismatches found", "count", len(reconcileDQ))
 		h.Store.InsertReconcileDQIssues(ctx, activeRunID, apiRunID, reconcileDQ)
 	}

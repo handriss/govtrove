@@ -257,7 +257,7 @@ func (db *DB) InsertReconcileDQIssues(ctx context.Context, csvRunID, apiRunID uu
 		batch.Queue(`
 			INSERT INTO pipeline.snap_reconcile_dq (csv_run_id, api_run_id, notice_id, snapshot_date, issue_type, field_name, csv_value, api_value)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		`, csvRunID, apiRunID, e.NoticeID, e.SnapshotDate, e.IssueType, e.FieldName, nilIfEmpty(e.CSVValue), nilIfEmpty(e.APIValue))
+		`, nilUUID(csvRunID), nilUUID(apiRunID), e.NoticeID, e.SnapshotDate, e.IssueType, e.FieldName, nilIfEmpty(e.CSVValue), nilIfEmpty(e.APIValue))
 	}
 
 	results := db.pool.SendBatch(ctx, batch)
@@ -274,4 +274,14 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// nilUUID maps a zero UUID to SQL NULL so the snap_reconcile_dq FK to
+// ingestion_runs stays satisfied when a reconcile ran with only one source
+// present (API-only during a CSV outage, or the reverse).
+func nilUUID(id uuid.UUID) any {
+	if id == uuid.Nil {
+		return nil
+	}
+	return id
 }
