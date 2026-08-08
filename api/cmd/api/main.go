@@ -315,7 +315,12 @@ func main() {
 		return false, err
 	}
 
+	// Not applied to /health — App Runner probes the container directly, so those
+	// requests never pass through Cloudflare and would never carry the header.
+	originVerify := authmw.RequireOriginVerify(cfg.OriginVerifySecret, logger)
+
 	r.Route("/api", func(r chi.Router) {
+		r.Use(originVerify)
 		r.Use(httprate.LimitByIP(100, time.Minute))
 		r.Use(authmw.MaxBodySize(1 << 20))
 

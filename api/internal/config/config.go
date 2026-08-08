@@ -28,6 +28,7 @@ type Config struct {
 	PosthogHost         string `envconfig:"POSTHOG_HOST" default:"https://us.i.posthog.com"`
 	MCPInternalURL      string `envconfig:"MCP_INTERNAL_URL" default:"https://mcp.govtrove.com"`
 	InternalAPIToken    string `envconfig:"INTERNAL_API_TOKEN"`
+	OriginVerifySecret  string `envconfig:"ORIGIN_VERIFY_SECRET"`
 	DSARBucket          string `envconfig:"DSAR_S3_BUCKET"`
 	SearchRescueEnabled bool   `envconfig:"SEARCH_RESCUE_ENABLED" default:"false"`
 	OpenRouterAPIKey    string `envconfig:"OPENROUTER_API_KEY"`

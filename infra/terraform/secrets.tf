@@ -134,3 +134,18 @@ resource "aws_secretsmanager_secret_version" "internal_api_token" {
   secret_id     = aws_secretsmanager_secret.internal_api_token.id
   secret_string = random_password.internal_api_token.result
 }
+
+# Shared secret between the Cloudflare Transform Rule and the API's origin-verify
+# middleware. Empty by default: the API only enforces once this is set, so the
+# Cloudflare rule can be created and confirmed first without risking an outage.
+resource "aws_secretsmanager_secret" "origin_verify" {
+  count       = var.origin_verify_secret != "" ? 1 : 0
+  name        = "${var.project_name}/origin-verify-secret"
+  description = "Value Cloudflare injects as X-Origin-Verify on proxied requests"
+}
+
+resource "aws_secretsmanager_secret_version" "origin_verify" {
+  count         = var.origin_verify_secret != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.origin_verify[0].id
+  secret_string = var.origin_verify_secret
+}

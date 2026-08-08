@@ -74,7 +74,6 @@ variable "schedule_expression" {
   default     = "cron(0 11 * * ? *)" # 6 AM ET = 11 AM UTC
 }
 
-
 variable "pipeline_schedule_enabled" {
   description = "Whether the pipeline schedule is enabled"
   type        = bool
@@ -198,43 +197,8 @@ variable "posthog_host" {
   default     = "https://us.i.posthog.com"
 }
 
-# Grafana Cloud — REMOVED 2026-08-08 (unused). The resources and provider are gone;
-# these declarations remain only so the existing grafana_* entries in terraform.tfvars
-# don't emit "undeclared variable" warnings. Delete both together.
-variable "grafana_cloud_access_token" {
-  description = "Grafana Cloud access policy token"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "grafana_sa_token" {
-  description = "Grafana Cloud service account token"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "grafana_stack_slug" {
-  description = "Grafana Cloud stack slug (e.g. govtrove)"
-  type        = string
-  default     = ""
-}
-
-variable "grafana_neon_host" {
-  description = "Neon PostgreSQL host for Grafana datasource"
-  type        = string
-  default     = ""
-}
-
-variable "grafana_neon_user" {
-  description = "Neon PostgreSQL user for Grafana (read-only)"
-  type        = string
-  default     = "grafana_readonly"
-}
-
-variable "grafana_neon_password" {
-  description = "Neon PostgreSQL password for Grafana read-only user"
+variable "origin_verify_secret" {
+  description = "Shared secret Cloudflare adds as X-Origin-Verify. Leave empty to disable origin verification; set it only AFTER the Cloudflare Transform Rule is live."
   type        = string
   sensitive   = true
   default     = ""
