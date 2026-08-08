@@ -170,3 +170,8 @@ output "ses_dkim_tokens" {
   description = "DKIM CNAME records to add to DNS: {token}._domainkey.govtrove.com -> {token}.dkim.amazonses.com"
   value       = var.domain_name != "" ? aws_sesv2_email_identity.domain.dkim_signing_attributes[0].tokens : []
 }
+
+output "aws_account_id" {
+  description = "AWS account ID (used to build console deep-links in the admin UI)"
+  value       = data.aws_caller_identity.current.account_id
+}

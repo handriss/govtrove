@@ -106,4 +106,4 @@ SELECT records_fetched, records_inserted, status FROM pipeline.ingestion_runs
 
 The API structurally omits ~40% of the catalog (Modifications, J&As, most
 standalone Solicitations — they 404 in the API). This backfill is a **majority
-recovery / outage stopgap only.** See `docs/csv-vs-api-analysis.md`.
+recovery / outage stopgap only.**

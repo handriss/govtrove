@@ -358,7 +358,9 @@ deploy-frontend: frontend-build
 	WORKOS_CLIENT_ID=$$(cd infra/terraform && terraform output -raw workos_client_id 2>/dev/null || echo "") && \
 	SENTRY_DSN=$$(cd infra/terraform && terraform output -raw sentry_frontend_dsn 2>/dev/null || echo "") && \
 	TAWK_ID=$$(cd infra/terraform && terraform output -raw tawk_property_id 2>/dev/null || echo "") && \
+	AWS_ACCOUNT_ID=$$(cd infra/terraform && terraform output -raw aws_account_id 2>/dev/null || echo "") && \
 	echo "VITE_API_URL=$$API_URL/api" > .env.production && \
+	if [ -n "$$AWS_ACCOUNT_ID" ]; then echo "VITE_AWS_ACCOUNT_ID=$$AWS_ACCOUNT_ID" >> .env.production; fi && \
 	if [ -n "$$WORKOS_CLIENT_ID" ]; then echo "VITE_WORKOS_CLIENT_ID=$$WORKOS_CLIENT_ID" >> .env.production; fi && \
 	if [ -n "$$SENTRY_DSN" ]; then echo "VITE_SENTRY_DSN=$$SENTRY_DSN" >> .env.production; fi && \
 	if [ -n "$$TAWK_ID" ]; then echo "VITE_TAWK_PROPERTY_ID=$$TAWK_ID" >> .env.production; fi && \

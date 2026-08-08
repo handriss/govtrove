@@ -2,6 +2,13 @@
 
 Federal contract opportunity search platform. Aggregates data from SAM.gov's official public data services and provides a fast, searchable interface for government contractors.
 
+Live at **[govtrove.com](https://govtrove.com)** — the app is free to use.
+
+Go API + React SPA + a Go/Step Functions ingest pipeline + a TypeScript MCP server,
+running on AWS App Runner, Lambda, CloudFront and Neon Postgres, all managed with
+Terraform. See [Architecture](#architecture) for how the pieces fit, and
+[Local Development](#local-development) to run the whole stack with one command.
+
 ## Architecture
 
 ```
@@ -26,17 +33,35 @@ Federal contract opportunity search platform. Aggregates data from SAM.gov's off
                +--------------+--------------+
                |              |              |
           download-csvs  ingest-active  reconcile
-                         ingest-archived
-                         ingest-api
-                         generate-alerts
+                         ingest-api     generate-alerts
+                                        seo-trends
+                                        seo-pages
 ```
 
 **Components:**
 - **Landing page** — Static marketing site (`landing/`), served via CloudFront/S3 at govtrove.com
 - **Frontend** — React SPA (`frontend/`), served via CloudFront/S3 at app.govtrove.com
 - **API** — Go service (`api/`), running on AWS App Runner at api.govtrove.com (proxied through Cloudflare)
+- **MCP server** — TypeScript service (`mcp/`), running on App Runner at mcp.govtrove.com. Exposes opportunity search to AI assistants over the Model Context Protocol, authenticated with WorkOS AuthKit.
 - **Pipeline** — Go Lambda functions (`pipeline/`), orchestrated by Step Functions on a 15-minute schedule. Downloads SAM.gov CSV bulk exports and API data, ingests into the database, and reconciles changes.
 - **Database** — Neon serverless PostgreSQL
+
+## Data Source and Compliance
+
+All opportunity data comes from SAM.gov, the U.S. government's official procurement
+system. Notice data is public government information.
+
+The pipeline uses two official access paths and performs **no web scraping** — there is no
+HTML parsing anywhere in the codebase:
+
+- `api.sam.gov/opportunities/v2/search` — the documented public REST API, with a registered
+  API key (`pipeline/internal/samgov/api.go`)
+- `sam.gov/api/prod/fileextractservices/...` — the bulk CSV extract that SAM.gov's Data
+  Services page publishes for exactly this purpose (`pipeline/internal/samgov/csv.go`)
+
+Requests are rate-limited well inside the published limits, every request is logged for
+audit (`pipeline.samgov_requests`), and the UI attributes SAM.gov and links back to the
+original notice on every opportunity.
 
 ## Prerequisites
 
@@ -123,6 +148,7 @@ make deploy-all
 make deploy-frontend    # Build React app → S3 → CloudFront invalidation
 make deploy-landing     # Sync landing/ → S3 → CloudFront invalidation
 make deploy-api         # Docker build → ECR push → App Runner deployment
+make deploy-mcp         # Docker build → ECR push → App Runner deployment (MCP)
 make deploy-pipeline    # Cross-compile Lambda zips → update-function-code
 ```
 
@@ -132,7 +158,7 @@ make deploy-pipeline    # Cross-compile Lambda zips → update-function-code
 
 **API deployment** builds a linux/amd64 Docker image, pushes to ECR, and triggers an App Runner deployment.
 
-**Pipeline deployment** cross-compiles all 6 Lambda functions (download-csvs, ingest-active, ingest-archived, ingest-api, reconcile, generate-alerts) as `provided.al2023` binaries, zips them, and updates each function via `aws lambda update-function-code`.
+**Pipeline deployment** cross-compiles all 7 Lambda functions (download-csvs, ingest-active, ingest-api, reconcile, generate-alerts, seo-trends, seo-pages) as `provided.al2023` binaries, zips them, and updates each function via `aws lambda update-function-code`.
 
 ## Pipeline Operations
 
@@ -150,7 +176,7 @@ make logs-pipeline SVC=reconcile    # Tail a specific Lambda's logs
 make status                         # Show status of all deployed services
 ```
 
-Available Lambda names for `SVC`: `download-csvs`, `ingest-active`, `ingest-archived`, `ingest-api`, `reconcile`, `generate-alerts`
+Available Lambda names for `SVC`: `download-csvs`, `ingest-active`, `ingest-api`, `reconcile`, `generate-alerts`, `seo-trends`, `seo-pages`
 
 ## Infrastructure
 
@@ -186,8 +212,10 @@ govtrove/
 │   └── internal/         # Handlers, repository, middleware
 ├── frontend/             # React + Vite frontend
 │   └── src/
+├── mcp/                  # TypeScript MCP server for AI assistants
+│   └── src/
 ├── pipeline/             # Go pipeline Lambda functions
-│   ├── cmd/lambda/       # Lambda entrypoints (6 functions)
+│   ├── cmd/lambda/       # Lambda entrypoints (7 functions)
 │   └── internal/         # SAM.gov client, CSV parsing, DB ops, reconciler
 ├── landing/              # Static landing page + blog
 │   └── blog/             # Blog post HTML files
@@ -200,3 +228,16 @@ govtrove/
 ├── Makefile              # All commands
 └── .env.example          # Environment variable template
 ```
+
+## License
+
+Source-available under the [Business Source License 1.1](LICENSE).
+
+You may read, modify, self-host, and make production use of this code. You may not
+offer it — or a derivative — as a commercial product or service whose primary purpose
+is searching, monitoring, or distributing U.S. federal contract opportunity data.
+
+On **2030-08-08** the licence converts automatically to Apache License 2.0.
+
+Trademarks and brand assets (including the GovTrove name and any third-party logos
+under `assets/`) are not covered by this licence.

@@ -1,8 +1,8 @@
 import { ExternalLink } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 
-const REGION = 'us-east-1';
-const ACCOUNT = '341115025444';
+const REGION = import.meta.env.VITE_AWS_REGION || 'us-east-1';
+const ACCOUNT = import.meta.env.VITE_AWS_ACCOUNT_ID || '';
 
 interface LinkItem {
   label: string;
