@@ -163,8 +163,22 @@ resource "aws_iam_role_policy" "lambda_pipeline_seo_pages" {
       {
         Sid      = "S3WriteLanding"
         Effect   = "Allow"
-        Action   = ["s3:PutObject"]
+        Action   = ["s3:PutObject", "s3:DeleteObject"]
         Resource = ["${aws_s3_bucket.landing[0].arn}/contracts/*", "${aws_s3_bucket.landing[0].arn}/sitemap.xml"]
+      },
+      {
+        # Listing is bucket-level, so it cannot be scoped by prefix in the resource — the
+        # condition does that instead, keeping the generator blind to everything but the
+        # pages it owns. Needed to find stale pages left by earlier runs.
+        Sid      = "S3ListLandingContracts"
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = [aws_s3_bucket.landing[0].arn]
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["contracts/*"]
+          }
+        }
       },
       {
         Sid      = "CloudFrontInvalidation"
