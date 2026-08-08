@@ -23,8 +23,7 @@ resource "aws_sns_topic_policy" "notifications" {
   })
 }
 
-resource "aws_sns_topic_subscription" "email" {
-  topic_arn = aws_sns_topic.notifications.arn
-  protocol  = "email"
-  endpoint  = var.notification_email
-}
+# Email subscriptions are managed by hand, not Terraform. SNS deletes an
+# unconfirmed email subscription after 3 days, so a Terraform-created one that
+# nobody clicks disappears and reappears in every plan forever. Current
+# subscribers: info@govtrove.com (notifications), andrew@govtrove.com (bounces).

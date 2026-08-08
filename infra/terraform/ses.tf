@@ -33,11 +33,7 @@ resource "aws_sns_topic" "ses_bounces" {
   }
 }
 
-resource "aws_sns_topic_subscription" "ses_bounces_email" {
-  topic_arn = aws_sns_topic.ses_bounces.arn
-  protocol  = "email"
-  endpoint  = var.notification_email
-}
+# Bounce-topic email subscription is managed by hand — see the note in sns.tf.
 
 # Route bounce and complaint events to SNS
 resource "aws_sesv2_configuration_set_event_destination" "bounces" {

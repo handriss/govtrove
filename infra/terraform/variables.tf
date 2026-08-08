@@ -198,7 +198,9 @@ variable "posthog_host" {
   default     = "https://us.i.posthog.com"
 }
 
-# Grafana Cloud
+# Grafana Cloud — REMOVED 2026-08-08 (unused). The resources and provider are gone;
+# these declarations remain only so the existing grafana_* entries in terraform.tfvars
+# don't emit "undeclared variable" warnings. Delete both together.
 variable "grafana_cloud_access_token" {
   description = "Grafana Cloud access policy token"
   type        = string

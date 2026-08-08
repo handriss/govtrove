@@ -42,17 +42,17 @@ resource "aws_lambda_function" "pipeline" {
 
   environment {
     variables = {
-      DATABASE_URL_SECRET_ARN  = aws_secretsmanager_secret.database_url.arn
-      S3_BUCKET                = aws_s3_bucket.data.id
-      AWS_REGION_NAME          = var.aws_region
-      SENTRY_DSN               = var.sentry_pipeline_dsn
-      SAM_API_KEY_SECRET_ARN   = aws_secretsmanager_secret.sam_api_key.arn
+      DATABASE_URL_SECRET_ARN   = aws_secretsmanager_secret.database_url.arn
+      S3_BUCKET                 = aws_s3_bucket.data.id
+      AWS_REGION_NAME           = var.aws_region
+      SENTRY_DSN                = var.sentry_pipeline_dsn
+      SAM_API_KEY_SECRET_ARN    = aws_secretsmanager_secret.sam_api_key.arn
       RESEND_API_KEY_SECRET_ARN = aws_secretsmanager_secret.resend_api_key.arn
-      UNSUBSCRIBE_SECRET_ARN   = aws_secretsmanager_secret.resend_webhook_secret.arn
-      EMAIL_FROM               = "GovTrove <notifications@govtrove.com>"
-      APP_BASE_URL             = "https://app.govtrove.com"
-      LANDING_S3_BUCKET        = var.domain_name != "" ? aws_s3_bucket.landing[0].id : ""
-      LANDING_DISTRIBUTION_ID  = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].id : ""
+      UNSUBSCRIBE_SECRET_ARN    = aws_secretsmanager_secret.resend_webhook_secret.arn
+      EMAIL_FROM                = "GovTrove <notifications@govtrove.com>"
+      APP_BASE_URL              = "https://app.govtrove.com"
+      LANDING_S3_BUCKET         = var.domain_name != "" ? aws_s3_bucket.landing[0].id : ""
+      LANDING_DISTRIBUTION_ID   = var.domain_name != "" ? aws_cloudfront_distribution.landing[0].id : ""
     }
   }
 
@@ -62,6 +62,14 @@ resource "aws_lambda_function" "pipeline" {
 
   tags = {
     Name = "${var.project_name}-${each.key}"
+  }
+
+  # `make deploy-pipeline` ships code via update-function-code, so the deployed
+  # binary is always newer than the zip Terraform hashed at plan time. Without
+  # this, any `terraform apply` silently rolls all 7 Lambdas back to the local
+  # build. Terraform owns config; the Makefile owns code.
+  lifecycle {
+    ignore_changes = [filename, source_code_hash]
   }
 }
 
@@ -105,9 +113,9 @@ resource "aws_iam_role_policy" "lambda_pipeline_base" {
         ]
       },
       {
-        Sid      = "SecretsManager"
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
+        Sid    = "SecretsManager"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.sam_api_key.arn,
@@ -225,15 +233,15 @@ resource "aws_sfn_state_machine" "pipeline" {
   role_arn = aws_iam_role.sfn_pipeline.arn
 
   definition = templatefile("${path.module}/step-functions.asl.json", {
-    download_csvs_arn      = aws_lambda_function.pipeline["download-csvs"].arn
-    ingest_active_arn      = aws_lambda_function.pipeline["ingest-active"].arn
-    reconcile_arn          = aws_lambda_function.pipeline["reconcile"].arn
-    generate_alerts_arn    = aws_lambda_function.pipeline["generate-alerts"].arn
-    ingest_api_arn         = aws_lambda_function.pipeline["ingest-api"].arn
-    seo_trends_arn         = aws_lambda_function.pipeline["seo-trends"].arn
-    seo_pages_arn          = aws_lambda_function.pipeline["seo-pages"].arn
-    sns_notifications_arn  = aws_sns_topic.notifications.arn
-    sqs_dlq_url            = aws_sqs_queue.pipeline_dlq.url
+    download_csvs_arn     = aws_lambda_function.pipeline["download-csvs"].arn
+    ingest_active_arn     = aws_lambda_function.pipeline["ingest-active"].arn
+    reconcile_arn         = aws_lambda_function.pipeline["reconcile"].arn
+    generate_alerts_arn   = aws_lambda_function.pipeline["generate-alerts"].arn
+    ingest_api_arn        = aws_lambda_function.pipeline["ingest-api"].arn
+    seo_trends_arn        = aws_lambda_function.pipeline["seo-trends"].arn
+    seo_pages_arn         = aws_lambda_function.pipeline["seo-pages"].arn
+    sns_notifications_arn = aws_sns_topic.notifications.arn
+    sqs_dlq_url           = aws_sqs_queue.pipeline_dlq.url
   })
 
   tags = {
