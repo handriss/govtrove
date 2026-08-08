@@ -54,6 +54,10 @@ frontend/dist/
 # Scratch — untracked working files, research, playground data
 scratch/
 
+# Pre-publish history backups (mirror of the old history + the rewritten clone).
+# Survives `git reset --hard`; would NOT survive deleting this directory.
+.backups/
+
 # Internal operational notes: outage history, data-quality caveats, deploy landmines
 PENDING-WORK.md
 
