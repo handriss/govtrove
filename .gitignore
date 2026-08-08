@@ -100,3 +100,6 @@ pipeline/seo-trends
 
 # Vite dependency cache
 .vite/
+
+# Internal research note (see PENDING-WORK.md)
+MIGRATION-000073-NOTES.md
