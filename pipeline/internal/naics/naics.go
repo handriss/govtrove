@@ -1015,6 +1015,30 @@ var codes = map[string]string{
 	"927110": "Space Research and Technology",
 	"928110": "National Security",
 	"928120": "International Affairs",
+
+	// Retired NAICS 2017 codes. SAM.gov still classifies live opportunities under them,
+	// and without an entry here the generator emits no page at all — those opportunities
+	// end up with nowhere to land. Titles from the Census 2017 6-digit code list.
+	// Keep on regeneration from frontend/src/data/naicsCodes.ts, which omits them.
+	"315220": "Men's and Boys' Cut and Sew Apparel Manufacturing",
+	"333249": "Other Industrial Machinery Manufacturing",
+	"333314": "Optical Instrument and Lens Manufacturing",
+	"333316": "Photographic and Photocopying Equipment Manufacturing",
+	"333318": "Other Commercial and Service Industry Machinery Manufacturing",
+	"333997": "Scale and Balance Manufacturing",
+	"335121": "Residential Electric Lighting Fixture Manufacturing",
+	"335122": "Commercial, Industrial, and Institutional Electric Lighting Fixture Manufacturing",
+	"335129": "Other Lighting Equipment Manufacturing",
+	"335911": "Storage Battery Manufacturing",
+	"336111": "Automobile Manufacturing",
+	"336112": "Light Truck and Utility Vehicle Manufacturing",
+	"448110": "Men's Clothing Stores",
+	"511120": "Periodical Publishers",
+	"511210": "Software Publishers",
+	"517311": "Wired Telecommunications Carriers",
+	"517312": "Wireless Telecommunications Carriers (except Satellite)",
+	"517919": "All Other Telecommunications",
+	"811212": "Computer and Office Machine Repair and Maintenance",
 }
 
 // Label returns the human-readable title for a 6-digit NAICS code.
@@ -1024,6 +1048,62 @@ func Label(code string) string {
 		return title
 	}
 	return code
+}
+
+// sectors maps a NAICS sector key to its title. Manufacturing, Retail Trade and
+// Transportation each officially span a range of 2-digit prefixes, so the key is the range
+// ("31-33"), not the prefix — one hub per sector rather than three pages all titled
+// "Manufacturing" competing with each other.
+// Titles from the Census 2017 NAICS sector list.
+var sectors = map[string]string{
+	"11":    "Agriculture, Forestry, Fishing and Hunting",
+	"21":    "Mining, Quarrying, and Oil and Gas Extraction",
+	"22":    "Utilities",
+	"23":    "Construction",
+	"31-33": "Manufacturing",
+	"42":    "Wholesale Trade",
+	"44-45": "Retail Trade",
+	"48-49": "Transportation and Warehousing",
+	"51":    "Information",
+	"52":    "Finance and Insurance",
+	"53":    "Real Estate and Rental and Leasing",
+	"54":    "Professional, Scientific, and Technical Services",
+	"55":    "Management of Companies and Enterprises",
+	"56":    "Administrative and Support and Waste Management and Remediation Services",
+	"61":    "Educational Services",
+	"62":    "Health Care and Social Assistance",
+	"71":    "Arts, Entertainment, and Recreation",
+	"72":    "Accommodation and Food Services",
+	"81":    "Other Services (except Public Administration)",
+	"92":    "Public Administration",
+}
+
+// sectorRanges folds the prefixes that belong to a multi-prefix sector onto its key.
+var sectorRanges = map[string]string{
+	"31": "31-33", "32": "31-33", "33": "31-33",
+	"44": "44-45", "45": "44-45",
+	"48": "48-49", "49": "48-49",
+}
+
+// Sectors returns a copy of the sector key-to-title map.
+func Sectors() map[string]string {
+	m := make(map[string]string, len(sectors))
+	for k, v := range sectors {
+		m[k] = v
+	}
+	return m
+}
+
+// SectorOf returns the sector key for a NAICS code ("541330" -> "54", "336111" -> "31-33").
+func SectorOf(code string) string {
+	if len(code) < 2 {
+		return ""
+	}
+	prefix := code[:2]
+	if key, ok := sectorRanges[prefix]; ok {
+		return key
+	}
+	return prefix
 }
 
 // Codes returns a copy of the NAICS code-to-label map.

@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/getsentry/sentry-go"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/handriss/govtrove/pipeline/internal/database"
 	"github.com/handriss/govtrove/pipeline/internal/naics"
+	"github.com/handriss/govtrove/pipeline/internal/psc"
 )
 
 var (
@@ -98,12 +100,17 @@ type Output struct {
 	SetAsides   int    `json:"set_aside_pages"`
 	NAICSPages  int    `json:"naics_pages"`
 	AgencyPages int    `json:"agency_pages"`
+	PSCPages    int    `json:"psc_pages"`
+	HubPages    int    `json:"hub_pages"`
 	SitemapURLs int    `json:"sitemap_urls"`
+	PrunedPages int    `json:"pruned_pages"`
 	Failures    int    `json:"failures"`
 }
 
 type S3Putter interface {
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	DeleteObjects(ctx context.Context, params *s3.DeleteObjectsInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error)
 }
 
 type CloudFrontInvalidator interface {
@@ -123,6 +130,76 @@ type uploadItem struct {
 	key         string
 	body        []byte
 	contentType string
+}
+
+// A page carrying one or two opportunities is near-indistinguishable from every other
+// near-empty page, and Google clusters them as duplicates — which drags on the pages that
+// do have substance. Below this they are still generated (they are useful to a human who
+// lands on one) but noindex'd and kept out of the sitemap.
+const indexThreshold = 3
+
+// pruneStalePages deletes contracts/ objects this run did not write. A NAICS code or
+// agency that stops appearing in the data is simply skipped by the generator, so without
+// this its page stays live in S3 forever: unlinked, absent from the sitemap, and still
+// serving 200 to crawlers. Scoped to contracts/ so hand-authored landing files are safe.
+func (h *Handler) pruneStalePages(ctx context.Context, writtenKeys map[string]bool) (int, error) {
+	const prefix = "contracts/"
+
+	var stale []s3types.ObjectIdentifier
+	var token *string
+	for {
+		page, err := h.S3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            &h.S3Bucket,
+			Prefix:            strPtr(prefix),
+			ContinuationToken: token,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("list %s: %w", prefix, err)
+		}
+		for _, obj := range page.Contents {
+			if obj.Key == nil || writtenKeys[*obj.Key] {
+				continue
+			}
+			stale = append(stale, s3types.ObjectIdentifier{Key: obj.Key})
+		}
+		if page.IsTruncated == nil || !*page.IsTruncated {
+			break
+		}
+		token = page.NextContinuationToken
+	}
+
+	if len(stale) == 0 {
+		return 0, nil
+	}
+
+	// A run that wrote nothing means the generator failed upstream, not that every page
+	// is genuinely gone. Refuse to empty the bucket on the strength of a bad run.
+	if len(writtenKeys) == 0 {
+		return 0, fmt.Errorf("refusing to prune %d objects: nothing was written this run", len(stale))
+	}
+
+	deleted := 0
+	for start := 0; start < len(stale); start += 1000 {
+		end := start + 1000
+		if end > len(stale) {
+			end = len(stale)
+		}
+		batch := stale[start:end]
+		out, err := h.S3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: &h.S3Bucket,
+			Delete: &s3types.Delete{Objects: batch, Quiet: boolPtr(true)},
+		})
+		if err != nil {
+			return deleted, fmt.Errorf("delete stale objects: %w", err)
+		}
+		deleted += len(batch) - len(out.Errors)
+		for _, e := range out.Errors {
+			h.Logger.Error("stale object delete failed", "key", deref(e.Key), "error", deref(e.Message))
+		}
+	}
+
+	h.Logger.Info("pruned stale SEO pages", "deleted", deleted, "candidates", len(stale))
+	return deleted, nil
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
@@ -237,8 +314,21 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}()
 	}
 
-	var setAsideCount, naicsCount, agencyCount int
+	// Every key written this run, so stale objects from earlier runs can be pruned.
+	// Without this, a NAICS code or agency that goes inactive leaves an orphan page
+	// live in S3 forever — unlinked, absent from the sitemap, and still returning 200.
+	writtenKeys := make(map[string]bool)
+	put := func(key string, body []byte, contentType string) {
+		writtenKeys[key] = true
+		uploads <- uploadItem{key: key, body: body, contentType: contentType}
+	}
+
+	var setAsideCount, naicsCount, agencyCount, pscCount, hubCount int
 	var sitemapURLs []string
+
+	sectorTitles := naics.Sectors()
+	naicsBySector := make(map[string][]indexEntry)
+	sectorCounts := make(map[string]int)
 
 	// Static sitemap entries
 	staticPages := []string{
@@ -286,7 +376,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 
 		key := fmt.Sprintf("contracts/set-aside/%s.html", sa.Slug)
-		uploads <- uploadItem{key: key, body: body, contentType: "text/html; charset=utf-8"}
+		put(key, body, "text/html; charset=utf-8")
 		setAsideCount++
 		sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/set-aside/%s.html", sa.Slug))
 
@@ -321,12 +411,15 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			}
 		}
 
-		seoTitle := fmt.Sprintf("NAICS %s: %s — %d Active Federal Contracts (2026)", code, label, c.TotalCount)
-		metaDesc := fmt.Sprintf("Browse %d active federal contract opportunities under NAICS %s (%s), updated daily from SAM.gov. Filter by set-aside, agency, and deadline — free.", c.TotalCount, code, label)
-		subtitle := fmt.Sprintf("Browse %d active federal contract opportunities classified under NAICS %s.", c.TotalCount, code)
+		// "naics 335313" is someone asking what the code is, not how many contracts are
+		// open under it. These pages ranked 5-10 on those queries and earned almost no
+		// clicks because the title answered the wrong question — lead with the definition.
+		seoTitle := fmt.Sprintf("NAICS %s – %s: What It Covers, %d Active Contracts", code, label, c.TotalCount)
+		metaDesc := fmt.Sprintf("NAICS %s covers %s. See what the code includes, which agencies buy under it, and %d active federal contract opportunities — updated daily from SAM.gov.", code, label, c.TotalCount)
+		subtitle := fmt.Sprintf("What NAICS %s (%s) covers, and %d active federal contract opportunities classified under it.", code, label, c.TotalCount)
 		if c.TotalCount == 0 {
-			seoTitle = fmt.Sprintf("NAICS %s – %s: Federal Contracting Guide (2026)", code, label)
-			metaDesc = fmt.Sprintf("What NAICS %s (%s) covers and how to find matching federal contracts on SAM.gov — free, daily-updated opportunity search from GovTrove.", code, label)
+			seoTitle = fmt.Sprintf("NAICS %s – %s: What This Code Covers", code, label)
+			metaDesc = fmt.Sprintf("What NAICS %s (%s) covers in federal contracting, and how to find matching opportunities on SAM.gov — free, daily-updated search from GovTrove.", code, label)
 			subtitle = fmt.Sprintf("What NAICS %s (%s) means for federal contracting, and how to find matching opportunities.", code, label)
 		}
 
@@ -343,8 +436,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?naics=%s", code),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
-			NoIndex:         c.TotalCount == 0,
+			NoIndex:         c.TotalCount < indexThreshold,
 			IsNAICS:         true,
+			ParentLink:      sectorLink(code),
+			ParentLabel:     sectorLabel(code),
 		}
 
 		body, err := renderPage(tmpl, data)
@@ -355,19 +450,24 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 
 		key := fmt.Sprintf("contracts/naics/%s.html", code)
-		uploads <- uploadItem{key: key, body: body, contentType: "text/html; charset=utf-8"}
+		put(key, body, "text/html; charset=utf-8")
 		naicsCount++
-		// Thin (0-opportunity) pages are noindex'd — keep them out of the sitemap too.
-		if c.TotalCount > 0 {
+		// Thin pages are noindex'd — keep them out of the sitemap too.
+		if c.TotalCount >= indexThreshold {
 			sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/naics/%s.html", code))
 		}
 
-		if c.TotalCount > 0 {
-			naicsEntries = append(naicsEntries, indexEntry{
+		if c.TotalCount >= indexThreshold {
+			entry := indexEntry{
 				Slug:  fmt.Sprintf("naics/%s", code),
 				Label: fmt.Sprintf("NAICS %s – %s", code, label),
 				Count: c.TotalCount,
-			})
+			}
+			naicsEntries = append(naicsEntries, entry)
+			if sec := naics.SectorOf(code); sectorTitles[sec] != "" {
+				naicsBySector[sec] = append(naicsBySector[sec], entry)
+				sectorCounts[sec] += c.TotalCount
+			}
 		}
 	}
 
@@ -418,7 +518,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 
 		key := fmt.Sprintf("contracts/agency/%s.html", slug)
-		uploads <- uploadItem{key: key, body: body, contentType: "text/html; charset=utf-8"}
+		put(key, body, "text/html; charset=utf-8")
 		agencyCount++
 		sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/agency/%s.html", slug))
 
@@ -429,34 +529,239 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		})
 	}
 
+	// Generate PSC code pages
+	allPSC := psc.Codes()
+	pscCodes := make([]string, 0, len(allPSC))
+	for code := range allPSC {
+		pscCodes = append(pscCodes, code)
+	}
+	sort.Strings(pscCodes)
+
+	pscByGroup := make(map[string][]indexEntry)
+	for _, code := range pscCodes {
+		label := allPSC[code]
+		c := countMap["psc"][code]
+
+		var opps []database.SEOOpportunity
+		if c.TotalCount > 0 {
+			var err error
+			opps, err = h.Store.GetSEOPageOpportunities(ctx, "classification_code", code, 25)
+			if err != nil {
+				h.Logger.Error("failed to get PSC opps", "code", code, "error", err)
+				failures.Add(1)
+				continue
+			}
+		}
+
+		parentKey, parentTitle, hasParent := psc.ParentOf(code)
+
+		seoTitle := fmt.Sprintf("PSC %s – %s: What It Covers, %d Active Contracts", code, label, c.TotalCount)
+		metaDesc := fmt.Sprintf("PSC code %s covers %s. See what the product service code includes, which agencies buy under it, and %d active federal contract opportunities from SAM.gov.", code, label, c.TotalCount)
+		subtitle := fmt.Sprintf("What PSC %s (%s) covers, and %d active federal contract opportunities classified under it.", code, label, c.TotalCount)
+		if c.TotalCount == 0 {
+			seoTitle = fmt.Sprintf("PSC %s – %s: What This Code Covers", code, label)
+			metaDesc = fmt.Sprintf("What PSC code %s (%s) covers in federal contracting, and how to find matching opportunities on SAM.gov — free, daily-updated search from GovTrove.", code, label)
+			subtitle = fmt.Sprintf("What PSC %s (%s) means for federal contracting, and how to find matching opportunities.", code, label)
+		}
+
+		data := pageData{
+			SEOTitle:        seoTitle,
+			MetaDescription: metaDesc,
+			CanonicalPath:   fmt.Sprintf("psc/%s", code),
+			Breadcrumb:      fmt.Sprintf("PSC %s – %s", code, label),
+			H1:              fmt.Sprintf("PSC %s – %s", code, label),
+			Subtitle:        subtitle,
+			TotalCount:      c.TotalCount,
+			RecentCount:     c.RecentCount,
+			Opportunities:   toTemplateOpps(opps),
+			CTALink:         fmt.Sprintf("https://app.govtrove.com/?psc=%s", code),
+			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
+			UpdatedDate:     updatedDate,
+			NoIndex:         c.TotalCount < indexThreshold,
+			IsPSC:           true,
+		}
+		if hasParent {
+			data.ParentLink = fmt.Sprintf("/contracts/psc/group/%s.html", parentKey)
+			data.ParentLabel = fmt.Sprintf("PSC %s – %s", parentKey, parentTitle)
+		}
+
+		body, err := renderPage(tmpl, data)
+		if err != nil {
+			h.Logger.Error("failed to render PSC page", "code", code, "error", err)
+			failures.Add(1)
+			continue
+		}
+
+		put(fmt.Sprintf("contracts/psc/%s.html", code), body, "text/html; charset=utf-8")
+		pscCount++
+		if c.TotalCount >= indexThreshold {
+			sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/psc/%s.html", code))
+			pscByGroup[parentKey] = append(pscByGroup[parentKey], indexEntry{
+				Slug:  fmt.Sprintf("psc/%s", code),
+				Label: fmt.Sprintf("PSC %s – %s", code, label),
+				Count: c.TotalCount,
+			})
+		}
+	}
+
+	// Generate PSC group hubs. These carry the "psc code list" style queries that a
+	// JS-only finder tool can never rank for, and give the 4-character pages a parent
+	// to inherit from instead of hanging off a flat index.
+	allGroups := psc.Hubs()
+	groupCodes := make([]string, 0, len(allGroups))
+	for g := range allGroups {
+		groupCodes = append(groupCodes, g)
+	}
+	sort.Strings(groupCodes)
+
+	var pscGroupEntries []indexEntry
+	for _, group := range groupCodes {
+		label := allGroups[group]
+		countKey := "psc_group"
+		if len(group) == 1 {
+			countKey = "psc_cat"
+		}
+		c := countMap[countKey][group]
+
+		opps, err := h.Store.GetSEOPageOpportunitiesByPrefix(ctx, "classification_code", group, 25)
+		if err != nil {
+			h.Logger.Error("failed to get PSC group opps", "group", group, "error", err)
+			failures.Add(1)
+			continue
+		}
+
+		children := pscByGroup[group]
+		sort.Slice(children, func(i, j int) bool { return children[i].Count > children[j].Count })
+
+		data := pageData{
+			SEOTitle:        fmt.Sprintf("PSC %s – %s: Full Code List, %d Active Contracts", group, label, c.TotalCount),
+			MetaDescription: fmt.Sprintf("Every PSC code under group %s (%s), what each covers, and %d active federal contract opportunities — updated daily from SAM.gov.", group, label, c.TotalCount),
+			CanonicalPath:   fmt.Sprintf("psc/group/%s", group),
+			Breadcrumb:      fmt.Sprintf("PSC %s – %s", group, label),
+			H1:              fmt.Sprintf("PSC Group %s – %s", group, label),
+			Subtitle:        fmt.Sprintf("All %d product service codes under PSC group %s, and %d active federal contract opportunities.", len(children), group, c.TotalCount),
+			TotalCount:      c.TotalCount,
+			RecentCount:     c.RecentCount,
+			Opportunities:   toTemplateOpps(opps),
+			ChildPages:      children,
+			CTALink:         fmt.Sprintf("https://app.govtrove.com/?psc=%s", group),
+			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
+			UpdatedDate:     updatedDate,
+			NoIndex:         c.TotalCount < indexThreshold,
+			IsPSC:           true,
+			IsHub:           true,
+		}
+
+		body, err := renderPage(tmpl, data)
+		if err != nil {
+			h.Logger.Error("failed to render PSC group page", "group", group, "error", err)
+			failures.Add(1)
+			continue
+		}
+
+		// Every group gets a page even when thin, so the static code directory on
+		// /psc-code-finder/ can link all 84 of them without risking a 404.
+		put(fmt.Sprintf("contracts/psc/group/%s.html", group), body, "text/html; charset=utf-8")
+		hubCount++
+		if c.TotalCount < indexThreshold {
+			continue
+		}
+		sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/psc/group/%s.html", group))
+		pscGroupEntries = append(pscGroupEntries, indexEntry{
+			Slug:  fmt.Sprintf("psc/group/%s", group),
+			Label: fmt.Sprintf("PSC %s – %s", group, label),
+			Count: c.TotalCount,
+		})
+	}
+	sort.Slice(pscGroupEntries, func(i, j int) bool { return pscGroupEntries[i].Count > pscGroupEntries[j].Count })
+
+	// Generate NAICS sector hubs, so /contracts/ links 20 sectors instead of 720 codes.
+	sectorPrefixes := make([]string, 0, len(sectorTitles))
+	for sec := range sectorTitles {
+		sectorPrefixes = append(sectorPrefixes, sec)
+	}
+	sort.Strings(sectorPrefixes)
+
+	var sectorEntries []indexEntry
+	for _, sec := range sectorPrefixes {
+		label := sectorTitles[sec]
+		children := naicsBySector[sec]
+		sort.Slice(children, func(i, j int) bool { return children[i].Count > children[j].Count })
+
+		total := sectorCounts[sec]
+		data := pageData{
+			SEOTitle:        fmt.Sprintf("NAICS Sector %s – %s: Code List, %d Active Contracts", sec, label, total),
+			MetaDescription: fmt.Sprintf("Every NAICS code in sector %s (%s) with active federal contract opportunities, what each covers, and %d open opportunities from SAM.gov.", sec, label, total),
+			CanonicalPath:   fmt.Sprintf("naics/sector/%s", sec),
+			Breadcrumb:      fmt.Sprintf("NAICS Sector %s", sec),
+			H1:              fmt.Sprintf("NAICS Sector %s – %s", sec, label),
+			Subtitle:        fmt.Sprintf("All %d NAICS codes in sector %s with active federal contract opportunities.", len(children), sec),
+			TotalCount:      total,
+			ChildPages:      children,
+			CTALink:         fmt.Sprintf("https://app.govtrove.com/?naics=%s", sec),
+			CTACountLabel:   fmt.Sprintf("%d+", total),
+			UpdatedDate:     updatedDate,
+			NoIndex:         total < indexThreshold,
+			IsNAICS:         true,
+			IsHub:           true,
+		}
+
+		body, err := renderPage(tmpl, data)
+		if err != nil {
+			h.Logger.Error("failed to render NAICS sector page", "sector", sec, "error", err)
+			failures.Add(1)
+			continue
+		}
+
+		put(fmt.Sprintf("contracts/naics/sector/%s.html", sec), body, "text/html; charset=utf-8")
+		hubCount++
+		if total < indexThreshold {
+			continue
+		}
+		sitemapURLs = append(sitemapURLs, fmt.Sprintf("https://govtrove.com/contracts/naics/sector/%s.html", sec))
+		sectorEntries = append(sectorEntries, indexEntry{
+			Slug:  fmt.Sprintf("naics/sector/%s", sec),
+			Label: fmt.Sprintf("%s – %s", sec, label),
+			Count: total,
+		})
+	}
+	sort.Slice(sectorEntries, func(i, j int) bool { return sectorEntries[i].Count > sectorEntries[j].Count })
+
 	// Generate index page
 	indexData := pageData{
-		SEOTitle:        "Federal Contract Opportunities by Set-Aside, NAICS Code, and Agency",
-		MetaDescription: "Browse federal contract opportunities by set-aside type (SDVOSB, 8(a), HUBZone, WOSB), NAICS code, and federal agency. Updated daily from SAM.gov.",
+		SEOTitle:        "Federal Contract Opportunities by NAICS Code, PSC Code, Set-Aside, and Agency",
+		MetaDescription: "Browse federal contract opportunities by NAICS code, PSC (product service) code, set-aside type (SDVOSB, 8(a), HUBZone, WOSB), and federal agency. Updated daily from SAM.gov.",
 		CanonicalPath:   "",
 		Breadcrumb:      "Federal Contracts",
 		H1:              "Federal Contract Opportunities",
-		Subtitle:        "Browse active federal contract opportunities by set-aside type, NAICS code, and federal agency. Updated daily from SAM.gov.",
+		Subtitle:        "Browse active federal contract opportunities by NAICS code, PSC code, set-aside type, and federal agency. Updated daily from SAM.gov.",
 		UpdatedDate:     updatedDate,
 		IsIndex:         true,
 		SetAsidePages:   setAsideEntries,
-		NAICSPages:      naicsEntries,
+		NAICSPages:      sectorEntries,
 		AgencyPages:     agencyEntries,
+		PSCPages:        pscGroupEntries,
 	}
 
 	indexBody, err := renderPage(tmpl, indexData)
 	if err != nil {
 		return nil, fmt.Errorf("render index page: %w", err)
 	}
-	uploads <- uploadItem{key: "contracts/index.html", body: indexBody, contentType: "text/html; charset=utf-8"}
+	put("contracts/index.html", indexBody, "text/html; charset=utf-8")
 
 	// Generate sitemap
 	today := now.Format("2006-01-02")
 	sitemapBody := buildSitemap(sitemapURLs, today)
-	uploads <- uploadItem{key: "sitemap.xml", body: sitemapBody, contentType: "application/xml; charset=utf-8"}
+	put("sitemap.xml", sitemapBody, "application/xml; charset=utf-8")
 
 	close(uploads)
 	wg.Wait()
+
+	pruned, err := h.pruneStalePages(ctx, writtenKeys)
+	if err != nil {
+		h.Logger.Error("prune stale pages failed", "error", err)
+		failures.Add(1)
+	}
 
 	// CloudFront invalidation
 	if h.DistributionID != "" {
@@ -485,7 +790,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		"set_aside_pages", setAsideCount,
 		"naics_pages", naicsCount,
 		"agency_pages", agencyCount,
+		"psc_pages", pscCount,
+		"hub_pages", hubCount,
 		"sitemap_urls", len(sitemapURLs),
+		"pruned_pages", pruned,
 		"failures", failCount,
 		"duration_ms", durationMs,
 	)
@@ -495,7 +803,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			"set_aside_pages": setAsideCount,
 			"naics_pages":     naicsCount,
 			"agency_pages":    agencyCount,
+			"psc_pages":       pscCount,
+			"hub_pages":       hubCount,
 			"sitemap_urls":    len(sitemapURLs),
+			"pruned_pages":    pruned,
 			"failures":        failCount,
 		}
 		completionCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -510,7 +821,10 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		SetAsides:   setAsideCount,
 		NAICSPages:  naicsCount,
 		AgencyPages: agencyCount,
+		PSCPages:    pscCount,
+		HubPages:    hubCount,
 		SitemapURLs: len(sitemapURLs),
+		PrunedPages: pruned,
 		Failures:    failCount,
 	}, nil
 }
@@ -548,6 +862,36 @@ func slugify(s string) string {
 }
 
 func int32Ptr(v int32) *int32 { return &v }
+
+func strPtr(v string) *string { return &v }
+
+// sectorLink and sectorLabel point a NAICS code page at its sector hub. Codes outside the
+// known sector list (SAM.gov carries a few) get no parent rather than a broken link.
+func sectorLink(code string) string {
+	sec := naics.SectorOf(code)
+	if naics.Sectors()[sec] == "" {
+		return ""
+	}
+	return fmt.Sprintf("/contracts/naics/sector/%s.html", sec)
+}
+
+func sectorLabel(code string) string {
+	sec := naics.SectorOf(code)
+	title := naics.Sectors()[sec]
+	if title == "" {
+		return ""
+	}
+	return fmt.Sprintf("NAICS Sector %s – %s", sec, title)
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func deref(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
 
 func toTemplateOpps(opps []database.SEOOpportunity) []opportunity {
 	result := make([]opportunity, len(opps))
@@ -672,9 +1016,15 @@ type pageData struct {
 	IsNAICS         bool
 	IsAgency        bool
 	IsIndex         bool
+	IsPSC           bool
+	IsHub           bool
+	ParentLink      string
+	ParentLabel     string
+	ChildPages      []indexEntry
 	SetAsidePages   []indexEntry
 	NAICSPages      []indexEntry
 	AgencyPages     []indexEntry
+	PSCPages        []indexEntry
 }
 
 type indexEntry struct {
@@ -817,11 +1167,24 @@ const pageTmpl = `<!DOCTYPE html>
 
         <div class="index-section">
             <h2>By NAICS Code</h2>
+            <p class="subtitle">Browse by industry sector. Each sector lists every NAICS code with active opportunities.</p>
             <ul class="index-list">
                 {{- range .NAICSPages}}
                 <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
                 {{- end}}
             </ul>
+            <p><a href="/naics-code-finder/">Not sure which NAICS code fits? Use the NAICS code finder &rarr;</a></p>
+        </div>
+
+        <div class="index-section">
+            <h2>By PSC Code (Product and Service Codes)</h2>
+            <p class="subtitle">Every PSC group with active opportunities. Each group lists the full set of 4-character codes beneath it.</p>
+            <ul class="index-list">
+                {{- range .PSCPages}}
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                {{- end}}
+            </ul>
+            <p><a href="/psc-code-finder/">Not sure which PSC code fits? Use the PSC code finder &rarr;</a></p>
         </div>
 
         <div class="index-section">
@@ -840,6 +1203,10 @@ const pageTmpl = `<!DOCTYPE html>
         </div>
         {{- else}}
 
+        {{- if .ParentLink}}
+        <p class="subtitle">Part of <a href="{{.ParentLink}}">{{.ParentLabel}}</a></p>
+        {{- end}}
+
         <div class="stats">
             <div class="stat">
                 <div class="stat-value">{{commaInt .TotalCount}}</div>
@@ -853,6 +1220,17 @@ const pageTmpl = `<!DOCTYPE html>
 
         {{- if .Explainer}}
         <div class="explainer">{{.Explainer}}</div>
+        {{- end}}
+
+        {{- if .ChildPages}}
+        <div class="index-section">
+            <h2>All Codes in This Group</h2>
+            <ul class="index-list">
+                {{- range .ChildPages}}
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                {{- end}}
+            </ul>
+        </div>
         {{- end}}
 
         <h2>Recent Opportunities</h2>

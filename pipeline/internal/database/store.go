@@ -77,6 +77,7 @@ type Store interface {
 	// SEO page generation
 	GetSEOPageCounts(ctx context.Context, recentSince time.Time) ([]SEOPageCount, error)
 	GetSEOPageOpportunities(ctx context.Context, filterCol, filterVal string, limit int) ([]SEOOpportunity, error)
+	GetSEOPageOpportunitiesByPrefix(ctx context.Context, filterCol, prefix string, limit int) ([]SEOOpportunity, error)
 	GetActiveAgencies(ctx context.Context) ([]AgencyInfo, error)
 }
 
