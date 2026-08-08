@@ -7,7 +7,7 @@ import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
 import SignupPromptModal, { type SignupPromptContext } from '../components/SignupPromptModal';
 import { DEFAULT_NOTICE_TYPES } from '../components/filters/constants';
-import { useFilterState } from '../hooks/useFilterState';
+import { useFilterState, parseStateFromURL } from '../hooks/useFilterState';
 import { useFacetCounts } from '../hooks/useFacetCounts';
 import { useSavedOpportunities } from '../hooks/useSavedOpportunities';
 import { useSavedSearches } from '../hooks/useSavedSearches';
@@ -15,7 +15,8 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
 import { usePostHog } from '@posthog/react';
-import { getFacetCounts } from '../services/api';
+import { getFacetCounts, rescueSearch } from '../services/api';
+import type { RescueResult, RescueSuggestion } from '../types/api';
 import { trackSearch, trackSavedSearchCreated, registerFlowId, trackCodeFinderLanding, trackAlertCreated } from '../lib/analytics';
 import { PRO_FEATURES_FREE_FOR_ALL } from '../lib/billing';
 
@@ -130,6 +131,50 @@ export default function SimpleSearchPage() {
       f.postedTo !== ''
     );
   }, [fs.filters]);
+
+  // Zero-result rescue: fires once per settled empty search, aborts on change.
+  const [rescue, setRescue] = useState<RescueResult | null>(null);
+  const [rescueLoading, setRescueLoading] = useState(false);
+  useEffect(() => {
+    setRescue(null);
+    if (loading || !hasSearched || error || total !== 0) {
+      setRescueLoading(false);
+      return;
+    }
+    if (!hasActiveFilters) return;
+    const params = fs.toSearchParams();
+    delete params.page;
+    delete params.limit;
+    delete params.sort;
+    delete params.order;
+    const ac = new AbortController();
+    setRescueLoading(true);
+    rescueSearch(params, ac.signal)
+      .then((r) => {
+        if (ac.signal.aborted) return;
+        setRescue(r);
+        if (r && r.suggestions.length > 0) {
+          posthog?.capture('search_rescue_shown', {
+            cause: r.cause,
+            stage: r.stage,
+            suggestions: r.suggestions.length,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!ac.signal.aborted) setRescueLoading(false);
+      });
+    return () => ac.abort();
+  }, [loading, total, hasSearched, error]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleApplyRescue = useCallback((s: RescueSuggestion) => {
+    posthog?.capture('search_rescue_clicked', { rule: s.rule, cause: rescue?.cause });
+    // The suggestion's params are URL-shaped; parseStateFromURL turns them into
+    // a full FilterState so unmentioned filters fall back to app defaults.
+    fs.setFilters(parseStateFromURL(new URLSearchParams(s.params)));
+    triggerSearch();
+  }, [posthog, rescue, fs, triggerSearch]);
 
   // Track search events in PostHog after results arrive
   const lastTrackedRef = useRef('');
@@ -545,6 +590,9 @@ export default function SimpleSearchPage() {
             onRetry={handleSubmit}
             isAuthenticated={isAuthenticated}
             onCreateAlert={handleCreateCodeAlert}
+            rescue={rescue}
+            rescueLoading={rescueLoading}
+            onApplyRescue={handleApplyRescue}
           />
           <SearchMobileFilters
             open={mobileFiltersOpen}

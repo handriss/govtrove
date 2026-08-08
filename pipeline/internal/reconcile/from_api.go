@@ -1,6 +1,7 @@
 package reconcile
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/handriss/govtrove/pipeline/internal/parse"
@@ -70,7 +71,7 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 	}
 
 	if d.TypeOfSetAside != nil {
-		opp.SetAsideCode = *d.TypeOfSetAside
+		opp.SetAsideCode = normalizeSetAsideCode(*d.TypeOfSetAside)
 	}
 	if d.TypeOfSetAsideDescription != nil {
 		opp.SetAsideDescription = *d.TypeOfSetAsideDescription
@@ -167,4 +168,21 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+// normalizeSetAsideCode unwraps a JSON array that SAM.gov sometimes returns where
+// a scalar is expected, e.g. `["SBA"]` instead of `SBA`. Stored verbatim it broke
+// set-aside filtering silently: 178 active rows held `["SBA"]` and were invisible
+// to a set_aside=SBA search, under-reporting small business work.
+func normalizeSetAsideCode(s string) string {
+	t := strings.TrimSpace(s)
+	if !strings.HasPrefix(t, "[") || !strings.HasSuffix(t, "]") {
+		return s
+	}
+	var codes []string
+	if err := json.Unmarshal([]byte(t), &codes); err != nil || len(codes) == 0 {
+		// Not the array form we expect — better to keep the raw value than guess.
+		return s
+	}
+	return strings.TrimSpace(codes[0])
 }

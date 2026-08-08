@@ -361,6 +361,15 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		h.Logger.Info("expired opportunities deactivated", "expired", expired, "stale", stale)
 	}
 
+	// 10. Collapse amendment reposts: SAM issues a new notice_id per amendment, so
+	// without this one solicitation shows up as several identical search results.
+	// Must follow deactivation — it only ranks rows that are still active.
+	if demoted, err := h.Store.RefreshIsCurrent(ctx); err != nil {
+		h.Logger.Error("failed to refresh is_current", "error", err)
+	} else if demoted > 0 {
+		h.Logger.Info("is_current refreshed", "rows_changed", demoted)
+	}
+
 	// Refresh planner stats after the upserts/deactivations. Neon suspends the
 	// compute when idle so autoanalyze lags badly; without this a large reconcile
 	// leaves search COUNT queries on stale stats (seen: 13s+ timeouts, Aug 2026).

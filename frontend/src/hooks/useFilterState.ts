@@ -129,7 +129,7 @@ const URL_MAP: [keyof FilterState, string][] = [
 
 const ARRAY_FIELDS = new Set<keyof FilterState>(['naics', 'psc', 'setAside', 'noticeType', 'agency']);
 
-function parseStateFromURL(urlParams: URLSearchParams): FilterState {
+export function parseStateFromURL(urlParams: URLSearchParams): FilterState {
   const state = { ...DEFAULTS };
 
   // Sort from localStorage if URL doesn't specify

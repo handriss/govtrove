@@ -314,7 +314,9 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 		return false, fmt.Errorf("unmarshal filters: %w", err)
 	}
 
-	conditions := []string{"active = true", "is_latest = true"}
+	// is_current collapses amendment reposts, so an alert counts a solicitation
+	// once instead of once per amendment.
+	conditions := []string{"active = true", "is_latest = true", "is_current = true"}
 	args := []any{}
 	argNum := 1
 
@@ -335,7 +337,7 @@ func (h *Handler) checkSearchForNewMatches(ctx context.Context, s savedSearchRow
 	}
 
 	// Also get total result count (ignoring the created_at constraint)
-	totalConditions := []string{"active = true", "is_latest = true"}
+	totalConditions := []string{"active = true", "is_latest = true", "is_current = true"}
 	totalArgs := []any{}
 	totalArgNum := 1
 	totalConditions, totalArgs, _ = appendFilterConditions(totalConditions, totalArgs, totalArgNum, f)

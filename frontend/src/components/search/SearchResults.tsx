@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 import OpportunityCard from './OpportunityCard';
 import SortDropdown from './SortDropdown';
 import SignupPromptModal, { type SignupPromptContext } from '../SignupPromptModal';
-import type { OpportunityListItem, FacetResult } from '../../types/api';
+import type { OpportunityListItem, FacetResult, RescueResult, RescueSuggestion } from '../../types/api';
 import type { FilterState } from '../../hooks/useFilterState';
 import { usePostHog } from '@posthog/react';
 import { trackCodeFinderZeroOpportunities } from '../../lib/analytics';
@@ -53,6 +53,9 @@ interface SearchResultsProps {
   onRetry?: () => void;
   isAuthenticated?: boolean;
   onCreateAlert?: () => void;
+  rescue?: RescueResult | null;
+  rescueLoading?: boolean;
+  onApplyRescue?: (s: RescueSuggestion) => void;
 }
 
 export default function SearchResults({
@@ -80,6 +83,9 @@ export default function SearchResults({
   onRetry,
   isAuthenticated,
   onCreateAlert,
+  rescue,
+  rescueLoading,
+  onApplyRescue,
 }: SearchResultsProps) {
   const codeFilter = useMemo((): { type: 'naics' | 'psc'; code: string } | null => {
     const naics = ((filters.naics as string[] | undefined) || []);
@@ -236,6 +242,9 @@ export default function SearchResults({
           codeFilter={codeFilter}
           isAuthenticated={isAuthenticated}
           onCreateAlert={onCreateAlert}
+          rescue={rescue}
+          rescueLoading={rescueLoading}
+          onApplyRescue={onApplyRescue}
         />
       )}
 
@@ -332,6 +341,9 @@ function ZeroResults({
   codeFilter,
   isAuthenticated,
   onCreateAlert,
+  rescue,
+  rescueLoading,
+  onApplyRescue,
 }: {
   keyword?: string;
   suggestion: string | null;
@@ -341,6 +353,9 @@ function ZeroResults({
   codeFilter?: { type: 'naics' | 'psc'; code: string } | null;
   isAuthenticated?: boolean;
   onCreateAlert?: () => void;
+  rescue?: RescueResult | null;
+  rescueLoading?: boolean;
+  onApplyRescue?: (s: RescueSuggestion) => void;
 }) {
   const posthog = usePostHog();
   const [alertDone, setAlertDone] = useState(false);
@@ -389,6 +404,37 @@ function ZeroResults({
       )}
       {suggestion && (
         <p className="text-dark-400 text-sm mb-4">{suggestion}</p>
+      )}
+
+      {rescueLoading && (
+        <p className="text-dark-500 text-xs mb-4 inline-flex items-center gap-2">
+          <Loader2 size={12} className="animate-spin" />
+          Checking why this found nothing…
+        </p>
+      )}
+
+      {rescue && rescue.suggestions.length > 0 && onApplyRescue && (
+        <div className="w-full max-w-md mb-5 rounded-xl border border-accent/25 bg-accent/5 p-5 text-left">
+          {rescue.explanation && (
+            <p className="text-sm text-dark-300 mb-3">{rescue.explanation}</p>
+          )}
+          <div className="flex flex-col gap-2">
+            {rescue.suggestions.map((s) => (
+              <button
+                key={s.rule + s.label}
+                type="button"
+                onClick={() => onApplyRescue(s)}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm rounded-lg
+                  bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-left"
+              >
+                <span>{s.label}</span>
+                <span className="shrink-0 text-xs font-medium tabular-nums">
+                  {s.verified_total.toLocaleString()} results
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {codeFilter && (

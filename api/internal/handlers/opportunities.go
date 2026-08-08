@@ -17,6 +17,7 @@ import (
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
+	"github.com/handriss/govtrove/api/internal/searchrescue"
 )
 
 type OpportunityHandler struct {
@@ -26,6 +27,12 @@ type OpportunityHandler struct {
 	eventLog *EventLogger
 	userRepo *repository.UserRepository
 	geoRepo  *repository.GeoSynonymRepository
+	rescue   *searchrescue.Service // nil unless SEARCH_RESCUE_ENABLED
+}
+
+// SetRescueService enables the zero-result search rescue endpoint.
+func (h *OpportunityHandler) SetRescueService(svc *searchrescue.Service) {
+	h.rescue = svc
 }
 
 func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository, geoRepo *repository.GeoSynonymRepository) *OpportunityHandler {

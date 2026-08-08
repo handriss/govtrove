@@ -1,4 +1,4 @@
-import type { SearchResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, NotificationsResponse, NotificationCount, AgencyResult, AgencySearchResponse } from '../types/api';
+import type { SearchResult, RescueResult, Opportunity, FilterOptions, SearchParams, StatusResponse, FacetResult, SolicitationHistory, SavedSearch, SavedOpportunitiesResponse, NotificationsResponse, NotificationCount, AgencyResult, AgencySearchResponse } from '../types/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -70,6 +70,34 @@ export async function searchOpportunities(params: SearchParams = {}, token?: str
       .catch(() => null);
     throw new Error(message ?? `Search failed: ${response.statusText}`);
   }
+  return response.json();
+}
+
+// Diagnose a zero-result search. Null means the feature is off, rate-limited,
+// or there is nothing to say — the caller just keeps the static empty state.
+export async function rescueSearch(params: SearchParams, signal?: AbortSignal): Promise<RescueResult | null> {
+  const searchParams = new URLSearchParams();
+  if (params.q) searchParams.set('q', params.q);
+  if (params.type) searchParams.set('type', params.type);
+  if (params.set_aside) searchParams.set('set_aside', params.set_aside);
+  if (params.naics) searchParams.set('naics', params.naics);
+  if (params.naics_prefix) searchParams.set('naics_prefix', params.naics_prefix);
+  if (params.naics_prefixes) searchParams.set('naics_prefixes', params.naics_prefixes);
+  if (params.psc) searchParams.set('psc', params.psc);
+  if (params.psc_prefixes) searchParams.set('psc_prefixes', params.psc_prefixes);
+  if (params.state) searchParams.set('state', params.state);
+  if (params.department) searchParams.set('department', params.department);
+  if (params.agency) searchParams.set('agency', params.agency);
+  if (params.posted_from) searchParams.set('posted_from', params.posted_from);
+  if (params.posted_to) searchParams.set('posted_to', params.posted_to);
+  if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);
+  if (params.deadline_to) searchParams.set('deadline_to', params.deadline_to);
+
+  const response = await fetch(`${API_BASE}/opportunities/rescue?${searchParams}`, {
+    headers: { ...utmHeaders() },
+    signal,
+  });
+  if (response.status !== 200) return null;
   return response.json();
 }
 

@@ -382,6 +382,37 @@ func (db *DB) DeactivateExpiredOpportunities(ctx context.Context) (expired int, 
 	return expired, stale, nil
 }
 
+// RefreshIsCurrent recomputes is_current: within each (solicitation_number, type)
+// group of active+latest rows, only the newest posting stays current.
+//
+// SAM.gov issues a new notice_id per amendment, and is_latest is scoped per
+// notice_id, so without this every amendment shows up as its own search result.
+// Keyed on type as well as solicitation so a Sources Sought is not hidden by the
+// Solicitation that superseded it — those are distinct stages, not duplicates.
+// Rows without a solicitation_number can't be grouped and stay current.
+//
+// Must run AFTER deactivation: it only considers rows that are still active.
+func (db *DB) RefreshIsCurrent(ctx context.Context) (demoted int, err error) {
+	tag, err := db.pool.Exec(ctx, `
+		WITH ranked AS (
+			SELECT id, row_number() OVER (
+			         PARTITION BY solicitation_number, type
+			         ORDER BY posted_date DESC, id DESC
+			       ) AS rn
+			FROM opportunities
+			WHERE is_latest = true AND active = true
+			  AND solicitation_number IS NOT NULL AND solicitation_number <> ''
+		)
+		UPDATE opportunities o SET is_current = (r.rn = 1)
+		FROM ranked r
+		WHERE o.id = r.id AND o.is_current <> (r.rn = 1)
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("refresh is_current: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // AnalyzeOpportunities refreshes planner statistics on the opportunities table.
 // Neon suspends the compute when idle, so autovacuum/autoanalyze rarely get a
 // window; after a large reconcile upsert the planner is left with stale stats,

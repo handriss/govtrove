@@ -9,6 +9,32 @@ import (
 )
 
 var _ = Describe("FromAPI", func() {
+	Context("set-aside code normalisation", func() {
+		setAside := func(raw string) string {
+			opp, _ := reconcile.FromAPI(samgov.OpportunityData{
+				NoticeID: "SA-001", Active: "Yes", TypeOfSetAside: &raw,
+			})
+			return opp.SetAsideCode
+		}
+
+		It("unwraps the JSON-array form SAM sometimes returns", func() {
+			// Stored verbatim this made 178 rows invisible to set_aside=SBA.
+			Expect(setAside(`["SBA"]`)).To(Equal("SBA"))
+		})
+
+		It("maps an empty array element to an empty code", func() {
+			Expect(setAside(`[""]`)).To(Equal(""))
+		})
+
+		It("leaves an ordinary scalar code untouched", func() {
+			Expect(setAside("SDVOSBC")).To(Equal("SDVOSBC"))
+		})
+
+		It("keeps the raw value when it is not parseable as an array", func() {
+			Expect(setAside("[not json")).To(Equal("[not json"))
+		})
+	})
+
 	Context("Place of Performance codes", func() {
 		It("extracts both name and code from City, State, and Country", func() {
 			d := samgov.OpportunityData{

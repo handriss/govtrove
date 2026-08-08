@@ -21,10 +21,10 @@ type MockStore struct {
 	FailIngestionRunFn     func(ctx context.Context, runID uuid.UUID, errMsg string, durationMs int) error
 	GetLastCompletedRunFn  func(ctx context.Context, jobType string) (uuid.UUID, time.Time, error)
 
-	BulkInsertSnapCSVFn    func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error)
-	GetPreviousRunHashesFn func(ctx context.Context, runID uuid.UUID) (map[string]database.PreviousRunRecord, error)
-	InsertDisappearancesFn func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.DisappearedRecord, logger *slog.Logger) (int, error)
-	DetectReappearancesFn  func(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error)
+	BulkInsertSnapCSVFn      func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, downloadID int64, rows []database.SnapCSVRow) (int64, error)
+	GetPreviousRunHashesFn   func(ctx context.Context, runID uuid.UUID) (map[string]database.PreviousRunRecord, error)
+	InsertDisappearancesFn   func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.DisappearedRecord, logger *slog.Logger) (int, error)
+	DetectReappearancesFn    func(ctx context.Context, currentRunID uuid.UUID, snapshotDate time.Time) (int, error)
 
 	GetSnapCSVRawDataFn              func(ctx context.Context, runID uuid.UUID) ([]map[string]string, error)
 	InsertDataQualityIssuesFn        func(ctx context.Context, runID uuid.UUID, entries []database.DataQualityEntry)
@@ -32,26 +32,27 @@ type MockStore struct {
 	GetExistingOpportunityHashesFn   func(ctx context.Context) (map[string]string, error)
 	BulkTouchUnchangedFn             func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, records []database.UnchangedRecord) (int, error)
 	UpsertOpportunitiesFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
-	MarkDisappearedInactiveFn        func(ctx context.Context, runID uuid.UUID) (int, error)
+	MarkDisappearedInactiveFn           func(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunitiesFn func(ctx context.Context) (int, int, error)
+	RefreshIsCurrentFn               func(ctx context.Context) (int, error)
 	AnalyzeOpportunitiesFn           func(ctx context.Context) error
 
 	BulkInsertSnapAPIFn func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error)
 	GetSnapAPIRawDataFn func(ctx context.Context, runID uuid.UUID) ([]database.SnapAPIRawRow, error)
 
-	InsertBulkCSVLogFn          func(ctx context.Context, r *database.BulkCSVLogRecord) (int, error)
-	GetLatestBulkCSVHashFn      func(ctx context.Context, source string) (string, error)
-	GetLatestBulkCSVHeadersFn   func(ctx context.Context, source string) (string, string, error)
-	GetLatestBulkCSVS3KeyFn     func(ctx context.Context, source string) (string, error)
-	GetBulkCSVLogByS3KeyFn      func(ctx context.Context, s3Key string) (*database.BulkCSVLogRecord, error)
-	UpdateBulkCSVLogIngestionFn func(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error
+	InsertBulkCSVLogFn        func(ctx context.Context, r *database.BulkCSVLogRecord) (int, error)
+	GetLatestBulkCSVHashFn    func(ctx context.Context, source string) (string, error)
+	GetLatestBulkCSVHeadersFn func(ctx context.Context, source string) (string, string, error)
+	GetLatestBulkCSVS3KeyFn   func(ctx context.Context, source string) (string, error)
+	GetBulkCSVLogByS3KeyFn            func(ctx context.Context, s3Key string) (*database.BulkCSVLogRecord, error)
+	UpdateBulkCSVLogIngestionFn       func(ctx context.Context, id int, ingestionRunID uuid.UUID, recordCount int, status string) error
 
 	CreatePipelineStepFn   func(ctx context.Context, executionID uuid.UUID, stepName string) (uuid.UUID, error)
 	CompletePipelineStepFn func(ctx context.Context, id uuid.UUID, stats map[string]any, durationMs int) error
 	FailPipelineStepFn     func(ctx context.Context, id uuid.UUID, errMsg string, durationMs int) error
 
-	RefreshAgenciesFn         func(ctx context.Context) (int, error)
-	RefreshCodeCorrelationsFn func(ctx context.Context) error
+	RefreshAgenciesFn          func(ctx context.Context) (int, error)
+	RefreshCodeCorrelationsFn  func(ctx context.Context) error
 
 	DeleteOldSearchEventsFn func(ctx context.Context, days int) (int64, error)
 	DeleteOldSnapshotsFn    func(ctx context.Context, snapDays, dqDays int) (int64, error)
@@ -61,10 +62,10 @@ type MockStore struct {
 	GetRecentTitlesFn      func(ctx context.Context) ([]database.TitleRow, error)
 	GetSetAsideCountsFn    func(ctx context.Context) ([]database.SetAsideCount, error)
 
-	GetSEOPageCountsFn                func(ctx context.Context, recentSince time.Time) ([]database.SEOPageCount, error)
-	GetSEOPageOpportunitiesFn         func(ctx context.Context, filterCol, filterVal string, limit int) ([]database.SEOOpportunity, error)
+	GetSEOPageCountsFn         func(ctx context.Context, recentSince time.Time) ([]database.SEOPageCount, error)
+	GetSEOPageOpportunitiesFn  func(ctx context.Context, filterCol, filterVal string, limit int) ([]database.SEOOpportunity, error)
 	GetSEOPageOpportunitiesByPrefixFn func(ctx context.Context, filterCol, prefix string, limit int) ([]database.SEOOpportunity, error)
-	GetActiveAgenciesFn               func(ctx context.Context) ([]database.AgencyInfo, error)
+	GetActiveAgenciesFn        func(ctx context.Context) ([]database.AgencyInfo, error)
 }
 
 var _ database.Store = (*MockStore)(nil)
@@ -208,6 +209,13 @@ func (m *MockStore) DeactivateExpiredOpportunities(ctx context.Context) (int, in
 		return m.DeactivateExpiredOpportunitiesFn(ctx)
 	}
 	return 0, 0, nil
+}
+
+func (m *MockStore) RefreshIsCurrent(ctx context.Context) (int, error) {
+	if m.RefreshIsCurrentFn != nil {
+		return m.RefreshIsCurrentFn(ctx)
+	}
+	return 0, nil
 }
 
 func (m *MockStore) AnalyzeOpportunities(ctx context.Context) error {

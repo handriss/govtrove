@@ -76,6 +76,22 @@ export interface SearchResult {
   suggestion?: string;
 }
 
+export interface RescueSuggestion {
+  label: string;
+  explanation?: string;
+  // Same keys as the search URL params — applying a suggestion is plain navigation.
+  params: Record<string, string>;
+  verified_total: number;
+  rule: string;
+}
+
+export interface RescueResult {
+  stage: 'probe' | 'llm' | 'none';
+  cause?: string;
+  explanation?: string;
+  suggestions: RescueSuggestion[];
+}
+
 export interface FilterOption {
   code: string;
   label?: string;

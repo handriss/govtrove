@@ -133,6 +133,7 @@ CREATE TABLE opportunities (
     resource_links  JSONB,
     version         INT NOT NULL DEFAULT 1,
     is_latest       BOOLEAN NOT NULL DEFAULT true,
+    is_current      BOOLEAN NOT NULL DEFAULT true,
     content_hash    TEXT,
     data_sources    TEXT DEFAULT 'csv',
     last_csv_run_id UUID,

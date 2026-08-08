@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/handriss/govtrove/api/internal/models"
 )
 
 var quotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
@@ -191,6 +191,9 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 
 	conditions = append(conditions, "active = true")
 	conditions = append(conditions, "is_latest = true")
+	// is_latest is per notice_id, but SAM issues a new notice_id per amendment, so
+	// without is_current one solicitation repeats across the result list.
+	conditions = append(conditions, "is_current = true")
 
 	if params.Query != "" {
 		var ftsConds []string
@@ -368,6 +371,17 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	}
 
 	return conditions, args, argNum, ftsExpr
+}
+
+// Count runs only the count half of the search — the probe primitive for
+// search rescue, where dozens of candidate counts may run per rescue.
+func (r *OpportunityRepository) Count(ctx context.Context, params models.SearchParams) (int, error) {
+	countQuery, countArgs, _, _ := r.buildSearchQuery(params)
+	var total int
+	if err := r.pool.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("counting search results: %w", err)
+	}
+	return total, nil
 }
 
 func (r *OpportunityRepository) buildSearchQuery(params models.SearchParams) (countQuery string, countArgs []any, dataQuery string, dataArgs []any) {
