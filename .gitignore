@@ -54,6 +54,20 @@ frontend/dist/
 # Scratch — untracked working files, research, playground data
 scratch/
 
+# Internal operational notes: outage history, data-quality caveats, deploy landmines
+PENDING-WORK.md
+
+# Internal-only: agent instructions and hard-won operational research. Kept on disk,
+# excluded from the public repo (also stripped from history — see the filter-repo pass).
+CLAUDE.md
+docs/sam-gov-api-limits.md
+docs/csv-vs-api-analysis.md
+docs/agency-data-analysis.md
+docs/search-and-filter-plan.md
+docs/search-and-filter-research.md
+docs/frontend-e2e-test-plan.md
+pipeline-historical/ARCHIVE-DATE-RESEARCH.md
+
 # Local development
 postgres_data/
 .logs/
