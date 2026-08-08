@@ -58,7 +58,8 @@ resource "aws_iam_role_policy" "apprunner_secrets" {
           aws_secretsmanager_secret.workos_api_key.arn,
           aws_secretsmanager_secret.resend_api_key.arn,
           aws_secretsmanager_secret.resend_webhook_secret.arn,
-        ],
+          aws_secretsmanager_secret.internal_api_token.arn,
+          ],
           var.stripe_secret_key != "" ? [aws_secretsmanager_secret.stripe_secret_key[0].arn] : [],
           var.stripe_webhook_secret != "" ? [aws_secretsmanager_secret.stripe_webhook_secret[0].arn] : [],
           var.stripe_price_monthly != "" ? [aws_secretsmanager_secret.stripe_price_monthly[0].arn] : [],
@@ -145,12 +146,13 @@ resource "aws_apprunner_service" "api" {
         port = tostring(var.api_port)
 
         runtime_environment_secrets = merge({
-          DATABASE_URL           = aws_secretsmanager_secret.database_url.arn
-          WORKOS_CLIENT_ID       = aws_secretsmanager_secret.workos_client_id.arn
-          WORKOS_API_KEY         = aws_secretsmanager_secret.workos_api_key.arn
-          RESEND_API_KEY         = aws_secretsmanager_secret.resend_api_key.arn
-          RESEND_WEBHOOK_SECRET  = aws_secretsmanager_secret.resend_webhook_secret.arn
-        },
+          DATABASE_URL          = aws_secretsmanager_secret.database_url.arn
+          WORKOS_CLIENT_ID      = aws_secretsmanager_secret.workos_client_id.arn
+          WORKOS_API_KEY        = aws_secretsmanager_secret.workos_api_key.arn
+          RESEND_API_KEY        = aws_secretsmanager_secret.resend_api_key.arn
+          RESEND_WEBHOOK_SECRET = aws_secretsmanager_secret.resend_webhook_secret.arn
+          INTERNAL_API_TOKEN    = aws_secretsmanager_secret.internal_api_token.arn
+          },
           var.stripe_secret_key != "" ? { STRIPE_SECRET_KEY = aws_secretsmanager_secret.stripe_secret_key[0].arn } : {},
           var.stripe_webhook_secret != "" ? { STRIPE_WEBHOOK_SECRET = aws_secretsmanager_secret.stripe_webhook_secret[0].arn } : {},
           var.stripe_price_monthly != "" ? { STRIPE_PRICE_MONTHLY = aws_secretsmanager_secret.stripe_price_monthly[0].arn } : {},
@@ -159,19 +161,19 @@ resource "aws_apprunner_service" "api" {
         )
 
         runtime_environment_variables = {
-          PORT            = tostring(var.api_port)
-          LOG_LEVEL       = "info"
-          ALLOWED_ORIGINS = var.domain_name != "" ? "https://app.${var.domain_name},https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
-          SNS_TOPIC_ARN   = aws_sns_topic.notifications.arn
-          AWS_REGION      = var.aws_region
-          ADMIN_EMAILS    = var.admin_emails
-          SENTRY_DSN      = var.sentry_dsn
+          PORT              = tostring(var.api_port)
+          LOG_LEVEL         = "info"
+          ALLOWED_ORIGINS   = var.domain_name != "" ? "https://app.${var.domain_name},https://${var.domain_name}" : "https://${aws_cloudfront_distribution.frontend.domain_name}"
+          SNS_TOPIC_ARN     = aws_sns_topic.notifications.arn
+          AWS_REGION        = var.aws_region
+          ADMIN_EMAILS      = var.admin_emails
+          SENTRY_DSN        = var.sentry_dsn
           RESEND_FROM_EMAIL = "GovTrove <notifications@govtrove.com>"
           SES_FROM_EMAIL    = var.domain_name != "" ? "noreply@${var.domain_name}" : ""
-          SES_CONFIG_SET      = aws_sesv2_configuration_set.main.configuration_set_name
-          POSTHOG_HOST            = var.posthog_host
-          MCP_INTERNAL_URL        = "https://${aws_apprunner_service.mcp.service_url}"
-          DSAR_S3_BUCKET          = aws_s3_bucket.dsar_exports.bucket
+          SES_CONFIG_SET    = aws_sesv2_configuration_set.main.configuration_set_name
+          POSTHOG_HOST      = var.posthog_host
+          MCP_INTERNAL_URL  = "https://${aws_apprunner_service.mcp.service_url}"
+          DSAR_S3_BUCKET    = aws_s3_bucket.dsar_exports.bucket
         }
       }
     }

@@ -68,6 +68,7 @@ resource "aws_iam_role_policy" "mcp_secrets" {
           [
             aws_secretsmanager_secret.workos_client_id.arn,
             aws_secretsmanager_secret.database_url.arn,
+            aws_secretsmanager_secret.internal_api_token.arn,
           ],
           var.posthog_key != "" ? [aws_secretsmanager_secret.posthog_key[0].arn] : [],
         )
@@ -105,9 +106,10 @@ resource "aws_apprunner_service" "mcp" {
         port = "3000"
 
         runtime_environment_secrets = merge({
-          WORKOS_CLIENT_ID = aws_secretsmanager_secret.workos_client_id.arn
-          DATABASE_URL     = aws_secretsmanager_secret.database_url.arn
-        },
+          WORKOS_CLIENT_ID   = aws_secretsmanager_secret.workos_client_id.arn
+          DATABASE_URL       = aws_secretsmanager_secret.database_url.arn
+          INTERNAL_API_TOKEN = aws_secretsmanager_secret.internal_api_token.arn
+          },
           var.posthog_key != "" ? { POSTHOG_KEY = aws_secretsmanager_secret.posthog_key[0].arn } : {},
         )
 

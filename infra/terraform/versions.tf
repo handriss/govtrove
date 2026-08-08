@@ -15,8 +15,8 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    grafana = {
-      source  = "grafana/grafana"
+    random = {
+      source  = "hashicorp/random"
       version = "~> 3.0"
     }
   }

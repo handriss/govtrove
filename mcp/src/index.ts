@@ -4,21 +4,29 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { pipeline as hfPipeline } from "@huggingface/transformers";
 import { z } from "zod";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import pg from "pg";
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`Missing required environment variable: ${name}`);
+    process.exit(1);
+  }
+  return value;
+}
+
 const PORT = process.env.PORT || 3000;
-const AUTHKIT_DOMAIN =
-  process.env.AUTHKIT_DOMAIN ||
-  "https://timely-midnight-01-staging.authkit.app";
+// No default: a fallback domain silently validates tokens from the wrong tenant.
+const AUTHKIT_DOMAIN = requireEnv("AUTHKIT_DOMAIN");
 const MCP_RESOURCE_URL =
   process.env.MCP_RESOURCE_URL || "http://localhost:3000";
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const POSTHOG_KEY = process.env.POSTHOG_KEY || "";
 const POSTHOG_HOST = process.env.POSTHOG_HOST || "https://us.i.posthog.com";
 
-const FREE_DAILY_LIMIT = 5;
-const PRO_DAILY_LIMIT = 500;
+// Not a paid-tier gate — just a backstop so a runaway AI client can't hammer Neon.
+const DAILY_LIMIT = 500;
 
 const JWKS = createRemoteJWKSet(new URL(`${AUTHKIT_DOMAIN}/oauth2/jwks`));
 
@@ -201,18 +209,16 @@ interface GovTroveUser {
   id: number;
   workosId: string;
   email: string;
-  plan: string;
-  freeForever: boolean;
 }
 
 async function lookupUser(workosId: string): Promise<GovTroveUser | null> {
   const result = await pool.query(
-    "SELECT id, workos_id, email, plan, free_forever FROM users WHERE workos_id = $1",
+    "SELECT id, workos_id, email FROM users WHERE workos_id = $1",
     [workosId]
   );
   if (result.rows.length === 0) return null;
   const row = result.rows[0];
-  return { id: row.id, workosId: row.workos_id, email: row.email, plan: row.plan, freeForever: row.free_forever };
+  return { id: row.id, workosId: row.workos_id, email: row.email };
 }
 
 async function getDailyUsageCount(userId: number): Promise<number> {
@@ -258,14 +264,26 @@ function capturePosthogEvent(
   }).catch(() => {});
 }
 
-function rateLimitError(plan: string): object {
-  const limit = plan === "pro" ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const message =
-    plan === "pro"
-      ? `You've reached your daily limit of ${limit} MCP tool calls. Your limit resets in 24 hours.`
-      : `You've used all ${limit} free MCP queries for today. Upgrade to GovTrove Pro for ${PRO_DAILY_LIMIT} queries/day at https://app.govtrove.com/settings`;
+function unknownUserError(): object {
   return {
-    content: [{ type: "text" as const, text: message }],
+    content: [
+      {
+        type: "text" as const,
+        text: "Your token authenticated, but no GovTrove account is linked to it. Sign in at https://app.govtrove.com once, then reconnect this server.",
+      },
+    ],
+    isError: true,
+  };
+}
+
+function rateLimitError(): object {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `You've reached the daily limit of ${DAILY_LIMIT} GovTrove tool calls. Your limit resets on a rolling 24-hour window.`,
+      },
+    ],
   };
 }
 
@@ -327,13 +345,15 @@ async function withUsageTracking(
 ): Promise<object> {
   const user = sessionId ? sessionUsers.get(sessionId) : undefined;
 
-  if (user) {
-    const effectivePlan = (user.plan === "pro" || user.freeForever) ? "pro" : "free";
-    const dailyLimit = effectivePlan === "pro" ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
-    const count = await getDailyUsageCount(user.id);
-    if (count >= dailyLimit) {
-      return rateLimitError(effectivePlan);
-    }
+  // Fail closed: a valid AuthKit JWT whose sub has no users row would otherwise
+  // reach here with no session user, skipping both the limit check and logging.
+  if (!user) {
+    return unknownUserError();
+  }
+
+  const count = await getDailyUsageCount(user.id);
+  if (count >= DAILY_LIMIT) {
+    return rateLimitError();
   }
 
   const start = Date.now();
@@ -341,15 +361,13 @@ async function withUsageTracking(
     const { response, resultCount } = await fn();
     const latencyMs = Date.now() - start;
 
-    if (user) {
-      logUsage(user.id, toolName, latencyMs, user.email ?? null, requestParams, resultCount).catch((e) => {
-        console.error("Failed to log usage:", e);
-      });
-      capturePosthogEvent(user.workosId, `mcp_${toolName}`, {
-        ...(requestParams || {}),
-        result_count: resultCount,
-      });
-    }
+    logUsage(user.id, toolName, latencyMs, user.email ?? null, requestParams, resultCount).catch((e) => {
+      console.error("Failed to log usage:", e);
+    });
+    capturePosthogEvent(user.workosId, `mcp_${toolName}`, {
+      ...(requestParams || {}),
+      result_count: resultCount,
+    });
 
     return response;
   } catch (err) {
@@ -593,7 +611,9 @@ Provide a plain-English analysis:
     async (params) => {
       const searchParams = { ...params };
       return withUsageTracking(sessionId, "search_opportunities", searchParams, async () => {
-        const conditions: string[] = ["active = true", "is_latest = true"];
+        // is_latest is per notice_id, but SAM issues a new notice_id per amendment,
+        // so without is_current one solicitation repeats across the results.
+        const conditions: string[] = ["active = true", "is_latest = true", "is_current = true"];
         const values: unknown[] = [];
         let paramIdx = 1;
 
@@ -937,7 +957,30 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Embedding endpoint — internal service-to-service, no auth
+// Embedding endpoint — internal service-to-service only. Called by the Go API
+// (api/internal/handlers/codes.go) for NAICS/PSC semantic search. It runs model
+// inference, so leaving it open is free compute for anyone who finds the origin.
+const INTERNAL_API_TOKEN = requireEnv("INTERNAL_API_TOKEN");
+const MAX_EMBED_CHARS = 2000;
+
+function internalAuthMiddleware(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const presented = req.headers["x-internal-token"];
+  const expected = INTERNAL_API_TOKEN;
+  const ok =
+    typeof presented === "string" &&
+    presented.length === expected.length &&
+    timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+  if (!ok) {
+    res.status(401).json({ error: "Unauthorized." });
+    return;
+  }
+  next();
+}
+
 let embedder: any = null;
 async function getEmbedder() {
   if (!embedder) {
@@ -948,10 +991,14 @@ async function getEmbedder() {
   return embedder;
 }
 
-app.post("/embed", express.json(), async (req, res) => {
+app.post("/embed", express.json({ limit: "32kb" }), internalAuthMiddleware, async (req, res) => {
   const { text } = req.body;
   if (!text || typeof text !== "string") {
     res.status(400).json({ error: "text field is required" });
+    return;
+  }
+  if (text.length > MAX_EMBED_CHARS) {
+    res.status(413).json({ error: `text exceeds ${MAX_EMBED_CHARS} characters` });
     return;
   }
   try {

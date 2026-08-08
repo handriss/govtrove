@@ -18,14 +18,16 @@ import (
 type CodeHandler struct {
 	repo           *repository.CodeRepository
 	mcpInternalURL string
+	internalToken  string
 	logger         *slog.Logger
 	httpClient     *http.Client
 }
 
-func NewCodeHandler(repo *repository.CodeRepository, mcpInternalURL string, logger *slog.Logger) *CodeHandler {
+func NewCodeHandler(repo *repository.CodeRepository, mcpInternalURL, internalToken string, logger *slog.Logger) *CodeHandler {
 	return &CodeHandler{
 		repo:           repo,
 		mcpInternalURL: mcpInternalURL,
+		internalToken:  internalToken,
 		logger:         logger,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -167,7 +169,14 @@ func (h *CodeHandler) getEmbedding(text string) ([]float32, error) {
 		return nil, fmt.Errorf("marshaling embed request: %w", err)
 	}
 
-	resp, err := h.httpClient.Post(h.mcpInternalURL+"/embed", "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, h.mcpInternalURL+"/embed", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("building embed request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-Token", h.internalToken)
+
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("calling embed endpoint: %w", err)
 	}

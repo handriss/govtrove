@@ -117,3 +117,20 @@ resource "aws_secretsmanager_secret_version" "posthog_key" {
   secret_id     = aws_secretsmanager_secret.posthog_key[0].id
   secret_string = var.posthog_key
 }
+
+# Shared token for API -> MCP internal calls (/embed). Generated here rather than
+# supplied via tfvars so it never lands in a file on disk.
+resource "random_password" "internal_api_token" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "internal_api_token" {
+  name        = "${var.project_name}/internal-api-token"
+  description = "Shared bearer token for API -> MCP service-to-service calls"
+}
+
+resource "aws_secretsmanager_secret_version" "internal_api_token" {
+  secret_id     = aws_secretsmanager_secret.internal_api_token.id
+  secret_string = random_password.internal_api_token.result
+}

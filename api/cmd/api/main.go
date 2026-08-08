@@ -11,25 +11,27 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/getsentry/sentry-go"
-	"github.com/MicahParks/keyfunc/v3"
-	"github.com/stripe/stripe-go/v82"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/stripe/stripe-go/v82"
 
+	"github.com/handriss/govtrove/api/internal/analytics"
 	"github.com/handriss/govtrove/api/internal/config"
 	"github.com/handriss/govtrove/api/internal/email"
 	"github.com/handriss/govtrove/api/internal/handlers"
 	authmw "github.com/handriss/govtrove/api/internal/middleware"
+	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/ogimage"
 	"github.com/handriss/govtrove/api/internal/repository"
-	"github.com/handriss/govtrove/api/internal/analytics"
+	"github.com/handriss/govtrove/api/internal/searchrescue"
 )
 
 func main() {
@@ -213,6 +215,25 @@ func main() {
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo, geoSynonymRepo)
+
+	if cfg.SearchRescueEnabled {
+		var rescueLLM *searchrescue.LLMClient
+		if cfg.OpenRouterAPIKey != "" {
+			rescueLLM = searchrescue.NewLLMClient(cfg.OpenRouterAPIKey, cfg.SearchRescueModel)
+		}
+		expandGeo := func(ctx context.Context, p *models.SearchParams) {
+			matches, err := geoSynonymRepo.Lookup(ctx, p.Query)
+			if err != nil {
+				return
+			}
+			for _, m := range matches {
+				p.GeoStates = append(p.GeoStates, m.States...)
+				p.GeoCities = append(p.GeoCities, m.Cities...)
+			}
+		}
+		oppHandler.SetRescueService(searchrescue.New(oppRepo, rescueLLM, expandGeo, logger))
+		logger.Info("search rescue enabled", "llm", rescueLLM != nil, "model", cfg.SearchRescueModel)
+	}
 	agencyHandler := handlers.NewAgencyHandler(agencyRepo, logger)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsRepo, logger)
 	contactHandler := handlers.NewContactHandler(contactRepo, snsClient, cfg.SNSTopicARN, logger)
@@ -229,7 +250,7 @@ func main() {
 	webhookHandler := handlers.NewWebhookHandler(sentEmailsRepo, emailPrefsRepo, emailSvc, logger)
 	unsubscribeHandler := handlers.NewUnsubscribeHandler(emailPrefsRepo, emailSvc, logger)
 	preferencesHandler := handlers.NewPreferencesHandler(emailPrefsRepo, userRepo, logger)
-	codeHandler := handlers.NewCodeHandler(codeRepo, cfg.MCPInternalURL, logger)
+	codeHandler := handlers.NewCodeHandler(codeRepo, cfg.MCPInternalURL, cfg.InternalAPIToken, logger)
 	healthHandler := handlers.NewHealthHandler(pool)
 	statusHandler := handlers.NewStatusHandler(pool)
 
@@ -310,6 +331,11 @@ func main() {
 			}
 			r.Get("/opportunities", oppHandler.Search)
 			r.Get("/opportunities/{id}", oppHandler.GetByID)
+
+			r.Group(func(r chi.Router) {
+				r.Use(httprate.LimitByIP(10, time.Hour))
+				r.Get("/opportunities/rescue", oppHandler.RescueSearch)
+			})
 		})
 
 		r.Route("/utm", func(r chi.Router) {
@@ -367,7 +393,7 @@ func main() {
 					r.Get("/pipeline-runs", adminHandler.ListPipelineRuns)
 					r.Get("/pipeline-runs/{id}", adminHandler.GetPipelineRunDetail)
 					r.Get("/search-events", adminHandler.ListSearchEvents)
-				r.Get("/code-lookups", adminHandler.ListCodeLookups)
+					r.Get("/code-lookups", adminHandler.ListCodeLookups)
 					r.Get("/mcp-usage", adminHandler.ListMcpUsage)
 					r.Get("/data-quality", adminHandler.ListDataQualityIssues)
 					r.Get("/data-quality/summary", adminHandler.DataQualitySummary)
@@ -383,26 +409,26 @@ func main() {
 					r.Get("/sent-emails", adminHandler.ListSentEmails)
 					r.Post("/sent-emails/{id}/resend", adminHandler.ResendEmail)
 					r.Post("/send-email", adminHandler.SendNewEmail)
-				r.Post("/promo-codes", adminHandler.CreatePromoCode)
-				r.Get("/promo-codes", adminHandler.ListPromoCodes)
-				r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
-				r.Delete("/promo-codes/{id}", adminHandler.RevokePromoCode)
-				r.Post("/invite-links", adminHandler.CreateInviteLink)
-				r.Get("/invite-links", adminHandler.ListInviteLinks)
-				r.Get("/invite-links/{id}", adminHandler.GetInviteLinkDetail)
-				r.Put("/invite-links/{id}", adminHandler.UpdateInviteLink)
-				r.Delete("/invite-links/{id}", adminHandler.DeactivateInviteLink)
-				r.Post("/gift-codes", adminHandler.CreateGiftCode)
-				r.Get("/gift-codes", adminHandler.ListGiftCodes)
-				r.Get("/gift-codes/{id}", adminHandler.GetGiftCodeDetail)
-				r.Put("/gift-codes/{id}", adminHandler.UpdateGiftCode)
-				r.Delete("/gift-codes/{id}", adminHandler.DeactivateGiftCode)
-				r.Get("/account-requests", adminHandler.ListAccountRequests)
-				r.Post("/account-requests/{id}/execute-export", adminHandler.ExecuteExport)
-				r.Post("/account-requests/{id}/execute-deletion", adminHandler.ExecuteDeletion)
-				r.Get("/users/{userId}/export", adminHandler.ExportUserData)
-				r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
-				r.Delete("/users/{userId}", adminHandler.DeleteUser)
+					r.Post("/promo-codes", adminHandler.CreatePromoCode)
+					r.Get("/promo-codes", adminHandler.ListPromoCodes)
+					r.Post("/promo-codes/{id}/send", adminHandler.SendPromoInvite)
+					r.Delete("/promo-codes/{id}", adminHandler.RevokePromoCode)
+					r.Post("/invite-links", adminHandler.CreateInviteLink)
+					r.Get("/invite-links", adminHandler.ListInviteLinks)
+					r.Get("/invite-links/{id}", adminHandler.GetInviteLinkDetail)
+					r.Put("/invite-links/{id}", adminHandler.UpdateInviteLink)
+					r.Delete("/invite-links/{id}", adminHandler.DeactivateInviteLink)
+					r.Post("/gift-codes", adminHandler.CreateGiftCode)
+					r.Get("/gift-codes", adminHandler.ListGiftCodes)
+					r.Get("/gift-codes/{id}", adminHandler.GetGiftCodeDetail)
+					r.Put("/gift-codes/{id}", adminHandler.UpdateGiftCode)
+					r.Delete("/gift-codes/{id}", adminHandler.DeactivateGiftCode)
+					r.Get("/account-requests", adminHandler.ListAccountRequests)
+					r.Post("/account-requests/{id}/execute-export", adminHandler.ExecuteExport)
+					r.Post("/account-requests/{id}/execute-deletion", adminHandler.ExecuteDeletion)
+					r.Get("/users/{userId}/export", adminHandler.ExportUserData)
+					r.Put("/users/{userId}/free-forever", adminHandler.SetFreeForever)
+					r.Delete("/users/{userId}", adminHandler.DeleteUser)
 				})
 
 				r.Get("/saved/opportunities", savedOppHandler.ListWithDetails)
