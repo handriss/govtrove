@@ -4,6 +4,7 @@ import {
   Hash, CalendarClock, ToggleRight, MapPin, Trophy,
   BookText, ExternalLink, ArrowRight, Search,
 } from 'lucide-react';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 interface GlossaryEntry {
   id: string;
@@ -143,6 +144,12 @@ const entries: GlossaryEntry[] = [
 ];
 
 export default function GlossaryPage() {
+  usePageMeta({
+    title: "Federal Contracting Glossary — SAM.gov Terms Explained | GovTrove",
+    description: "Plain-English definitions of the federal contracting terms you meet on SAM.gov: NAICS, PSC, set-asides, solicitation types, response deadlines, and more.",
+    canonicalPath: '/glossary',
+  });
+
   return (
     <div className="min-h-screen relative">
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />

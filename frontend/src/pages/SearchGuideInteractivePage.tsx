@@ -16,6 +16,7 @@ import {
 } from '../components/filters/constants';
 import { getFacetCounts } from '../services/api';
 import type { FacetResult } from '../types/api';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const SET_ASIDE_OPTIONS = Object.entries(SET_ASIDE_LABELS).map(([value, label]) => ({
   value,
@@ -63,6 +64,12 @@ function DemoSection({ id, icon: Icon, title, description, children, searchUrl }
 }
 
 export default function SearchGuideInteractivePage() {
+  usePageMeta({
+    title: "Interactive Search Tutorial — Practice Boolean Contract Search | GovTrove",
+    description: "Practice building federal contract searches step by step. Try boolean operators, quoted phrases, and filters against live SAM.gov opportunity data.",
+    canonicalPath: '/guide/interactive',
+  });
+
   const navigate = useNavigate();
   const [facets, setFacets] = useState<FacetResult['facets'] | null>(null);
 

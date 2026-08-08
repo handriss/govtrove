@@ -6,6 +6,7 @@ import MobileFilterSheet from '../components/MobileFilterSheet';
 import { searchOpportunities } from '../services/api';
 import { getWhatsNewSync, getWhatsNew, whatsNewBaseParams } from '../services/whatsNewCache';
 import type { OpportunityListItem } from '../types/api';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const PAGE_SIZE = 25;
 
@@ -29,6 +30,12 @@ function filtersFromParams(params: URLSearchParams): Record<string, string> {
 }
 
 export default function WhatsNewPage() {
+  usePageMeta({
+    title: "What's New in GovTrove — Product Updates and Changelog",
+    description: "Recent GovTrove releases: new search features, filters, alerts, and data improvements for finding federal contract opportunities from SAM.gov.",
+    canonicalPath: '/whats-new',
+  });
+
   const [searchParams, setSearchParams] = useSearchParams();
   const allData = useRef<OpportunityListItem[]>([]);
   const [loading, setLoading] = useState(true);

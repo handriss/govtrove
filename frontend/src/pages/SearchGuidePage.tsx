@@ -5,6 +5,7 @@ import {
   Layers, ArrowRight, BookOpen, Star,
 } from 'lucide-react';
 import { useAppAuth } from '../contexts/AuthContext';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 interface GuideSection {
   id: string;
@@ -126,6 +127,12 @@ const sections: GuideSection[] = [
 ];
 
 export default function SearchGuidePage() {
+  usePageMeta({
+    title: "How to Search Federal Contract Opportunities — Boolean Search Guide | GovTrove",
+    description: "Learn how to search SAM.gov contract opportunities with boolean operators, exact phrases, exclusions, and filters — with worked examples you can copy.",
+    canonicalPath: '/guide',
+  });
+
   const { isAuthenticated, signUp } = useAppAuth();
 
   return (
