@@ -76,9 +76,7 @@ func (h *Handler) writeSearchNotifications(ctx context.Context) (int, error) {
 				continue
 			}
 
-			// is_current collapses amendment reposts, so a saved search notifies
-			// once per solicitation instead of once per amendment.
-			conditions := []string{"active = true", "is_latest = true", "is_current = true"}
+			conditions := []string{"active = true", "is_latest = true"}
 			args := []any{}
 			argNum := 1
 

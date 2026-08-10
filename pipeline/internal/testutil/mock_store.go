@@ -34,7 +34,6 @@ type MockStore struct {
 	UpsertOpportunitiesFn            func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, opps []reconcile.Opportunity) (int, error)
 	MarkDisappearedInactiveFn           func(ctx context.Context, runID uuid.UUID) (int, error)
 	DeactivateExpiredOpportunitiesFn func(ctx context.Context) (int, int, error)
-	RefreshIsCurrentFn               func(ctx context.Context) (int, error)
 	AnalyzeOpportunitiesFn           func(ctx context.Context) error
 
 	BulkInsertSnapAPIFn func(ctx context.Context, runID uuid.UUID, snapshotDate time.Time, rows []database.SnapAPIRow) (int64, error)
@@ -209,13 +208,6 @@ func (m *MockStore) DeactivateExpiredOpportunities(ctx context.Context) (int, in
 		return m.DeactivateExpiredOpportunitiesFn(ctx)
 	}
 	return 0, 0, nil
-}
-
-func (m *MockStore) RefreshIsCurrent(ctx context.Context) (int, error) {
-	if m.RefreshIsCurrentFn != nil {
-		return m.RefreshIsCurrentFn(ctx)
-	}
-	return 0, nil
 }
 
 func (m *MockStore) AnalyzeOpportunities(ctx context.Context) error {

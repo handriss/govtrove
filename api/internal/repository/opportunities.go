@@ -191,9 +191,6 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 
 	conditions = append(conditions, "active = true")
 	conditions = append(conditions, "is_latest = true")
-	// is_latest is per notice_id, but SAM issues a new notice_id per amendment, so
-	// without is_current one solicitation repeats across the result list.
-	conditions = append(conditions, "is_current = true")
 
 	if params.Query != "" {
 		var ftsConds []string

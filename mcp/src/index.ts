@@ -611,9 +611,7 @@ Provide a plain-English analysis:
     async (params) => {
       const searchParams = { ...params };
       return withUsageTracking(sessionId, "search_opportunities", searchParams, async () => {
-        // is_latest is per notice_id, but SAM issues a new notice_id per amendment,
-        // so without is_current one solicitation repeats across the results.
-        const conditions: string[] = ["active = true", "is_latest = true", "is_current = true"];
+        const conditions: string[] = ["active = true", "is_latest = true"];
         const values: unknown[] = [];
         let paramIdx = 1;
 
