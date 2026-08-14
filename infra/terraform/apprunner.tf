@@ -176,6 +176,10 @@ resource "aws_apprunner_service" "api" {
           POSTHOG_HOST      = var.posthog_host
           MCP_INTERNAL_URL  = "https://${aws_apprunner_service.mcp.service_url}"
           DSAR_S3_BUCKET    = aws_s3_bucket.dsar_exports.bucket
+          # Deterministic tiers only. The LLM tier stays dark until
+          # OPENROUTER_API_KEY is set, which also needs the OpenRouter/Anthropic
+          # subprocessor disclosed in the privacy policy first.
+          SEARCH_RESCUE_ENABLED = "true"
         }
       }
     }

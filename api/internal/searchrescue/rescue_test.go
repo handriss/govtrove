@@ -249,3 +249,50 @@ func TestRescueNothingToRescue(t *testing.T) {
 		t.Errorf("prober called %d times for empty params", prober.calls)
 	}
 }
+
+// A probe must model what the user actually sees. The frontend's "still open"
+// default is active=true, which INCLUDES notices with no stated deadline —
+// probing with a bare deadline_from instead undercounts by every undated
+// notice, and suggestions get dropped as false zeros.
+func TestNormalizeForProbe_UsesActiveOnlyNotDeadlineFrom(t *testing.T) {
+	s := &Service{}
+	got := s.normalizeForProbe(models.SearchParams{Query: "coffee"})
+
+	if !got.ActiveOnly {
+		t.Error("bare params must probe with ActiveOnly set")
+	}
+	if got.DeadlineFrom != nil {
+		t.Errorf("bare params must NOT get a deadline_from default, got %v", got.DeadlineFrom)
+	}
+	if m := paramsToMap(got); m["active"] != "true" || m["deadline_from"] != "" {
+		t.Errorf("serialized probe params wrong: %v", m)
+	}
+}
+
+// An explicit deadline range is a different intent and must be left alone.
+func TestNormalizeForProbe_LeavesExplicitDeadlineRange(t *testing.T) {
+	s := &Service{}
+	got := s.normalizeForProbe(models.SearchParams{
+		Query: "coffee", DeadlineFrom: date("2026-09-01"),
+	})
+
+	if got.ActiveOnly {
+		t.Error("an explicit deadline range must not be turned into ActiveOnly")
+	}
+	if got.DeadlineFrom == nil || !got.DeadlineFrom.Equal(*date("2026-09-01")) {
+		t.Errorf("explicit deadline_from was altered: %v", got.DeadlineFrom)
+	}
+}
+
+// active must survive the map round-trip or probe dedupe collides.
+func TestParamsMapRoundTrip_PreservesActiveOnly(t *testing.T) {
+	in := models.SearchParams{Query: "coffee", ActiveOnly: true}
+	out := paramsFromMap(paramsToMap(in))
+
+	if !out.ActiveOnly {
+		t.Error("ActiveOnly lost in map round-trip")
+	}
+	if canonical(in) == canonical(models.SearchParams{Query: "coffee"}) {
+		t.Error("active=true and bare params must not share a canonical key")
+	}
+}

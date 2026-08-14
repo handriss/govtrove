@@ -15,9 +15,15 @@ return results.
 - `OR` broadens (`a OR b`); `-word` excludes.
 - The query searches titles, descriptions, agency names, solicitation and
   notice numbers.
-- Filters compound with the query. The app always shows only active
-  opportunities with a future deadline — those two constraints are fixed;
-  never try to relax them.
+- Filters compound with the query. The app shows only opportunities that are
+  still open: either the response deadline is still ahead, or the notice
+  states no deadline at all. Treat "still open" as fixed — never try to
+  relax it.
+- A query that is a single notice number (e.g. `W15QKN-26-R-A037`) is looked
+  up directly, ignoring the open-only and notice-type filters, and matches
+  with or without dashes. So if such a search found nothing, that number is
+  simply not in the catalog — relaxing filters will not help, and
+  `no-market` is usually the honest answer.
 - Government notices use government vocabulary: "custodial services" not
   "cleaning", "MRO" not "maintenance supplies", "PPE" not "safety gear".
   Translating commercial phrasing into procurement phrasing is your main

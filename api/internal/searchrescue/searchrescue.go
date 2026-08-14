@@ -231,15 +231,17 @@ func (s *Service) probe(ctx context.Context, b *budget, pl *probeLog, p models.S
 }
 
 // normalizeForProbe applies the frontend's implicit defaults so a probe
-// counts what the user would actually see. The app defaults to active
-// opportunities with a future deadline; a bare params set must probe the
-// same way or counts overstate reality (the 810-quoted-vs-22-shown bug).
+// counts what the user would actually see. A bare params set must probe the
+// same way or counts misstate reality (the 810-quoted-vs-22-shown bug).
+//
+// The default is ActiveOnly, NOT deadline_from=today: "still open" includes
+// notices with no deadline at all. Probing with a bare date would undercount
+// by the ~8k undated active notices the real search returns.
 func (s *Service) normalizeForProbe(p models.SearchParams) models.SearchParams {
 	p.Sort, p.Order, p.Page, p.Limit = "", "", 0, 0
 	p.GeoStates, p.GeoCities = nil, nil
 	if p.DeadlineFrom == nil && p.DeadlineTo == nil {
-		t := s.today()
-		p.DeadlineFrom = &t
+		p.ActiveOnly = true
 	}
 	return p
 }
@@ -309,6 +311,9 @@ func paramsToMap(p models.SearchParams) map[string]string {
 	if p.DeadlineTo != nil {
 		set("deadline_to", p.DeadlineTo.Format(dateFmt))
 	}
+	if p.ActiveOnly {
+		set("active", "true")
+	}
 	return m
 }
 
@@ -348,6 +353,7 @@ func paramsFromMap(m map[string]string) models.SearchParams {
 	p.PostedTo = date("posted_to")
 	p.DeadlineFrom = date("deadline_from")
 	p.DeadlineTo = date("deadline_to")
+	p.ActiveOnly = m["active"] == "true"
 	return p
 }
 
