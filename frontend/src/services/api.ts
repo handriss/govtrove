@@ -133,6 +133,9 @@ export async function getFacetCounts(params: SearchParams = {}, signal?: AbortSi
   if (params.posted_to) searchParams.set('posted_to', params.posted_to);
   if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);
   if (params.deadline_to) searchParams.set('deadline_to', params.deadline_to);
+  // Facets drive the headline result count, so it must carry the same filters
+  // as the search itself or the two disagree.
+  if (params.active) searchParams.set('active', params.active);
 
   const response = await fetch(`${API_BASE}/opportunities/facets?${searchParams}`, { signal });
   if (!response.ok) {
