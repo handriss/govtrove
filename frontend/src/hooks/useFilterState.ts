@@ -51,7 +51,12 @@ const DEFAULTS: FilterState = {
   page: 1,
 };
 
-const SORT_STORAGE_KEY = 'govtrove_sort';
+// Bumped to _v2 on 2026-08-14: every prior visitor had 'posted_date' written
+// here automatically by the old default, which pinned them to it and hid the
+// switch to relevance. A new key resets everyone once; explicit choices made
+// from here on still persist. The old key is cleaned up on read.
+const SORT_STORAGE_KEY = 'govtrove_sort_v2';
+const LEGACY_SORT_STORAGE_KEY = 'govtrove_sort';
 
 type Action =
   | { type: 'SET'; key: keyof FilterState; value: FilterState[keyof FilterState] }
@@ -135,6 +140,7 @@ export function parseStateFromURL(urlParams: URLSearchParams): FilterState {
   const state = { ...DEFAULTS };
 
   // Sort from localStorage if URL doesn't specify
+  localStorage.removeItem(LEGACY_SORT_STORAGE_KEY);
   const savedSort = localStorage.getItem(SORT_STORAGE_KEY);
   if (savedSort) {
     try {
