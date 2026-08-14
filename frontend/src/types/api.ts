@@ -74,6 +74,9 @@ export interface SearchResult {
   limit: number;
   total_pages: number;
   suggestion?: string;
+  /** Set when quotes collapsed the result set; the unquoted form and its count. */
+  relaxed_query?: string;
+  relaxed_total?: number;
 }
 
 export interface RescueSuggestion {
@@ -138,6 +141,8 @@ export interface SearchParams {
   posted_to?: string;
   deadline_from?: string;
   deadline_to?: string;
+  /** "still open" — includes undated notices, unlike a deadline_from range. */
+  active?: string;
   sol_num?: string;
   pop_city?: string;
   sort?: string;

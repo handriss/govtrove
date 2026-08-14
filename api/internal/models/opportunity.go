@@ -88,10 +88,14 @@ type SearchParams struct {
 	PostedFrom   *time.Time
 	PostedTo     *time.Time
 	DeadlineFrom *time.Time
-	DeadlineTo           *time.Time
-	SolicitationNumber   string
-	PopCity              string
-	Sort                 string
+	DeadlineTo *time.Time
+	// ActiveOnly means "still open", which is not the same as "deadline >= today":
+	// an undated notice is not expired. Kept separate from DeadlineFrom so an
+	// explicit date range still excludes undated rows.
+	ActiveOnly         bool
+	SolicitationNumber string
+	PopCity            string
+	Sort               string
 	Order        string
 	Page         int
 	Limit        int
@@ -107,6 +111,11 @@ type SearchResult struct {
 	Limit         int                   `json:"limit"`
 	TotalPages    int                   `json:"total_pages"`
 	Suggestion    string                `json:"suggestion,omitempty"`
+	// Set when quotes collapsed the result set — "Utilization Management"
+	// returns 3,443 but the quoted form returns 1, which reads as a broken
+	// site unless we say so.
+	RelaxedQuery string `json:"relaxed_query,omitempty"`
+	RelaxedTotal int    `json:"relaxed_total,omitempty"`
 }
 
 type FilterOptions struct {

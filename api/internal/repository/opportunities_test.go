@@ -188,24 +188,46 @@ func TestBuildFilterConditions_BareTermsAreANDed(t *testing.T) {
 }
 
 // A quoted phrase next to a bare term must AND, not OR.
+//
+// The phrase and the remainder used to be combined into a single tsquery with
+// `&&`. They are now separate ANDed conditions because an all-stopword phrase
+// ("IT") produces an EMPTY tsquery, and an empty operand of `&&` matches
+// nothing — which vetoed the whole segment. Ranking still combines them, so
+// assert AND-ness on the condition and `&&` on the rank expression.
 func TestBuildFilterConditions_PhrasePlusTermIsANDed(t *testing.T) {
 	params := models.SearchParams{Query: `cybersecurity "zero trust"`, Page: 1, Limit: 20}
-	conditions, args, _, _ := buildFilterConditions(params, "", 1)
+	conditions, args, _, ftsExpr := buildFilterConditions(params, "", 1)
 
 	if len(args) != 3 {
 		t.Fatalf("expected phrase + literal + remainder args, got %v", args)
 	}
 	cond := conditions[len(conditions)-1]
-	if !strings.Contains(cond, "&&") {
-		t.Errorf("phrase and term must be ANDed inside one tsquery: %s", cond)
+	if !strings.Contains(cond, " AND ") {
+		t.Errorf("phrase and term must be ANDed: %s", cond)
 	}
-	// note: `||` also appears as SQL string concat in the literal re-check,
-	// so assert on the SQL disjunction instead.
-	if strings.Contains(cond, " OR ") {
-		t.Errorf("no OR expected for a single segment: %s", cond)
+	if !strings.Contains(ftsExpr, "&&") {
+		t.Errorf("rank expression must still combine phrase and term: %s", ftsExpr)
 	}
 	if !strings.Contains(cond, "ILIKE") {
 		t.Errorf("quoted phrase should carry a literal re-check: %s", cond)
+	}
+	// Without this the empty-tsquery case can never match.
+	if !strings.Contains(cond, "= ''::tsquery") {
+		t.Errorf("phrase condition must tolerate a degenerate (all-stopword) tsquery: %s", cond)
+	}
+}
+
+// Segments are still OR'd against each other; only the intra-segment shape changed.
+func TestBuildFilterConditions_SegmentsAreORed(t *testing.T) {
+	params := models.SearchParams{Query: `"zero trust" OR "supply chain"`, Page: 1, Limit: 20}
+	conditions, _, _, ftsExpr := buildFilterConditions(params, "", 1)
+
+	cond := conditions[len(conditions)-1]
+	if !strings.Contains(cond, " OR ") {
+		t.Errorf("two segments must be OR'd: %s", cond)
+	}
+	if !strings.Contains(ftsExpr, "||") {
+		t.Errorf("rank expression should OR the segments: %s", ftsExpr)
 	}
 }
 

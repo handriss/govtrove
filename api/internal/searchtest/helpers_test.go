@@ -242,4 +242,15 @@ VALUES
     ('TEST-008', 'Medical Laboratory Equipment', 'Supply of medical laboratory testing equipment and supplies', 'SOL-2026-008', 'Solicitation', '2026-03-03', '2026-04-10', true, true, 'SBA', 'Total Small Business Set-Aside', '339112', 'A075', 'DEPT OF DEFENSE', NULL),
     ('TEST-009', 'Inactive Sterilizer Opportunity', 'This opportunity is no longer active', 'SOL-2026-009', 'Solicitation', '2026-03-01', '2026-04-01', false, true, 'SBA', 'Total Small Business Set-Aside', '541512', NULL, 'DEPT OF DEFENSE', 'VA'),
     ('TEST-010', 'Old Version Opportunity', 'This is an older version of an opportunity', 'SOL-2026-010', 'Solicitation', '2026-03-01', '2026-04-01', true, false, 'SBA', 'Total Small Business Set-Aside', '541512', NULL, 'DEPT OF DEFENSE', 'VA');
+
+-- Fixtures taken from real zero-result searches in search_events. Deadlines are
+-- relative so the "still open" cases don't rot. None of these are an active
+-- 'Solicitation' and none mention sterilizer, so existing counts are unaffected.
+INSERT INTO opportunities (notice_id, title, description, solicitation_number, type, posted_date, response_deadline, active, is_latest, naics_code, department)
+VALUES
+    ('TEST-011', 'IT Support Desk Modernization', 'Modernization of the IT support desk', 'SOL-2026-011', 'Sources Sought', '2026-03-01', NULL, true, true, '541519', 'DEPT OF DEFENSE'),
+    ('TEST-012', 'Range Instrumentation Support', 'Instrumentation support for test ranges', 'W519TC-25-D-A066', 'Award Notice', '2026-02-01', CURRENT_DATE - INTERVAL '60 days', true, true, '541330', 'DEPT OF DEFENSE'),
+    ('TEST-013', 'Utilization Management Program Review', 'Review of clinical utilization management practices', 'SOL-2026-013', 'Special Notice', '2026-03-01', CURRENT_DATE + INTERVAL '30 days', true, true, '621999', 'DEPT OF VETERANS AFFAIRS'),
+    ('TEST-014', 'Resource Utilization Study', 'Study of resource allocation and program management', 'SOL-2026-014', 'Special Notice', '2026-03-02', CURRENT_DATE + INTERVAL '30 days', true, true, '541611', 'DEPT OF VETERANS AFFAIRS'),
+    ('TEST-015', 'Expired Facility Painting', 'Interior painting with a closed deadline', 'SOL-2026-015', 'Special Notice', '2026-01-01', CURRENT_DATE - INTERVAL '30 days', true, true, '238320', 'GENERAL SERVICES ADMINISTRATION');
 `

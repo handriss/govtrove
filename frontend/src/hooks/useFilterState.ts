@@ -44,7 +44,9 @@ const DEFAULTS: FilterState = {
   solicitationNumber: '',
   popCity: '',
   activeOnly: true,
-  sort: 'posted_date',
+  // Relevance falls back to posted_date when there is no keyword, so this is
+  // "best match when searching, newest when browsing".
+  sort: 'relevance',
   sortDir: 'desc',
   page: 1,
 };
@@ -369,7 +371,8 @@ export function useFilterState(): UseFilterStateReturn {
       if (filters.deadlineFrom) p.deadline_from = filters.deadlineFrom;
       if (filters.deadlineTo) p.deadline_to = filters.deadlineTo;
     } else if (filters.activeOnly) {
-      p.deadline_from = today();
+      // Not deadline_from=today: an undated notice is open, not expired.
+      p.active = 'true';
     }
 
     if (filters.solicitationNumber) p.sol_num = filters.solicitationNumber;

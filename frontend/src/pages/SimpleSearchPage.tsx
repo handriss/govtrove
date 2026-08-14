@@ -27,7 +27,7 @@ export default function SimpleSearchPage() {
   const { facets, total: facetTotal, isLoading: facetsLoading } = useFacetCounts(fs.toFacetParams());
   const { isAuthenticated, getAccessToken, govtroveUser } = useAppAuth();
   const authOptions = useMemo(() => ({ getAccessToken }), [getAccessToken]);
-  const { results, total, page, totalPages, loading, error, suggestion, search, reset } = useSearch(authOptions);
+  const { results, total, page, totalPages, loading, error, suggestion, relaxedQuery, relaxedTotal, search, reset } = useSearch(authOptions);
   const posthog = usePostHog();
   const saved = useSavedOpportunities();
   const { savedSearches, loading: savedSearchesLoading, saveCurrentSearch, deleteSearch } = useSavedSearches();
@@ -585,6 +585,8 @@ export default function SimpleSearchPage() {
             onSaveAll={saved.saveAll}
             querySuggestion={suggestion}
             onQuerySuggestionClick={handleQuerySuggestion}
+            relaxedQuery={relaxedQuery}
+            relaxedTotal={relaxedTotal}
             clearAllFilters={clearAllAndReset}
             error={error}
             onRetry={handleSubmit}

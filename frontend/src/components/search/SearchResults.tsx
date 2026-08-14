@@ -49,6 +49,8 @@ interface SearchResultsProps {
   clearAllFilters: () => void;
   querySuggestion?: string | null;
   onQuerySuggestionClick?: (suggestion: string) => void;
+  relaxedQuery?: string | null;
+  relaxedTotal?: number;
   error?: string | null;
   onRetry?: () => void;
   isAuthenticated?: boolean;
@@ -78,6 +80,8 @@ export default function SearchResults({
   onSaveAll,
   querySuggestion,
   onQuerySuggestionClick,
+  relaxedQuery,
+  relaxedTotal,
   clearAllFilters,
   error,
   onRetry,
@@ -207,6 +211,22 @@ export default function SearchResults({
           />
         </div>
       </div>
+
+      {/* Quotes are an exact-phrase match and can cut thousands of hits to one
+          with no visible reason — say so, and offer the unquoted search. */}
+      {!error && relaxedQuery && !!relaxedTotal && onQuerySuggestionClick && (
+        <div className="mb-4 rounded-lg border border-accent/25 bg-accent/5 px-4 py-3 text-sm text-dark-300">
+          Quotes match the exact phrase.{' '}
+          <button
+            type="button"
+            onClick={() => onQuerySuggestionClick(relaxedQuery)}
+            className="text-accent font-semibold underline underline-offset-4 decoration-accent/40 hover:decoration-accent transition-colors"
+          >
+            Search without quotes
+          </button>{' '}
+          for {relaxedTotal.toLocaleString()} results.
+        </div>
+      )}
 
       {/* Error state */}
       {error && (

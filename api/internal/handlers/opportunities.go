@@ -20,6 +20,10 @@ import (
 	"github.com/handriss/govtrove/api/internal/searchrescue"
 )
 
+// Below this many hits a quoted search is worth re-probing unquoted; above it
+// the user has plenty to work with and the extra query isn't worth the latency.
+const quoteRelaxThreshold = 10
+
 type OpportunityHandler struct {
 	repo     *repository.OpportunityRepository
 	logger   *slog.Logger
@@ -99,6 +103,24 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 				result.Suggestion = suggestion
 			} else if err != nil {
 				h.logger.Warn("suggest query failed", "error", err)
+			}
+		}
+	}
+
+	// Quotes are an exact-substring match, so they can cut thousands of hits to
+	// one with no visible reason. Only worth a second query when the quoted
+	// result set is small enough that the user is probably stuck.
+	if result.Total < quoteRelaxThreshold && strings.Contains(params.Query, `"`) {
+		relaxed := strings.TrimSpace(strings.ReplaceAll(params.Query, `"`, ""))
+		if relaxed != "" && relaxed != params.Query {
+			probe := params
+			probe.Query = relaxed
+			probe.Page, probe.Limit = 1, 1
+			if r2, err := h.repo.Search(r.Context(), probe); err == nil && r2.Total > result.Total {
+				result.RelaxedQuery = relaxed
+				result.RelaxedTotal = r2.Total
+			} else if err != nil {
+				h.logger.Warn("relaxed-query probe failed", "error", err)
 			}
 		}
 	}
@@ -467,6 +489,8 @@ func (h *OpportunityHandler) parseSearchParams(r *http.Request) models.SearchPar
 			params.DeadlineTo = &t
 		}
 	}
+
+	params.ActiveOnly = q.Get("active") == "true"
 
 	if pageStr := q.Get("page"); pageStr != "" {
 		if page, err := strconv.Atoi(pageStr); err == nil && page > 0 {

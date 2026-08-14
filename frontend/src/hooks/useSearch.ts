@@ -10,6 +10,8 @@ interface UseSearchState {
   loading: boolean;
   error: string | null;
   suggestion: string | null;
+  relaxedQuery: string | null;
+  relaxedTotal: number;
 }
 
 interface UseSearchOptions {
@@ -25,10 +27,12 @@ export function useSearch(options?: UseSearchOptions) {
     loading: false,
     error: null,
     suggestion: null,
+    relaxedQuery: null,
+    relaxedTotal: 0,
   });
 
   const search = useCallback(async (params: SearchParams) => {
-    setState((prev) => ({ ...prev, loading: true, error: null, suggestion: null }));
+    setState((prev) => ({ ...prev, loading: true, error: null, suggestion: null, relaxedQuery: null, relaxedTotal: 0 }));
 
     try {
       let token: string | undefined;
@@ -44,6 +48,8 @@ export function useSearch(options?: UseSearchOptions) {
         loading: false,
         error: null,
         suggestion: data.suggestion || null,
+        relaxedQuery: data.relaxed_query || null,
+        relaxedTotal: data.relaxed_total || 0,
       });
     } catch (err) {
       setState((prev) => ({
@@ -63,6 +69,8 @@ export function useSearch(options?: UseSearchOptions) {
       loading: false,
       error: null,
       suggestion: data.suggestion || null,
+      relaxedQuery: data.relaxed_query || null,
+      relaxedTotal: data.relaxed_total || 0,
     });
   }, []);
 
@@ -75,6 +83,8 @@ export function useSearch(options?: UseSearchOptions) {
       loading: false,
       error: null,
       suggestion: null,
+      relaxedQuery: null,
+      relaxedTotal: 0,
     });
   }, []);
 

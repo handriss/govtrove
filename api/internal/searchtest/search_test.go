@@ -143,3 +143,84 @@ func TestSearch_NoResults(t *testing.T) {
 		t.Errorf("expected empty opportunities slice, got %d items", len(result.Opportunities))
 	}
 }
+
+// The cases below are taken verbatim from zero-result searches in search_events.
+
+// "IT" is entirely stopwords, so phraseto_tsquery yields an empty tsquery that
+// matches nothing. It used to veto the literal re-check it was ANDed with.
+func TestSearch_QuotedStopwordOnlyPhrase(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {`"IT"`}})
+
+	if result.Total == 0 {
+		t.Fatalf(`searching "IT" returned 0; expected the IT support notice`)
+	}
+	if !hasTitle(result, "IT Support Desk Modernization") {
+		t.Errorf("missing 'IT Support Desk Modernization', got %v", titles(result))
+	}
+}
+
+// An undated notice is open, not expired. response_deadline >= x drops it
+// because NULL >= x is NULL.
+func TestSearch_ActiveOnlyKeepsUndatedNotices(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {"modernization"}, "active": {"true"}})
+
+	if !hasTitle(result, "IT Support Desk Modernization") {
+		t.Errorf("active=true dropped the undated notice; got %v", titles(result))
+	}
+}
+
+func TestSearch_ActiveOnlyStillExcludesExpired(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {"painting"}, "active": {"true"}})
+
+	if hasTitle(result, "Expired Facility Painting") {
+		t.Errorf("active=true returned a closed notice: %v", titles(result))
+	}
+}
+
+// Someone pasting a notice number wants that notice, even though it closed and
+// its type sits outside the default filter.
+func TestSearch_KnownItemSolicitationLookup(t *testing.T) {
+	for _, q := range []string{"W519TC-25-D-A066", "W519TC25DA066", "w519tc25da066"} {
+		params := url.Values{
+			"q":      {q},
+			"active": {"true"},
+			"type":   {"Solicitation", "Presolicitation", "Sources Sought"},
+		}
+		result := searchGet(t, server.URL, params)
+		if !hasTitle(result, "Range Instrumentation Support") {
+			t.Errorf("known-item lookup %q returned %v; expected the notice regardless of filters", q, titles(result))
+		}
+	}
+}
+
+// A topic search must not be treated as a known-item lookup.
+func TestSearch_KnownItemDoesNotHijackTopicSearch(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {"painting"}, "active": {"true"}})
+
+	if hasTitle(result, "Range Instrumentation Support") {
+		t.Errorf("topic search matched an unrelated notice number: %v", titles(result))
+	}
+}
+
+// Quotes are an exact-substring match and can collapse thousands of hits to
+// one; the response has to say so.
+func TestSearch_QuoteCollapseOffersRelaxedQuery(t *testing.T) {
+	quoted := searchGet(t, server.URL, url.Values{"q": {`"Utilization Management"`}})
+	if quoted.Total != 1 {
+		t.Fatalf("expected the quoted phrase to match exactly 1, got %d: %v", quoted.Total, titles(quoted))
+	}
+	if quoted.RelaxedQuery != "Utilization Management" {
+		t.Errorf("expected relaxed_query %q, got %q", "Utilization Management", quoted.RelaxedQuery)
+	}
+	if quoted.RelaxedTotal <= quoted.Total {
+		t.Errorf("expected relaxed_total > %d, got %d", quoted.Total, quoted.RelaxedTotal)
+	}
+}
+
+func TestSearch_NoRelaxedHintWhenUnquoted(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {"Utilization Management"}})
+
+	if result.RelaxedQuery != "" {
+		t.Errorf("unquoted search should not offer a relaxed query, got %q", result.RelaxedQuery)
+	}
+}

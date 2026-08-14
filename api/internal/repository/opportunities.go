@@ -18,6 +18,39 @@ var quotedPhraseRe = regexp.MustCompile(`"([^"]+)"`)
 // The same fields search_vector is built from, for literal phrase re-checks.
 const searchableText = `(COALESCE(title,'') || ' ' || COALESCE(description,'') || ' ' || COALESCE(solicitation_number,''))`
 
+// Solicitation numbers are stored inconsistently — 13% carry dashes, the rest
+// don't — and users paste them in whichever form they were given.
+var solNumStripRe = regexp.MustCompile(`[^A-Za-z0-9]`)
+
+func normalizeSolNum(s string) string {
+	return strings.ToUpper(solNumStripRe.ReplaceAllString(s, ""))
+}
+
+// looksLikeSolicitationNumber reports whether a query is a known-item lookup
+// rather than a topic search: one token, mixed letters and digits, long enough
+// not to be a word. Someone pasting a notice number wants that notice — not
+// "open opportunities matching it" — so filters are relaxed for these.
+func looksLikeSolicitationNumber(q string) bool {
+	q = strings.TrimSpace(q)
+	if q == "" || strings.ContainsAny(q, " \t\"") {
+		return false
+	}
+	n := normalizeSolNum(q)
+	if len(n) < 8 || len(n) > 30 {
+		return false
+	}
+	var hasAlpha, hasDigit bool
+	for _, r := range n {
+		switch {
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case r >= 'A' && r <= 'Z':
+			hasAlpha = true
+		}
+	}
+	return hasAlpha && hasDigit
+}
+
 func parseQuotedPhrases(query string) (phrases []string, remainder string) {
 	matches := quotedPhraseRe.FindAllStringSubmatch(query, -1)
 	for _, m := range matches {
@@ -192,6 +225,11 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	conditions = append(conditions, "active = true")
 	conditions = append(conditions, "is_latest = true")
 
+	// A pasted notice number is a known-item lookup. The default "open only" and
+	// notice-type filters would hide the very record being asked for — a closed
+	// Solicitation, or its Award Notice — so they are skipped for these.
+	knownItem := looksLikeSolicitationNumber(params.Query)
+
 	if params.Query != "" {
 		var ftsConds []string
 
@@ -210,9 +248,19 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 			var literalConds []string
 
 			for _, phrase := range phrases {
-				tsParts = append(tsParts, fmt.Sprintf("phraseto_tsquery('english', $%d)", argNum))
+				phraseArg := argNum
+				tsParts = append(tsParts, fmt.Sprintf("phraseto_tsquery('english', $%d)", phraseArg))
 				args = append(args, phrase)
 				argNum++
+
+				// A phrase made only of stopwords ("IT") yields an EMPTY tsquery,
+				// and an empty tsquery matches nothing — which would veto the
+				// literal check below and return zero for 14k+ notices containing
+				// "IT". Skip the FTS half when it degenerates; the ILIKE is the
+				// stricter test anyway.
+				literalConds = append(literalConds, fmt.Sprintf(
+					"(phraseto_tsquery('english', $%d) = ''::tsquery OR search_vector @@ phraseto_tsquery('english', $%d))",
+					phraseArg, phraseArg))
 
 				// phraseto_tsquery drops stopwords, so "IT services" silently
 				// degrades to "services". Re-assert the literal string so a
@@ -222,8 +270,10 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 				argNum++
 			}
 
+			var remainderCond string
 			if ftsQuery != "" {
 				tsParts = append(tsParts, fmt.Sprintf("websearch_to_tsquery('english', $%d)", argNum))
+				remainderCond = fmt.Sprintf("search_vector @@ websearch_to_tsquery('english', $%d)", argNum)
 				args = append(args, ftsQuery)
 				argNum++
 			}
@@ -232,15 +282,20 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 				continue
 			}
 
-			tsExpr := strings.Join(tsParts, " && ")
-			segExprs = append(segExprs, "("+tsExpr+")")
+			// tsParts is only used for ts_rank ordering; matching is done by the
+			// per-part conditions so one degenerate phrase can't veto the segment.
+			segExprs = append(segExprs, "("+strings.Join(tsParts, " && ")+")")
 
-			segCond := fmt.Sprintf("search_vector @@ (%s)", tsExpr)
+			var segParts []string
+			if remainderCond != "" {
+				segParts = append(segParts, remainderCond)
+			}
+			segParts = append(segParts, literalConds...)
+
 			if len(literalConds) > 0 {
 				anyLiteral = true
-				segCond = "(" + segCond + " AND " + strings.Join(literalConds, " AND ") + ")"
 			}
-			segConds = append(segConds, segCond)
+			segConds = append(segConds, "("+strings.Join(segParts, " AND ")+")")
 		}
 
 		if len(segConds) > 0 {
@@ -252,6 +307,16 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 				// One tsquery keeps this to a single GIN index scan.
 				ftsConds = append(ftsConds, fmt.Sprintf("search_vector @@ (%s)", ftsExpr))
 			}
+		}
+
+		// Match the notice number in whichever form it was pasted: strip
+		// punctuation on both sides so W519TC-25-D-A066 and W519TC25DA066 are
+		// the same lookup. ORed with the FTS so a topic search is unaffected.
+		if knownItem {
+			ftsConds = append(ftsConds, fmt.Sprintf(
+				"regexp_replace(upper(COALESCE(solicitation_number,'')), '[^A-Z0-9]', '', 'g') = $%d", argNum))
+			args = append(args, normalizeSolNum(params.Query))
+			argNum++
 		}
 
 		geoCond := buildGeoCondition(params, &argNum, &args)
@@ -266,7 +331,7 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		}
 	}
 
-	if len(params.Types) > 0 && exclude != "type" {
+	if len(params.Types) > 0 && exclude != "type" && !knownItem {
 		conditions = append(conditions, fmt.Sprintf("type = ANY($%d)", argNum))
 		args = append(args, params.Types)
 		argNum++
@@ -284,6 +349,14 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 		argNum++
 	}
 
+	// "Still open" is not "deadline >= today": ~8k active notices carry no
+	// deadline at all (every Justification, 46% of Award Notices), and
+	// response_deadline >= x silently drops them because NULL >= x is NULL.
+	if params.ActiveOnly && !knownItem {
+		conditions = append(conditions, "(response_deadline >= CURRENT_DATE OR response_deadline IS NULL)")
+	}
+
+	// An explicit date range is a different intent — undated rows stay excluded.
 	if params.DeadlineFrom != nil {
 		conditions = append(conditions, fmt.Sprintf("response_deadline >= $%d", argNum))
 		args = append(args, *params.DeadlineFrom)
@@ -418,7 +491,15 @@ func (r *OpportunityRepository) buildOrderClause(params models.SearchParams, fts
 		order = "DESC"
 	}
 
-	switch params.Sort {
+	sort := params.Sort
+	// A typed query is a relevance request. Sorting it by posted_date puts
+	// whatever was posted yesterday on top instead of the best match, which is
+	// why users kept re-phrasing rather than scrolling.
+	if sort == "" && params.Query != "" {
+		sort = "relevance"
+	}
+
+	switch sort {
 	case "relevance":
 		if params.Query != "" && ftsExpr != "" {
 			return fmt.Sprintf("ORDER BY ts_rank(search_vector, %s) %s, posted_date DESC", ftsExpr, order)

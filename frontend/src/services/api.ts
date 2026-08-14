@@ -50,6 +50,7 @@ export async function searchOpportunities(params: SearchParams = {}, token?: str
   if (params.posted_to) searchParams.set('posted_to', params.posted_to);
   if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);
   if (params.deadline_to) searchParams.set('deadline_to', params.deadline_to);
+  if (params.active) searchParams.set('active', params.active);
   if (params.sort) searchParams.set('sort', params.sort);
   if (params.order) searchParams.set('order', params.order);
   if (params.page) searchParams.set('page', String(params.page));
@@ -92,6 +93,7 @@ export async function rescueSearch(params: SearchParams, signal?: AbortSignal): 
   if (params.posted_to) searchParams.set('posted_to', params.posted_to);
   if (params.deadline_from) searchParams.set('deadline_from', params.deadline_from);
   if (params.deadline_to) searchParams.set('deadline_to', params.deadline_to);
+  if (params.active) searchParams.set('active', params.active);
 
   const response = await fetch(`${API_BASE}/opportunities/rescue?${searchParams}`, {
     headers: { ...utmHeaders() },
