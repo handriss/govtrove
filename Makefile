@@ -3,7 +3,7 @@
 	api-run api-run-d api-run-neon api-stop api-build api-docker-build \
 	mcp-install mcp-dev mcp-docker-build \
 	frontend-install frontend-dev frontend-dev-d frontend-stop frontend-build \
-	test test-e2e test-api-search lambda-build \
+	test test-e2e test-api-search test-ui test-ui-headed lambda-build \
 	ecr-login deploy-frontend minify-landing deploy-landing deploy-api deploy-mcp deploy-pipeline deploy-all \
 	run-pipeline run-pipeline-force pipeline-status pipeline-dlq-status \
 	logs-pipeline logs-api status \
@@ -334,6 +334,17 @@ test-e2e:
 
 test-api-search:
 	cd api && go test -v -count=1 ./internal/searchtest/ -timeout 120s
+
+# Browser-driven checks against the REAL UI. Defaults to production; override
+# with E2E_BASE_URL / E2E_API_URL. See e2e/README.md.
+# (test-e2e above is the pipeline's Ginkgo suite — different thing.)
+test-ui:
+	@[ -d e2e/node_modules ] || (cd e2e && npm install && npx playwright install chromium)
+	cd e2e && npx playwright test
+
+test-ui-headed:
+	@[ -d e2e/node_modules ] || (cd e2e && npm install && npx playwright install chromium)
+	cd e2e && npx playwright test --headed
 
 lambda-build:
 	@for svc in $(LAMBDA_FUNCTIONS); do \
