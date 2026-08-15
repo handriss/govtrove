@@ -313,3 +313,95 @@ func TestBuildFilterConditions_NoGeo(t *testing.T) {
 		t.Fatalf("expected 1 arg, got %d: %v", len(args), args)
 	}
 }
+
+// --- Sort defaults. Untested until 2026-08-15 despite being changed twice. ---
+
+// A typed query is a relevance request. This was the whole point of the
+// 2026-08-14 change and nothing pinned it.
+func TestBuildOrderClause_DefaultsToRelevanceWhenQueryPresent(t *testing.T) {
+	r := &OpportunityRepository{}
+	got := r.buildOrderClause(models.SearchParams{Query: "coffee"}, "websearch_to_tsquery('english', $1)")
+
+	if !strings.Contains(got, "ts_rank") {
+		t.Errorf("a typed query with no explicit sort must rank by relevance, got: %s", got)
+	}
+}
+
+// Browsing with no query has nothing to rank, so newest-first is correct.
+func TestBuildOrderClause_DefaultsToPostedDateWhenBrowsing(t *testing.T) {
+	r := &OpportunityRepository{}
+	got := r.buildOrderClause(models.SearchParams{}, "")
+
+	if strings.Contains(got, "ts_rank") {
+		t.Errorf("browsing must not rank by relevance, got: %s", got)
+	}
+	if !strings.Contains(got, "posted_date") {
+		t.Errorf("browsing should sort by posted_date, got: %s", got)
+	}
+}
+
+// relevance falls back safely when there is no FTS expression to rank against.
+func TestBuildOrderClause_RelevanceWithoutQueryFallsBack(t *testing.T) {
+	r := &OpportunityRepository{}
+	got := r.buildOrderClause(models.SearchParams{Sort: "relevance"}, "")
+
+	if strings.Contains(got, "ts_rank") {
+		t.Errorf("ts_rank needs a tsquery; expected fallback, got: %s", got)
+	}
+}
+
+// An explicit choice must survive, or the sort dropdown is decorative.
+func TestBuildOrderClause_ExplicitSortWinsOverDefault(t *testing.T) {
+	r := &OpportunityRepository{}
+	got := r.buildOrderClause(models.SearchParams{Query: "coffee", Sort: "deadline"}, "x")
+
+	if !strings.Contains(got, "response_deadline") {
+		t.Errorf("explicit sort=deadline ignored, got: %s", got)
+	}
+	if strings.Contains(got, "ts_rank") {
+		t.Errorf("explicit sort must not be overridden by the relevance default, got: %s", got)
+	}
+}
+
+// --- Known-item detection. A false positive silently bypasses the open-only
+// and notice-type filters, so the boundaries matter more than the happy path.
+
+func TestLooksLikeSolicitationNumber(t *testing.T) {
+	cases := []struct {
+		q    string
+		want bool
+		why  string
+	}{
+		{"W15QKN26RA037", true, "plain notice number"},
+		{"W15QKN-26-R-A037", true, "dashed notice number"},
+		{"w519tc25da066", true, "lowercase still a notice number"},
+		{"36C77626R0025", true, "VA-style number"},
+		{"", false, "empty"},
+		{"coffee", false, "no digits"},
+		{"541611", false, "NAICS code: digits only, must stay a topic search"},
+		{"424490", false, "NAICS code"},
+		{"1550", false, "PSC code"},
+		{"cloud migration", false, "contains a space"},
+		{`"IT"`, false, "quoted phrase"},
+		{"AB12", false, "too short to be a notice number"},
+		{"IT services 2026", false, "multi-word"},
+		{strings.Repeat("A1", 20), false, "too long"},
+	}
+	for _, c := range cases {
+		if got := looksLikeSolicitationNumber(c.q); got != c.want {
+			t.Errorf("looksLikeSolicitationNumber(%q) = %v, want %v (%s)", c.q, got, c.want, c.why)
+		}
+	}
+}
+
+func TestNormalizeSolNum(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"W15QKN-26-R-A037", "W15QKN26RA037"},
+		{"w519tc 25 d a066", "W519TC25DA066"},
+		{"36C776/26R0025", "36C77626R0025"},
+	} {
+		if got := normalizeSolNum(c.in); got != c.want {
+			t.Errorf("normalizeSolNum(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

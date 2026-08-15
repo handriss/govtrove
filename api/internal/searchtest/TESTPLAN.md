@@ -8,6 +8,29 @@ All tests run against a real Postgres 16 container via `make test-api-search`.
 - [x] `TestSearch_FilterByType` — `type=o` returns 3 Solicitation results (TEST-001, TEST-005, TEST-008)
 - [x] `TestSearch_NoResults` — `q=xyznonexistent123` returns 0 results with correct structure
 
+### Added 2026-08-14 (fixtures TEST-011..015, taken from real zero-result searches)
+- [x] `TestSearch_QuotedStopwordOnlyPhrase` — `"IT"` returns results (empty tsquery must not veto the literal re-check)
+- [x] `TestSearch_ActiveOnlyKeepsUndatedNotices` — `active=true` keeps notices with no deadline
+- [x] `TestSearch_ActiveOnlyStillExcludesExpired` — `active=true` still drops closed notices
+- [x] `TestSearch_KnownItemSolicitationLookup` — dashed / undashed / lowercase all find the notice past its deadline
+- [x] `TestSearch_KnownItemDoesNotHijackTopicSearch` — a topic search must not match a notice number
+- [x] `TestSearch_QuoteCollapseOffersRelaxedQuery` / `TestSearch_NoRelaxedHintWhenUnquoted`
+
+### Added 2026-08-15 (fixture TEST-016)
+- [x] `TestFacets_TotalMatchesSearchTotal` — facets and search must agree. **Caveat: this pins API-side parity only.** The 2026-08-14 production bug was the *frontend* serializer omitting `active`; no Go test can catch that.
+- [x] `TestFacets_HonoursActiveFilter`
+- [x] `TestSearch_ExplicitDeadlineRangeExcludesUndatedNotices` — an explicit range is a different intent from "still open"
+- [x] `TestSearch_QuotedStopwordPhraseMatchesSubstrings_CURRENT` — **pins today's substring semantics**: `"IT"` also matches Monitor/Unit/the pronoun. Moving to case-sensitive word-boundary matching MUST break this test; update it deliberately.
+
+Unit-level (in `internal/repository`): `TestBuildOrderClause_*` (relevance default, browsing default, fallback, explicit sort wins), `TestLooksLikeSolicitationNumber` (14 boundary cases), `TestNormalizeSolNum`.
+Rescue (in `internal/searchrescue`): `TestNormalizeForProbe_*`, `TestParamsMapRoundTrip_PreservesActiveOnly`.
+
+## Known gaps (2026-08-15)
+
+- **No frontend tests exist at all** — no vitest/jest/testing-library in `package.json`. Two of the three regressions this session were frontend-only: the facets serializer omitting `active`, and sort being pinned by `localStorage`. Neither is reachable from Go. `services/api.ts` has **three** param serializers (search, rescue, facets) that must stay in sync.
+- `quoteRelaxThreshold` (no relax probe when results are plentiful) is unpinned — the seed is too small to produce 10+ hits for one phrase.
+- Pagination, visibility and most filter permutations below are still unimplemented.
+
 ## Planned
 
 ### Keyword Search

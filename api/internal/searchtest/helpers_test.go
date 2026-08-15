@@ -31,6 +31,30 @@ func searchGet(t *testing.T, baseURL string, params url.Values) models.SearchRes
 	return result
 }
 
+// facetsGet hits the endpoint that produces the headline result count. It is a
+// SEPARATE code path from search with its own param serializer, which is how a
+// filter mismatch reached production on 2026-08-14.
+func facetsGet(t *testing.T, baseURL string, params url.Values) models.FacetResult {
+	t.Helper()
+	u := baseURL + "/api/opportunities/facets"
+	if len(params) > 0 {
+		u += "?" + params.Encode()
+	}
+	resp, err := http.Get(u)
+	if err != nil {
+		t.Fatalf("GET %s: %v", u, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET %s: status %d", u, resp.StatusCode)
+	}
+	var result models.FacetResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	return result
+}
+
 func titles(result models.SearchResult) []string {
 	out := make([]string, len(result.Opportunities))
 	for i, o := range result.Opportunities {
@@ -252,5 +276,8 @@ VALUES
     ('TEST-012', 'Range Instrumentation Support', 'Instrumentation support for test ranges', 'W519TC-25-D-A066', 'Award Notice', '2026-02-01', CURRENT_DATE - INTERVAL '60 days', true, true, '541330', 'DEPT OF DEFENSE'),
     ('TEST-013', 'Utilization Management Program Review', 'Review of clinical utilization management practices', 'SOL-2026-013', 'Special Notice', '2026-03-01', CURRENT_DATE + INTERVAL '30 days', true, true, '621999', 'DEPT OF VETERANS AFFAIRS'),
     ('TEST-014', 'Resource Utilization Study', 'Study of resource allocation and program management', 'SOL-2026-014', 'Special Notice', '2026-03-02', CURRENT_DATE + INTERVAL '30 days', true, true, '541611', 'DEPT OF VETERANS AFFAIRS'),
-    ('TEST-015', 'Expired Facility Painting', 'Interior painting with a closed deadline', 'SOL-2026-015', 'Special Notice', '2026-01-01', CURRENT_DATE - INTERVAL '30 days', true, true, '238320', 'GENERAL SERVICES ADMINISTRATION');
+    ('TEST-015', 'Expired Facility Painting', 'Interior painting with a closed deadline', 'SOL-2026-015', 'Special Notice', '2026-01-01', CURRENT_DATE - INTERVAL '30 days', true, true, '238320', 'GENERAL SERVICES ADMINISTRATION'),
+    -- Contains "it" ONLY inside other words (Monitor, Unit) and as the English
+    -- pronoun. Pins how an all-stopword quoted phrase currently matches.
+    ('TEST-016', 'Monitor Calibration Unit', 'The vendor shall confirm it operates within tolerance', 'SOL-2026-016', 'Special Notice', '2026-03-04', CURRENT_DATE + INTERVAL '30 days', true, true, '334519', 'DEPT OF DEFENSE');
 `

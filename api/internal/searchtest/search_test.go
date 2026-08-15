@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 
 	r := chi.NewRouter()
 	r.Get("/api/opportunities", oppHandler.Search)
+	r.Get("/api/opportunities/facets", oppHandler.GetFacets)
 
 	server = httptest.NewServer(r)
 
@@ -222,5 +223,65 @@ func TestSearch_NoRelaxedHintWhenUnquoted(t *testing.T) {
 
 	if result.RelaxedQuery != "" {
 		t.Errorf("unquoted search should not offer a relaxed query, got %q", result.RelaxedQuery)
+	}
+}
+
+// --- Coverage added 2026-08-15 for behaviours that shipped untested. ---
+
+// The facets endpoint produces the headline result count from a SEPARATE code
+// path with its own param serializer. When it drifted from search on
+// 2026-08-14 the page showed "26 results" above a list of 12, and every unit
+// test and API probe passed. Parity is the invariant worth pinning.
+func TestFacets_TotalMatchesSearchTotal(t *testing.T) {
+	cases := []url.Values{
+		{"q": {"modernization"}, "active": {"true"}},
+		{"q": {"painting"}, "active": {"true"}},
+		{"q": {"sterilizer"}},
+		{"active": {"true"}},
+	}
+	for _, params := range cases {
+		s := searchGet(t, server.URL, params)
+		f := facetsGet(t, server.URL, params)
+		if s.Total != f.Total {
+			t.Errorf("params %v: search total %d != facets total %d", params, s.Total, f.Total)
+		}
+	}
+}
+
+func TestFacets_HonoursActiveFilter(t *testing.T) {
+	withActive := facetsGet(t, server.URL, url.Values{"q": {"painting"}, "active": {"true"}})
+	without := facetsGet(t, server.URL, url.Values{"q": {"painting"}})
+
+	if withActive.Total >= without.Total {
+		t.Errorf("active=true must narrow the facet total: %d (active) vs %d (all)",
+			withActive.Total, without.Total)
+	}
+}
+
+// "Still open" and "deadline within a range" are deliberately different
+// intents: only the former includes undated notices.
+func TestSearch_ExplicitDeadlineRangeExcludesUndatedNotices(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{
+		"q":             {"modernization"},
+		"deadline_from": {"2020-01-01"},
+	})
+
+	if hasTitle(result, "IT Support Desk Modernization") {
+		t.Errorf("an explicit deadline range must exclude the undated notice; got %v", titles(result))
+	}
+}
+
+// Pins TODAY's behaviour: a phrase that is entirely stopwords falls back to a
+// case-insensitive SUBSTRING match, so "IT" also matches Monitor and Unit and
+// the pronoun "it". Moving to case-sensitive word-boundary matching should
+// break this test — update it deliberately, don't delete it.
+func TestSearch_QuotedStopwordPhraseMatchesSubstrings_CURRENT(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"q": {`"IT"`}})
+
+	if !hasTitle(result, "Monitor Calibration Unit") {
+		t.Errorf("expected substring semantics to match Monitor/Unit; got %v", titles(result))
+	}
+	if !hasTitle(result, "IT Support Desk Modernization") {
+		t.Errorf("the genuine IT notice must match under any semantics; got %v", titles(result))
 	}
 }
