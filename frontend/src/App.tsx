@@ -9,25 +9,47 @@ import useUTMCapture from './hooks/useUTMCapture';
 import useTawk from './hooks/useTawk';
 import AppLayout from './components/AppLayout';
 
-const WhatsNewPage = lazy(() => import('./pages/WhatsNewPage'));
-const OpportunityDetail = lazy(() => import('./pages/OpportunityDetail'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const SavedPage = lazy(() => import('./pages/SavedPage'));
-const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
-const AdminPage = lazy(() => import('./pages/AdminPage'));
-const AdminPipelineRunDetailPage = lazy(() => import('./pages/AdminPipelineRunDetailPage'));
-const AdminDataQualityPage = lazy(() => import('./pages/AdminDataQualityPage'));
-const AdminReconcileDQPage = lazy(() => import('./pages/AdminReconcileDQPage'));
-const AdminCampaignsPage = lazy(() => import('./pages/AdminCampaignsPage'));
-const AdminObservabilityPage = lazy(() => import('./pages/AdminObservabilityPage'));
-const AdminDSARPage = lazy(() => import('./pages/AdminDSARPage'));
-const SnapDetailPage = lazy(() => import('./pages/AdminSnapDetailPage'));
-const RedeemPage = lazy(() => import('./pages/RedeemPage'));
-const SearchHistoryPage = lazy(() => import('./pages/SearchHistoryPage'));
-const SearchGuidePage = lazy(() => import('./pages/SearchGuidePage'));
-const SearchGuideInteractivePage = lazy(() => import('./pages/SearchGuideInteractivePage'));
-const GlossaryPage = lazy(() => import('./pages/GlossaryPage'));
-const ThankYouPage = lazy(() => import('./pages/ThankYouPage'));
+const CHUNK_RELOAD_KEY = 'govtrove_chunk_reload';
+
+// A deploy replaces the hashed asset files, so a tab that loaded the old index 404s
+// on the next lazy route and renders a blank page. Reload once to pick up the new
+// index; the sentinel keeps a genuinely unreachable chunk from looping forever, and
+// is cleared as soon as any chunk loads.
+function lazyWithReload(factory: Parameters<typeof lazy>[0]): ReturnType<typeof lazy> {
+  return lazy(() =>
+    factory()
+      .then((mod) => {
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+        return mod;
+      })
+      .catch((err) => {
+        if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) throw err;
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+        window.location.reload();
+        return new Promise<never>(() => {}); // the reload replaces the page
+      }),
+  );
+}
+
+const WhatsNewPage = lazyWithReload(() => import('./pages/WhatsNewPage'));
+const OpportunityDetail = lazyWithReload(() => import('./pages/OpportunityDetail'));
+const ProfilePage = lazyWithReload(() => import('./pages/ProfilePage'));
+const SavedPage = lazyWithReload(() => import('./pages/SavedPage'));
+const NotificationsPage = lazyWithReload(() => import('./pages/NotificationsPage'));
+const AdminPage = lazyWithReload(() => import('./pages/AdminPage'));
+const AdminPipelineRunDetailPage = lazyWithReload(() => import('./pages/AdminPipelineRunDetailPage'));
+const AdminDataQualityPage = lazyWithReload(() => import('./pages/AdminDataQualityPage'));
+const AdminReconcileDQPage = lazyWithReload(() => import('./pages/AdminReconcileDQPage'));
+const AdminCampaignsPage = lazyWithReload(() => import('./pages/AdminCampaignsPage'));
+const AdminObservabilityPage = lazyWithReload(() => import('./pages/AdminObservabilityPage'));
+const AdminDSARPage = lazyWithReload(() => import('./pages/AdminDSARPage'));
+const SnapDetailPage = lazyWithReload(() => import('./pages/AdminSnapDetailPage'));
+const RedeemPage = lazyWithReload(() => import('./pages/RedeemPage'));
+const SearchHistoryPage = lazyWithReload(() => import('./pages/SearchHistoryPage'));
+const SearchGuidePage = lazyWithReload(() => import('./pages/SearchGuidePage'));
+const SearchGuideInteractivePage = lazyWithReload(() => import('./pages/SearchGuideInteractivePage'));
+const GlossaryPage = lazyWithReload(() => import('./pages/GlossaryPage'));
+const ThankYouPage = lazyWithReload(() => import('./pages/ThankYouPage'));
 
 const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
 const REDIRECT_URI = `${window.location.origin}/callback`;

@@ -103,9 +103,12 @@ export async function rescueSearch(params: SearchParams, signal?: AbortSignal): 
   return response.json();
 }
 
-export async function getOpportunity(id: number): Promise<Opportunity> {
+export async function getOpportunity(id: number, token?: string): Promise<Opportunity> {
+  const headers: Record<string, string> = { ...utmHeaders() };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}/opportunities/${id}`, {
-    headers: { ...utmHeaders() },
+    headers,
   });
   if (!response.ok) {
     if (response.status === 404) {

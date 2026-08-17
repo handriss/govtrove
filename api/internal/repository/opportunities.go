@@ -182,6 +182,24 @@ func buildGeoCondition(params models.SearchParams, argNum *int, args *[]any) str
 	return "(" + strings.Join(parts, " OR ") + ")"
 }
 
+// naicsCodeLength is the length of a full NAICS code as stored in naics_code.
+const naicsCodeLength = 6
+
+// splitNAICSByDepth separates full 6-digit NAICS codes from shorter sector/subsector
+// codes. Deep links and hand-built URLs routinely carry a 2-5 digit code (?naics=5415),
+// which matches nothing under equality because naics_code is always 6 digits — so the
+// short ones become prefix matches instead of a silent zero-result search.
+func splitNAICSByDepth(codes []string) (exact, prefixes []string) {
+	for _, c := range codes {
+		if len(c) >= naicsCodeLength {
+			exact = append(exact, c)
+		} else if c != "" {
+			prefixes = append(prefixes, c)
+		}
+	}
+	return exact, prefixes
+}
+
 // buildCodeOrPrefixConditions builds an OR condition combining exact codes, a single prefix, and multiple prefixes.
 func buildCodeOrPrefixConditions(codes []string, prefix string, prefixes []string, column string, argNum *int, args *[]any) string {
 	var parts []string
@@ -393,7 +411,8 @@ func buildFilterConditions(params models.SearchParams, exclude string, argStart 
 	}
 
 	if exclude != "naics" {
-		naicsConds := buildCodeOrPrefixConditions(params.NAICSCodes, params.NAICSPrefix, params.NAICSPrefixes, "naics_code", &argNum, &args)
+		naicsExact, naicsShort := splitNAICSByDepth(params.NAICSCodes)
+		naicsConds := buildCodeOrPrefixConditions(naicsExact, params.NAICSPrefix, append(naicsShort, params.NAICSPrefixes...), "naics_code", &argNum, &args)
 		if naicsConds != "" {
 			conditions = append(conditions, naicsConds)
 		}

@@ -17,9 +17,28 @@ const API = process.env.E2E_API_URL || 'https://api.govtrove.com/api';
  */
 async function headlineCount(page: Page): Promise<number> {
   await expect(page).toHaveTitle(/[\d,]+\s+results? for/, { timeout: 90_000 });
-  const m = (await page.title()).match(/([\d,]+)\s+results?/);
-  if (!m) throw new Error(`no result count in title: ${await page.title()}`);
-  return parseInt(m[1].replace(/,/g, ''), 10);
+
+  // The title briefly reads "0 results" while the request is still in flight, so
+  // the first match is not necessarily the settled one — reading it directly made
+  // this flake. Wait for the same number twice in a row instead. Still returns a
+  // real 0 when that is genuinely the answer.
+  let last: number | null = null;
+  await expect
+    .poll(
+      async () => {
+        const m = (await page.title()).match(/([\d,]+)\s+results?/);
+        if (!m) return false;
+        const n = parseInt(m[1].replace(/,/g, ''), 10);
+        const settled = last === n;
+        last = n;
+        return settled;
+      },
+      { timeout: 90_000, intervals: [500] },
+    )
+    .toBe(true);
+
+  if (last === null) throw new Error(`no result count in title: ${await page.title()}`);
+  return last;
 }
 
 /** Types a query into the real search box and submits it, as a user would. */
@@ -235,5 +254,67 @@ test.describe('still-open filter', () => {
       activeOnly,
       'active=true must be broader than a bare deadline range: undated notices are open, not expired',
     ).toBeGreaterThan(futureDeadlineOnly);
+  });
+});
+
+test.describe('fixes 2026-08-17', () => {
+  // naics_code is always 6 digits, so a sector/subsector code from a deep link
+  // (?naics=5415) matched nothing under equality and returned a silent zero.
+  // Short codes have to widen to a prefix instead.
+  test('a short NAICS code from a deep link returns results', async ({ request }) => {
+    const sector = await apiTotal(request, 'naics=54');
+    const subsector = await apiTotal(request, 'naics=5415');
+    const full = await apiTotal(request, 'naics=541512');
+
+    expect(full, 'the exact 6-digit code should have results to nest inside').toBeGreaterThan(0);
+    expect(subsector, 'a 4-digit NAICS must widen to a prefix, not return zero').toBeGreaterThanOrEqual(full);
+    expect(sector, 'a 2-digit NAICS must be broader still').toBeGreaterThanOrEqual(subsector);
+  });
+
+  // PSC codes are natively 4 characters. The NAICS widening must not leak across
+  // and turn every exact PSC lookup into a prefix scan.
+  test('a 4-character PSC code stays an exact match', async ({ request }) => {
+    const exact = await apiTotal(request, 'psc=R425');
+    const prefix = await apiTotal(request, 'psc_prefixes=R4');
+
+    expect(exact).toBeGreaterThan(0);
+    expect(prefix, 'R4* must be strictly broader than R425 — if equal, PSC went prefix too').toBeGreaterThan(exact);
+  });
+
+  // The headline count comes from /opportunities/facets, which has its own param
+  // serializer. A NAICS change that lands in one and not the other shows a count
+  // above a list that disagrees with it.
+  test('a short NAICS deep link agrees between facets and results', async ({ page }) => {
+    const totals = captureTotals(page);
+
+    await page.goto('/?naics=5415');
+    await headlineCount(page);
+    await page.waitForTimeout(3000);
+
+    expect(totals.search, 'no search response captured').toBeDefined();
+    expect(totals.search, 'a 4-digit NAICS deep link must not return zero').toBeGreaterThan(0);
+    expect(totals.facets, `facets ${totals.facets} != search ${totals.search}`).toBe(totals.search);
+  });
+
+  // Opening a notice used to send no Authorization header, so every view was
+  // logged anonymously and the search -> view funnel was unmeasurable. The page
+  // must still render for a signed-out visitor, which is what this pins.
+  test('an opportunity page opens from a search result', async ({ page }) => {
+    await page.goto('/');
+    await typeSearch(page, 'services');
+    await headlineCount(page);
+
+    const firstResult = page.getByRole('link', { name: /view details|open notice/i }).first();
+    const fallback = page.locator('a[href*="/opportunities/"]').first();
+    const link = (await firstResult.count()) > 0 ? firstResult : fallback;
+
+    await link.click();
+    await expect(page, 'clicking a result must land on the notice page').toHaveURL(/\/opportunities\/\d+/, {
+      timeout: 60_000,
+    });
+    await expect(
+      page.getByText(/sam\.gov/i).first(),
+      'the notice page must render, not blank out on a stale chunk',
+    ).toBeVisible({ timeout: 60_000 });
   });
 });

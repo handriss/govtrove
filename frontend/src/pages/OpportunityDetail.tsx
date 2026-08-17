@@ -203,7 +203,7 @@ export default function OpportunityDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const keyword = searchParams.get('q') || undefined;
-  const { isAuthenticated } = useAppAuth();
+  const { isAuthenticated, getAccessToken } = useAppAuth();
   const posthog = usePostHog();
   const { isSaved, toggleSave } = useSavedOpportunities();
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
@@ -220,13 +220,21 @@ export default function OpportunityDetail() {
     setLoading(true);
     setError(null);
 
-    getOpportunity(parseInt(id))
-      .then((opp) => {
+    // The token is passed so the server-side view event is attributed to the user;
+    // the request itself works fine anonymously.
+    (async () => {
+      let token: string | undefined;
+      try { token = await getAccessToken(); } catch { /* not authenticated */ }
+      try {
+        const opp = await getOpportunity(parseInt(id), token);
         setOpportunity(opp);
         trackOpportunityViewed(posthog, opp);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load opportunity');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
