@@ -16,7 +16,8 @@ const API = process.env.E2E_API_URL || 'https://api.govtrove.com/api';
  * the same state, so it is both user-visible and a stable thing to assert on.
  */
 async function headlineCount(page: Page): Promise<number> {
-  await expect(page).toHaveTitle(/[\d,]+\s+results? for/, { timeout: 90_000 });
+  // No "for <query>" suffix on a filter-only search, so match the count alone.
+  await expect(page).toHaveTitle(/[\d,]+\s+results?/, { timeout: 90_000 });
 
   // The title briefly reads "0 results" while the request is still in flight, so
   // the first match is not necessarily the settled one — reading it directly made
@@ -41,14 +42,32 @@ async function headlineCount(page: Page): Promise<number> {
   return last;
 }
 
-/** Types a query into the real search box and submits it, as a user would. */
+/**
+ * Types a query into the real search box and submits it, as a user would.
+ *
+ * Waits for the response to the submitted query before returning. Typing is
+ * debounced (300ms), so without this the caller can read the headline while an
+ * intermediate keystroke is still the live query — `"IT"` half-typed is `"IT`,
+ * which legitimately has zero results and made this flake.
+ */
 async function typeSearch(page: Page, query: string) {
   const box = page.getByRole('textbox', { name: /search keywords/i });
   await box.waitFor({ state: 'visible' });
   await box.click();
   await box.fill('');
+
+  const settled = page.waitForResponse(
+    (res) => {
+      if (!res.url().includes('/api/opportunities')) return false;
+      if (res.status() !== 200) return false;
+      return new URL(res.url()).searchParams.get('q') === query;
+    },
+    { timeout: 90_000 },
+  );
+
   await box.pressSequentially(query, { delay: 15 });
   await box.press('Enter');
+  await settled;
 }
 
 /**
@@ -217,17 +236,30 @@ test.describe('search rescue', () => {
   // counts it verified server-side. The contract worth testing is that the
   // number on the chip is the number you get when you click it.
   test('a zero-result search is rescued with a count that holds up', async ({ page }) => {
+    // /opportunities/rescue is rate limited to 10/hour per IP, and one full
+    // `make test-ui` spends two (desktop + mobile). Past that the endpoint 429s
+    // and the empty state has nothing to render — an environment limit, not a
+    // product failure, so skip rather than report a false regression.
+    let rateLimited = false;
+    page.on('response', (res) => {
+      if (res.url().includes('/opportunities/rescue') && res.status() === 429) rateLimited = true;
+    });
+
     // Coffee wholesaler's real search: a term that exists, under a NAICS that has none.
     await page.goto('/?q=coffee&naics=424490');
     await page.waitForLoadState('networkidle', { timeout: 90_000 }).catch(() => {});
 
     const count = await headlineCount(page);
     test.skip(count > 0, 'this filter combination now returns results; nothing to rescue');
+    test.skip(rateLimited, 'rescue endpoint rate limited (10/hour) — rerun in an hour');
 
-    const chip = page.getByRole('button', { name: /remove the naics filter/i });
-    await expect(chip, 'rescue should offer to drop the over-narrow filter').toBeVisible({ timeout: 60_000 });
+    // Which suggestion wins depends on what verifies against live data today, so
+    // match the shape every suggestion has (a label plus its verified count)
+    // rather than one specific rule that may legitimately be outranked.
+    const chip = page.getByRole('button', { name: /[\d,]+\s+results\s*$/ }).first();
+    await expect(chip, 'a zero-result search must be offered a way out').toBeVisible({ timeout: 60_000 });
 
-    const promisedText = (await chip.locator('..').textContent()) ?? '';
+    const promisedText = (await chip.textContent()) ?? '';
     const promised = parseInt((promisedText.match(/([\d,]+)\s+results/) ?? ['', '0'])[1].replace(/,/g, ''), 10);
     expect(promised, 'a rescue suggestion must carry a verified count').toBeGreaterThan(0);
 
@@ -281,19 +313,27 @@ test.describe('fixes 2026-08-17', () => {
     expect(prefix, 'R4* must be strictly broader than R425 — if equal, PSC went prefix too').toBeGreaterThan(exact);
   });
 
-  // The headline count comes from /opportunities/facets, which has its own param
-  // serializer. A NAICS change that lands in one and not the other shows a count
-  // above a list that disagrees with it.
-  test('a short NAICS deep link agrees between facets and results', async ({ page }) => {
+  // The deep link is the path that was broken: a short NAICS in the URL used to
+  // land on an empty page. Anchored on the headline the user actually reads —
+  // NOT on the last facets response, because the home view also fetches an
+  // unfiltered catalog count for its "N active opportunities" badge.
+  test('a short NAICS deep link shows a real count, not zero', async ({ page }) => {
     const totals = captureTotals(page);
 
     await page.goto('/?naics=5415');
-    await headlineCount(page);
-    await page.waitForTimeout(3000);
+    const headline = await headlineCount(page);
 
+    expect(headline, 'a 4-digit NAICS deep link must not return zero').toBeGreaterThan(0);
     expect(totals.search, 'no search response captured').toBeDefined();
-    expect(totals.search, 'a 4-digit NAICS deep link must not return zero').toBeGreaterThan(0);
-    expect(totals.facets, `facets ${totals.facets} != search ${totals.search}`).toBe(totals.search);
+    expect(
+      headline,
+      `headline ${headline} != search total ${totals.search} — the count and the list disagree`,
+    ).toBe(totals.search);
+
+    await expect(
+      page.getByRole('button', { name: /remove naics 5415 filter/i }),
+      'the filter from the URL should be visible as a chip',
+    ).toBeVisible();
   });
 
   // Opening a notice used to send no Authorization header, so every view was
@@ -304,12 +344,9 @@ test.describe('fixes 2026-08-17', () => {
     await typeSearch(page, 'services');
     await headlineCount(page);
 
-    const firstResult = page.getByRole('link', { name: /view details|open notice/i }).first();
-    const fallback = page.locator('a[href*="/opportunities/"]').first();
-    const link = (await firstResult.count()) > 0 ? firstResult : fallback;
-
+    const link = page.locator('a[href*="/opportunity/"]').first();
     await link.click();
-    await expect(page, 'clicking a result must land on the notice page').toHaveURL(/\/opportunities\/\d+/, {
+    await expect(page, 'clicking a result must land on the notice page').toHaveURL(/\/opportunity\/\d+/, {
       timeout: 60_000,
     });
     await expect(
