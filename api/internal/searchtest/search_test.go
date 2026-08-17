@@ -285,3 +285,57 @@ func TestSearch_QuotedStopwordPhraseMatchesSubstrings_CURRENT(t *testing.T) {
 		t.Errorf("the genuine IT notice must match under any semantics; got %v", titles(result))
 	}
 }
+
+// A sector/subsector NAICS code (2-5 digits) arrives via deep links and hand-built
+// URLs. naics_code is always 6 digits, so matching those by equality silently
+// returned nothing; they have to widen to a prefix match instead.
+func TestSearch_ShortNAICSCodeMatchesAsPrefix(t *testing.T) {
+	cases := []struct {
+		naics string
+		want  []string
+	}{
+		{"5415", []string{"Cybersecurity Assessment Services", "Cloud Infrastructure Migration",
+			"Network Security Monitoring Tools", "IT Support Desk Modernization"}},
+		{"54", []string{"Cybersecurity Assessment Services", "Cloud Infrastructure Migration",
+			"Network Security Monitoring Tools", "IT Support Desk Modernization",
+			"Resource Utilization Study", "Range Instrumentation Support"}},
+		{"541512", []string{"Cybersecurity Assessment Services", "Network Security Monitoring Tools"}},
+	}
+
+	for _, tc := range cases {
+		result := searchGet(t, server.URL, url.Values{"naics": {tc.naics}})
+		if result.Total != len(tc.want) {
+			t.Errorf("naics=%s: got %d results %v, want %d", tc.naics, result.Total, titles(result), len(tc.want))
+			continue
+		}
+		for _, title := range tc.want {
+			if !hasTitle(result, title) {
+				t.Errorf("naics=%s: missing %q, got %v", tc.naics, title, titles(result))
+			}
+		}
+	}
+}
+
+// A short NAICS code must not widen a sibling exact code in the same request.
+func TestSearch_ShortAndFullNAICSCombine(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"naics": {"5416,339113"}})
+
+	for _, title := range []string{"Resource Utilization Study", "Sterilizer Equipment Maintenance",
+		"Autoclave Repair and Calibration", "Sterilizer Supply Chain Analysis"} {
+		if !hasTitle(result, title) {
+			t.Errorf("missing %q, got %v", title, titles(result))
+		}
+	}
+	if hasTitle(result, "Cybersecurity Assessment Services") {
+		t.Errorf("541512 should not match the 5416 prefix: %v", titles(result))
+	}
+}
+
+// PSC codes are natively 4 characters, so the NAICS widening must not leak into them.
+func TestSearch_ShortPSCCodeStaysExact(t *testing.T) {
+	result := searchGet(t, server.URL, url.Values{"psc": {"J065"}})
+
+	if result.Total != 2 {
+		t.Fatalf("expected 2 J065 results, got %d: %v", result.Total, titles(result))
+	}
+}
