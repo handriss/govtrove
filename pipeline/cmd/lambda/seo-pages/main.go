@@ -15,13 +15,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 
@@ -314,6 +314,23 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}()
 	}
 
+	// Hoisted above the first page loop: every page type links its opportunity rows'
+	// NAICS codes, so this set is needed before the NAICS pages themselves are built.
+	allNAICS := naics.Codes()
+	allPSCCodes := psc.Codes()
+	allSectors := naics.Sectors()
+
+	naicsSiblings := buildSiblingIndex(allNAICS, countMap["naics"],
+		func(code string) (string, bool) {
+			sec := naics.SectorOf(code)
+			return sec, allSectors[sec] != ""
+		}, "naics", "NAICS")
+	pscSiblings := buildSiblingIndex(allPSCCodes, countMap["psc"],
+		func(code string) (string, bool) {
+			k, _, ok := psc.ParentOf(code)
+			return k, ok
+		}, "psc", "PSC")
+
 	// Every key written this run, so stale objects from earlier runs can be pruned.
 	// Without this, a NAICS code or agency that goes inactive leaves an orphan page
 	// live in S3 forever — unlinked, absent from the sitemap, and still returning 200.
@@ -361,7 +378,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
 			Explainer:       sa.Explainer,
-			Opportunities:   toTemplateOpps(opps),
+			Opportunities:   toTemplateOpps(opps, allNAICS),
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?setAside=%s", sa.Code),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
@@ -388,7 +405,6 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	}
 
 	// Generate NAICS pages
-	allNAICS := naics.Codes()
 	naicsCodes := make([]string, 0, len(allNAICS))
 	for code := range allNAICS {
 		naicsCodes = append(naicsCodes, code)
@@ -432,7 +448,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			Subtitle:        subtitle,
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
-			Opportunities:   toTemplateOpps(opps),
+			Opportunities:   toTemplateOpps(opps, allNAICS),
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?naics=%s", code),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
@@ -440,6 +456,8 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			IsNAICS:         true,
 			ParentLink:      sectorLink(code),
 			ParentLabel:     sectorLabel(code),
+			SiblingPages:    siblingsOf(naicsSiblings, naics.SectorOf(code), fmt.Sprintf("naics/%s", code)),
+			SiblingHeading:  "Related NAICS Codes",
 		}
 
 		body, err := renderPage(tmpl, data)
@@ -503,7 +521,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			Subtitle:        fmt.Sprintf("Browse %d+ active federal contract opportunities from %s.", c.TotalCount, ag.Department),
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
-			Opportunities:   toTemplateOpps(opps),
+			Opportunities:   toTemplateOpps(opps, allNAICS),
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?agency=%s", ag.Department),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
@@ -573,7 +591,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			Subtitle:        subtitle,
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
-			Opportunities:   toTemplateOpps(opps),
+			Opportunities:   toTemplateOpps(opps, allNAICS),
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?psc=%s", code),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
 			UpdatedDate:     updatedDate,
@@ -583,6 +601,8 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		if hasParent {
 			data.ParentLink = fmt.Sprintf("/contracts/psc/group/%s.html", parentKey)
 			data.ParentLabel = fmt.Sprintf("PSC %s – %s", parentKey, parentTitle)
+			data.SiblingPages = siblingsOf(pscSiblings, parentKey, fmt.Sprintf("psc/%s", code))
+			data.SiblingHeading = "Related PSC Codes"
 		}
 
 		body, err := renderPage(tmpl, data)
@@ -642,7 +662,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 			Subtitle:        fmt.Sprintf("All %d product service codes under PSC group %s, and %d active federal contract opportunities.", len(children), group, c.TotalCount),
 			TotalCount:      c.TotalCount,
 			RecentCount:     c.RecentCount,
-			Opportunities:   toTemplateOpps(opps),
+			Opportunities:   toTemplateOpps(opps, allNAICS),
 			ChildPages:      children,
 			CTALink:         fmt.Sprintf("https://app.govtrove.com/?psc=%s", group),
 			CTACountLabel:   fmt.Sprintf("%d+", c.TotalCount),
@@ -893,7 +913,66 @@ func deref(v *string) string {
 	return *v
 }
 
-func toTemplateOpps(opps []database.SEOOpportunity) []opportunity {
+// buildSiblingIndex maps each parent key to every published code beneath it.
+//
+// It is computed up-front rather than accumulated while pages render: the leaf loop
+// would otherwise leave the first pages with no siblings and the last with all of them.
+// Only codes at or above indexThreshold are included, so a leaf never links to a page
+// we deliberately keep out of the index.
+func buildSiblingIndex(
+	codes map[string]string,
+	counts map[string]database.SEOPageCount,
+	parentOf func(string) (string, bool),
+	slugPrefix, labelPrefix string,
+) map[string][]indexEntry {
+	idx := make(map[string][]indexEntry)
+	for code, label := range codes {
+		c := counts[code]
+		if c.TotalCount < indexThreshold {
+			continue
+		}
+		parent, ok := parentOf(code)
+		if !ok {
+			continue
+		}
+		idx[parent] = append(idx[parent], indexEntry{
+			Slug:  fmt.Sprintf("%s/%s", slugPrefix, code),
+			Label: fmt.Sprintf("%s %s – %s", labelPrefix, code, label),
+			Count: c.TotalCount,
+		})
+	}
+	for parent := range idx {
+		sort.Slice(idx[parent], func(i, j int) bool { return idx[parent][i].Count > idx[parent][j].Count })
+	}
+	return idx
+}
+
+// maxSiblings caps the lateral block. Enough to spread crawl depth and give a reader
+// somewhere to go; not so many that the page turns into a link farm.
+const maxSiblings = 12
+
+// siblingsOf returns the busiest peers of code under parent, excluding code itself.
+func siblingsOf(idx map[string][]indexEntry, parent, selfSlug string) []indexEntry {
+	all := idx[parent]
+	out := make([]indexEntry, 0, maxSiblings)
+	for _, e := range all {
+		if e.Slug == selfSlug {
+			continue
+		}
+		out = append(out, e)
+		if len(out) == maxSiblings {
+			break
+		}
+	}
+	return out
+}
+
+// toTemplateOpps converts store rows for rendering. The NAICS code printed on every
+// opportunity row becomes a link when we actually publish a page for that code — it is
+// the only lateral path between the PSC and NAICS page sets, which are otherwise two
+// disconnected islands. Codes we do not generate (retired, 5-digit, malformed) stay
+// plain text rather than linking to a 403.
+func toTemplateOpps(opps []database.SEOOpportunity, naicsPages map[string]string) []opportunity {
 	result := make([]opportunity, len(opps))
 	for i, o := range opps {
 		result[i] = opportunity{
@@ -906,6 +985,11 @@ func toTemplateOpps(opps []database.SEOOpportunity) []opportunity {
 			ResponseDeadline:   o.ResponseDeadline,
 			PopState:           o.PopState,
 			SolicitationNumber: o.SolicitationNumber,
+		}
+		if code := deref(o.NAICSCode); code != "" {
+			if _, ok := naicsPages[code]; ok {
+				result[i].NAICSLink = fmt.Sprintf("/contracts/naics/%s.html", code)
+			}
 		}
 	}
 	return result
@@ -995,6 +1079,7 @@ type opportunity struct {
 	ResponseDeadline   *time.Time
 	PopState           *string
 	SolicitationNumber *string
+	NAICSLink          string
 }
 
 type pageData struct {
@@ -1021,6 +1106,8 @@ type pageData struct {
 	ParentLink      string
 	ParentLabel     string
 	ChildPages      []indexEntry
+	SiblingPages    []indexEntry
+	SiblingHeading  string
 	SetAsidePages   []indexEntry
 	NAICSPages      []indexEntry
 	AgencyPages     []indexEntry
@@ -1133,6 +1220,8 @@ const pageTmpl = `<!DOCTYPE html>
     .index-list a { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.5rem; text-decoration: none; color: var(--text-primary); }
     .index-list a:hover { color: var(--accent); }
     .index-count { background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 20px; padding: 0.2rem 0.75rem; font-size: 0.8rem; color: var(--text-secondary); }
+    .meta-link { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+    .meta-link:hover { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -1249,7 +1338,11 @@ const pageTmpl = `<!DOCTYPE html>
                     <span>Due: {{formatDate .ResponseDeadline}}</span>
                     {{- end}}
                     {{- if and .NAICSCode (ne (deref .NAICSCode) "")}}
+                    {{- if and .NAICSLink (ne .NAICSLink (printf "/contracts/%s.html" $.CanonicalPath))}}
+                    <span>NAICS: <a href="{{.NAICSLink}}" class="meta-link">{{deref .NAICSCode}}</a></span>
+                    {{- else}}
                     <span>NAICS: {{deref .NAICSCode}}</span>
+                    {{- end}}
                     {{- end}}
                     {{- if and .SetAsideCode (ne (deref .SetAsideCode) "")}}
                     <span>Set-Aside: {{deref .SetAsideCode}}</span>
@@ -1266,6 +1359,17 @@ const pageTmpl = `<!DOCTYPE html>
             <h2>Search All {{commaInt .TotalCount}}+ Opportunities</h2>
             <p>Filter by keyword, NAICS, set-aside, agency, and more. Free to use.</p>
             <a href="{{.CTALink}}" class="cta-btn">Search on GovTrove &rarr;</a>
+        </div>
+        {{- end}}
+
+        {{- if .SiblingPages}}
+        <div class="index-section">
+            <h2>{{.SiblingHeading}}</h2>
+            <ul class="index-list">
+                {{- range .SiblingPages}}
+                <li><a href="/contracts/{{.Slug}}.html"><span>{{.Label}}</span><span class="index-count">{{commaInt .Count}} active</span></a></li>
+                {{- end}}
+            </ul>
         </div>
         {{- end}}
 
