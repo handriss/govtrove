@@ -5,7 +5,16 @@ import (
 	"compress/gzip"
 	"io"
 	"strings"
+	"time"
 )
+
+// Reconcile deactivates anything whose archive_date has passed
+// (`archive_date < CURRENT_DATE`), so a record a spec expects to still be
+// active cannot carry a hardcoded date — it silently flips to inactive once
+// that date goes by. Keep such dates relative to the run.
+func csvDate(offsetDays int) string {
+	return time.Now().UTC().AddDate(0, 0, offsetDays).Format("01/02/2006")
+}
 
 // CSV headers matching the SAM.gov Contract Opportunities format.
 // Both ExtractSnapCSVRow and reconcile.FromCSV read from these headers.
@@ -53,7 +62,7 @@ var activeCSVRun1 = csvHeaders + "\n" +
 		// HAPPY-001: fully populated solicitation
 		row(map[int]string{
 			0: "HAPPY-001", 1: "SOL-001", 2: "Test Solicitation", 3: "Solicitation", 4: "Solicitation",
-			5: "01/15/2026", 6: "03/01/2026", 7: "06/01/2026", 8: "auto",
+			5: csvDate(-210), 6: csvDate(30), 7: csvDate(90), 8: "auto",
 			9: "SBA", 10: "Total Small Business", 11: "541511", 12: "R425", 13: "Yes",
 			14: "Department of Defense", 15: "Navy", 16: "NAVSEA", 17: "097", 18: "N00024", 19: "AAC001",
 			24: "A test solicitation description", 25: "DoD/Military", 26: "https://sam.gov/opp/HAPPY-001",
@@ -73,7 +82,7 @@ var activeCSVRun1 = csvHeaders + "\n" +
 		// SENTINEL-001: sentinel archive date (1969-12-31)
 		row(map[int]string{
 			0: "SENTINEL-001", 1: "SOL-SENT", 2: "Sentinel Test", 3: "Solicitation", 4: "Solicitation",
-			5: "01/10/2026", 7: "12/31/1969", 8: "auto", 11: "541330", 13: "Yes",
+			5: csvDate(-30), 7: "12/31/1969", 8: "auto", 11: "541330", 13: "Yes",
 			14: "Dept of Energy", 17: "019",
 		}),
 		// BADDATE-001: unparseable archive date
@@ -89,7 +98,7 @@ var activeCSVRun1 = csvHeaders + "\n" +
 		// WILL-CHANGE: modified in run 2
 		row(map[int]string{
 			0: "WILL-CHANGE", 1: "SOL-CHG", 2: "Original Title", 3: "Solicitation", 4: "Solicitation",
-			5: "01/05/2026", 13: "Yes",
+			5: csvDate(-30), 13: "Yes",
 			14: "DHS", 17: "070",
 			22: "1000",
 		}),
@@ -102,7 +111,7 @@ var activeCSVRun1 = csvHeaders + "\n" +
 		// WILL-GLITCH: removed in run 2, returns in run 3
 		row(map[int]string{
 			0: "WILL-GLITCH", 1: "SOL-GLITCH", 2: "Glitch Record", 3: "Solicitation", 4: "Solicitation",
-			5: "01/02/2026", 13: "Yes",
+			5: csvDate(-30), 13: "Yes",
 			14: "DoD", 17: "097",
 		}),
 	}, "\n")
@@ -112,7 +121,7 @@ var activeCSVRun2 = csvHeaders + "\n" +
 	strings.Join([]string{
 		row(map[int]string{
 			0: "HAPPY-001", 1: "SOL-001", 2: "Test Solicitation", 3: "Solicitation", 4: "Solicitation",
-			5: "01/15/2026", 6: "03/01/2026", 7: "06/01/2026", 8: "auto",
+			5: csvDate(-210), 6: csvDate(30), 7: csvDate(90), 8: "auto",
 			9: "SBA", 10: "Total Small Business", 11: "541511", 12: "R425", 13: "Yes",
 			14: "Department of Defense", 15: "Navy", 16: "NAVSEA", 17: "097", 18: "N00024", 19: "AAC001",
 			24: "A test solicitation description", 25: "DoD/Military", 26: "https://sam.gov/opp/HAPPY-001",
@@ -130,7 +139,7 @@ var activeCSVRun2 = csvHeaders + "\n" +
 		}),
 		row(map[int]string{
 			0: "SENTINEL-001", 1: "SOL-SENT", 2: "Sentinel Test", 3: "Solicitation", 4: "Solicitation",
-			5: "01/10/2026", 7: "12/31/1969", 8: "auto", 11: "541330", 13: "Yes",
+			5: csvDate(-30), 7: "12/31/1969", 8: "auto", 11: "541330", 13: "Yes",
 			14: "Dept of Energy", 17: "019",
 		}),
 		row(map[int]string{
@@ -144,7 +153,7 @@ var activeCSVRun2 = csvHeaders + "\n" +
 		// WILL-CHANGE: Title and Award$ modified
 		row(map[int]string{
 			0: "WILL-CHANGE", 1: "SOL-CHG", 2: "Updated Title", 3: "Solicitation", 4: "Solicitation",
-			5: "01/05/2026", 13: "Yes",
+			5: csvDate(-30), 13: "Yes",
 			14: "DHS", 17: "070",
 			22: "2000",
 		}),
@@ -160,7 +169,7 @@ var activeCSVRun2 = csvHeaders + "\n" +
 var activeCSVRun3 = activeCSVRun2 + "\n" +
 	row(map[int]string{
 		0: "WILL-GLITCH", 1: "SOL-GLITCH", 2: "Glitch Record", 3: "Solicitation", 4: "Solicitation",
-		5: "01/02/2026", 13: "Yes",
+		5: csvDate(-30), 13: "Yes",
 		14: "DoD", 17: "097",
 	})
 
@@ -171,4 +180,3 @@ func gzipCSV(csv string) io.ReadCloser {
 	gz.Close()
 	return io.NopCloser(&buf)
 }
-
