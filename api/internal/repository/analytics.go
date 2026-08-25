@@ -16,6 +16,14 @@ func NewAnalyticsRepository(pool *pgxpool.Pool) *AnalyticsRepository {
 	return &AnalyticsRepository{pool: pool}
 }
 
+// excludeTestTraffic drops our own smoke-test and browser-E2E traffic from the
+// admin analytics displays. The 2026-08-23 smoke run alone added 969 searches
+// (114 zero-result) and the E2E suite adds ~368 more, which is enough to move
+// every figure on the page. Passed as a Sprintf argument, never inlined into a
+// format string — the LIKE wildcards would otherwise read as format verbs.
+const excludeTestTraffic = `AND COALESCE(user_agent, '') NOT LIKE 'govtrove-smoke-test%' ` +
+	`AND COALESCE(user_agent, '') NOT LIKE '%GovTroveE2E%'`
+
 func (r *AnalyticsRepository) GetSearchAnalytics(ctx context.Context, period string) (*models.SearchAnalytics, error) {
 	interval := periodToInterval(period)
 
@@ -71,13 +79,14 @@ func (r *AnalyticsRepository) getPopularSearches(ctx context.Context, interval s
 		SELECT LOWER(TRIM(query)) as query, COUNT(*) as count
 		FROM search_events
 		WHERE event_type = 'search'
+		  %s
 		  AND query IS NOT NULL
 		  AND query != ''
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY LOWER(TRIM(query))
 		ORDER BY count DESC
 		LIMIT 20
-	`, interval)
+	`, excludeTestTraffic, interval)
 
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
@@ -105,6 +114,7 @@ func (r *AnalyticsRepository) getZeroResultSearches(ctx context.Context, interva
 		SELECT LOWER(TRIM(query)) as query, COUNT(*) as count
 		FROM search_events
 		WHERE event_type = 'search'
+		  %s
 		  AND query IS NOT NULL
 		  AND query != ''
 		  AND total_results = 0
@@ -112,7 +122,7 @@ func (r *AnalyticsRepository) getZeroResultSearches(ctx context.Context, interva
 		GROUP BY LOWER(TRIM(query))
 		ORDER BY count DESC
 		LIMIT 20
-	`, interval)
+	`, excludeTestTraffic, interval)
 
 	rows, err := r.pool.Query(ctx, query)
 	if err != nil {
@@ -147,12 +157,13 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'type') as value
 		WHERE event_type = 'search'
+		  %s
 		  AND filters->'type' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
 		ORDER BY count DESC
 		LIMIT 10
-	`, interval)
+	`, excludeTestTraffic, interval)
 
 	rows, err := r.pool.Query(ctx, typeQuery)
 	if err != nil {
@@ -173,12 +184,13 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'set_aside') as value
 		WHERE event_type = 'search'
+		  %s
 		  AND filters->'set_aside' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
 		ORDER BY count DESC
 		LIMIT 10
-	`, interval)
+	`, excludeTestTraffic, interval)
 
 	rows, err = r.pool.Query(ctx, setAsideQuery)
 	if err != nil {
@@ -199,12 +211,13 @@ func (r *AnalyticsRepository) getFilterUsage(ctx context.Context, interval strin
 		FROM search_events,
 		     jsonb_array_elements_text(filters->'state') as value
 		WHERE event_type = 'search'
+		  %s
 		  AND filters->'state' IS NOT NULL
 		  AND created_at > NOW() - INTERVAL '%s'
 		GROUP BY value
 		ORDER BY count DESC
 		LIMIT 10
-	`, interval)
+	`, excludeTestTraffic, interval)
 
 	rows, err = r.pool.Query(ctx, stateQuery)
 	if err != nil {
@@ -232,7 +245,8 @@ func (r *AnalyticsRepository) getClickStats(ctx context.Context, interval string
 			COALESCE(SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END), 0) as views
 		FROM search_events
 		WHERE created_at > NOW() - INTERVAL '%s'
-	`, interval)
+		  %s
+	`, interval, excludeTestTraffic)
 
 	err := r.pool.QueryRow(ctx, query).Scan(&stats.TotalSearches, &stats.TotalViews)
 	if err != nil {
@@ -255,7 +269,8 @@ func (r *AnalyticsRepository) getEventCounts(ctx context.Context, interval strin
 			COALESCE(SUM(CASE WHEN event_type = 'save_search' THEN 1 ELSE 0 END), 0) as search_saves
 		FROM search_events
 		WHERE created_at > NOW() - INTERVAL '%s'
-	`, interval)
+		  %s
+	`, interval, excludeTestTraffic)
 
 	var counts models.EventCounts
 	err := r.pool.QueryRow(ctx, query).Scan(&counts.Searches, &counts.Views, &counts.Saves, &counts.SearchSaves)

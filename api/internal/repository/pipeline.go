@@ -266,20 +266,19 @@ func (r *PipelineRepository) ListPipelineRuns(ctx context.Context, page, limit i
 	return executions, total, rows.Err()
 }
 
+// searchEventsAdminFilter hides our own test traffic from the admin Searches
+// tab, sharing one predicate with the analytics displays so the two can't drift.
+const searchEventsAdminFilter = `WHERE event_type = 'search' ` + excludeTestTraffic
+
 func (r *PipelineRepository) ListSearchEvents(ctx context.Context, page, limit int, emptyOnly bool) ([]SearchEventRow, int, error) {
-	countQuery := `SELECT COUNT(*) FROM search_events WHERE event_type = 'search'`
+	whereClause := searchEventsAdminFilter
 	if emptyOnly {
-		countQuery += ` AND (total_results = 0 OR total_results IS NULL)`
+		whereClause += ` AND (total_results = 0 OR total_results IS NULL)`
 	}
 
 	var total int
-	if err := r.pool.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+	if err := r.pool.QueryRow(ctx, `SELECT COUNT(*) FROM search_events `+whereClause).Scan(&total); err != nil {
 		return nil, 0, err
-	}
-
-	whereClause := `WHERE event_type = 'search'`
-	if emptyOnly {
-		whereClause += ` AND (total_results = 0 OR total_results IS NULL)`
 	}
 
 	offset := (page - 1) * limit
