@@ -1,6 +1,7 @@
 # Search Analytics, Signup Conversion & Search Coaching — Research and Implementation Plan
 
-**Status:** Research complete, ready to implement.
+**Status:** Research complete. §7 items 1-4 are done — see §10.
+**Audited 2026-08-25** against production; three claims were wrong and are corrected inline.
 **Prepared:** 2026-08-24, from a read-only session against the production database.
 **Intended use:** hand this to a local Claude Code session that has the full `.env` available.
 
@@ -48,6 +49,14 @@ WHERE user_agent = 'govtrove-smoke-test/1.0';
 
 All numbers in this document already exclude that window (`created_at::date < '2026-08-23'`).
 
+**Incomplete — corrected 2026-08-25.** The date filter excludes the smoke-test window, but
+the baseline still contained **368 `GovTroveE2E` events** (plus 111 from an AI crawler),
+which this section never mentions. Excluding them: 2,429 -> 2,060 searches and 363 -> 309
+zero-result. The *rates* are unaffected (15.0% vs 14.9%), so §1.2's headline holds, but
+absolute daily volumes were inflated ~15%. Both smoke-test and E2E traffic are now filtered
+out of the admin displays in code (`excludeTestTraffic`, `api/internal/repository/analytics.go`);
+the rows remain in the table by choice.
+
 ### 1.2 Search outcome distribution
 
 Over 2,452 genuine searches (2026-05-26 → 2026-08-22):
@@ -71,15 +80,21 @@ evaluation is trivially affordable.
 | Anonymous searches | 3,527 |
 | Anonymous opportunity **views** | **1,063** |
 | `save_opportunity` events | 35 (all authenticated) |
-| `save_search` events | **2, ever** |
+| `save_search` events | 2 logged (logging began 2026-08-06 — see note) |
+| `saved_searches` rows | **33, by 10 users** |
 | Total users | 59 |
 
 Two conclusions:
 
 1. **Anonymous users engage well beyond searching** — 1,063 opportunity detail views is a much
    stronger intent signal than a failed search, and nothing currently converts on it.
-2. **Saved searches are drastically under-sold** — 2 uses ever, against 35 opportunity saves.
-   This is the feature to promote, and the alerting infrastructure already exists
+2. **Saved searches are under-used** — but the "2 uses ever" figure is an instrumentation
+   artifact, not user behaviour. `save_search` event logging began 2026-08-06 while
+   `save_opportunity` began 2026-06-15, so the two counts cover different windows. The
+   tables tell the real story: **33 saved searches by 10 users** since February, against
+   66 saved opportunities by 14 users. The conclusion survives — only **1** saved search
+   in the last 60 days, most recent 2026-08-17 — but it is stagnation, not near-zero
+   adoption. The alerting infrastructure already exists
    (`pipeline/cmd/lambda/generate-alerts`).
 
 Monthly signups (Feb→Aug): 3, 12, 19, 9, 6, 6, 4. **Do not read a trend into this.** The
@@ -360,16 +375,22 @@ Placed in the existing empty state in `SearchResults.tsx`, **below** the rescue 
 Fix the search first, sell second; if the rescue panel repaired the query, the user never sees this.
 
 > **No matches today.**
-> 82 new opportunities are added daily. Get an email the moment something matches
-> "*{query}*".
+> About 2,000 new opportunities are added daily. Get an email the moment something
+> matches "*{query}*".
+
+**Corrected 2026-08-25.** An earlier draft said *82 new opportunities are added daily*,
+wrong by roughly 25x, and would have shipped a false claim in user-facing copy. Measured
+distinct new `notice_id`s per day for the week to 2026-08-25: 1,074 / 2,333 / 2,309 /
+2,459 / 2,189 / 1,105 / 2,685. Consistent with CLAUDE.md's stated 500-2,000/day.
+Re-measure before committing to a specific number.
 > `[ Create a free alert ]` · Takes 20 seconds. No card.
 
 **Why this offer rather than "sign up for search tips":**
 
 - It is genuinely unavailable without an account — a real reason to sign up.
 - It is immediate and concrete, not a deferred promise.
-- It is honest: zero results usually means nothing matches *today*, and ~82 new opportunities
-  were ingested per day last week.
+- It is honest: zero results usually means nothing matches *today*, and roughly 2,000 new
+  opportunities were ingested per day last week.
 - The infrastructure already exists (`saved_searches` + `generate-alerts`).
 - It reframes failure as timing rather than user error — important, because §2.3 shows the
   product is often the cause.
@@ -515,3 +536,38 @@ WHERE event_type='search' AND total_results = 0
   AND created_at::date < '2026-08-23' AND query <> ''
 GROUP BY query ORDER BY times DESC LIMIT 30;
 ```
+
+
+---
+
+## 10. What has shipped (2026-08-25)
+
+Audited against production before implementing. Three claims in this document were wrong and
+are corrected in place above: the "82 new opportunities daily" CTA figure, the "`save_search`
+used twice ever" comparison, and the completeness of the §1.1 purge.
+
+| §7 item | Status |
+|---|---|
+| 1. Purge smoke-test data | **Done differently** — filtered from all admin displays rather than deleted; rows remain in the table by choice |
+| 2. FK fix + `gdpr.sh` | **Done, and larger than described.** §2.1 named one blocking FK; there were four — `search_events`, `mcp_usage`, `invite_link_redemptions`, `gift_code_redemptions`. Migrations `000076`/`000077`, all `SET NULL`. `SET NULL` rather than `CASCADE` on the redemption tables because `max_redemptions` is enforced by `COUNT(*)` with no counter column, so deleting a row would hand back a redemption slot |
+| 3. Fix `SuggestQuery` garbage | **Done.** Root cause was not the 0.4 threshold: the query split titles on `\s+` then *deleted* punctuation, gluing `Management/Wayfinding` into `managementwayfinding`. Now splits on punctuation boundaries. The `NN--` PSC prefix cases were left alone — diagnosed 2026-08-17, deliberately not fixed |
+| 4. Normalise `opportunities: null` | **Done** — both sites, `repository/opportunities.go` and `repository/saved_searches.go` |
+| 5-11 | Not started |
+
+### Prerequisite discovered during implementation
+
+`migrate` could not run at all: `022_geo_synonyms` (legacy 3-digit, added March) collided with
+`000022_drop_api_probe_tables`, and golang-migrate refuses to parse a directory containing a
+duplicate version. Renumbered to `000075` and made idempotent, since its table already existed
+in production from a manual apply. **Anything here needing a migration depended on this first.**
+
+### Privacy
+
+§6's coaching now runs from a local Claude Code session against Anthropic directly, not
+OpenRouter. Anthropic is in the privacy policy's processor table, qualified as a consumer
+subscription rather than a commercial DPA, with training opt-out noted. Per §13 of that policy
+the change **takes effect 2026-09-24** after 30 days' notice — coaching must not run against
+other users' data before then. The policy states no name or email is sent to Anthropic, so the
+implementation must join on `user_id` and resolve to an email only at send time. Two further
+undisclosed processors were found and added: **Resend** (sends every user email; the table had
+credited AWS SES) and **PostHog**.
