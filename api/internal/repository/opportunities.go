@@ -145,6 +145,13 @@ func (r *OpportunityRepository) Search(ctx context.Context, params models.Search
 		totalPages = 1
 	}
 
+	// Normalise to [] so zero-result searches serialise as "opportunities": []
+	// rather than null, matching saved_opportunities.go and sparing every
+	// consumer a `|| []` guard.
+	if opportunities == nil {
+		opportunities = []models.OpportunityListItem{}
+	}
+
 	return &models.SearchResult{
 		Opportunities: opportunities,
 		Total:         totalCount,
@@ -562,9 +569,13 @@ func (r *OpportunityRepository) SuggestQuery(ctx context.Context, query string) 
 			WHERE length(word) > 0
 		),
 		title_words AS (
-			SELECT DISTINCT regexp_replace(word, '[^a-zA-Z0-9''-]', '', 'g') AS tw
-			FROM best, regexp_split_to_table(best.title, '\s+') AS word
-			WHERE length(regexp_replace(word, '[^a-zA-Z0-9''-]', '', 'g')) > 1
+			-- Split on punctuation rather than stripping it: splitting on \s+ and
+			-- then deleting punctuation glued "Management/Wayfinding" into one
+			-- token, which surfaced as "managementwayfinding" in a text-xl
+			-- "Did you mean?" prompt.
+			SELECT DISTINCT word AS tw
+			FROM best, regexp_split_to_table(best.title, '[^a-zA-Z0-9''-]+') AS word
+			WHERE length(word) > 1
 		),
 		matched AS (
 			SELECT qw.ordinality,
