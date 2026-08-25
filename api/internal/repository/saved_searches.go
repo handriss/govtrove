@@ -275,6 +275,10 @@ func (r *SavedSearchRepository) HistoryDay(ctx context.Context, id, userID int, 
 		totalPages = 1
 	}
 
+	if opps == nil {
+		opps = []models.OpportunityListItem{}
+	}
+
 	return search, &models.SearchResult{
 		Opportunities: opps,
 		Total:         total,
