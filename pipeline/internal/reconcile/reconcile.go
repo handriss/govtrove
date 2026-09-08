@@ -102,9 +102,17 @@ type Opportunity struct {
 // ContentHash returns a deterministic SHA-256 hash of content fields.
 // Excludes Active (feed metadata, not content) to avoid spurious versions
 // when the same notice_id appears in both active and archived CSV feeds.
+//
+// Also excludes AwardeeName, which is derived rather than sourced: it is parsed
+// out of Awardee (hashed) or normalised from the API's own concatenated value.
+// Hashing a derivation would have made the parser's introduction re-version
+// every award notice that has an awardee — 80,258 of them — recording a change
+// the upstream feed never made. A genuine change of awardee still versions the
+// notice through Awardee and AwardeeUeiSAM, which are both hashed.
 func (o Opportunity) ContentHash() string {
 	tmp := o
 	tmp.Active = false
+	tmp.AwardeeName = ""
 	b, _ := json.Marshal(tmp)
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
@@ -175,6 +183,10 @@ func FromCSV(raw map[string]string) (Opportunity, []DataQualityIssue) {
 		AwardDate:   awardDate,
 		AwardAmount: parse.Amount(raw["Award$"]),
 		Awardee:     raw["Awardee"],
+		// The CSV's Awardee column runs the name and address together, and it is
+		// the only awardee field the CSV has. Derive the bare name so notices the
+		// API never enriches (about four in five) are still attributable.
+		AwardeeName: parse.AwardeeName(raw["Awardee"]),
 
 		PrimaryContactTitle:    raw["PrimaryContactTitle"],
 		PrimaryContactFullname: raw["PrimaryContactFullname"],
@@ -315,7 +327,11 @@ func ReconcileRecord(csv, api *Opportunity) (Opportunity, []ReconcileMismatch) {
 	merged.DataSources = "csv+api"
 
 	// Carry forward API-only awardee fields (no merging — keep both sides)
-	merged.AwardeeName = api.AwardeeName
+	//
+	// AwardeeName is the exception: the API usually returns a clean name, but for
+	// roughly 9% of notices it returns the name and address concatenated, same as
+	// the CSV. Taking it verbatim would replace the parsed CSV name with a blob.
+	merged.AwardeeName = parse.AwardeeNameOrBlob(api.AwardeeName, csv.Awardee)
 	merged.AwardeeUeiSAM = api.AwardeeUeiSAM
 	merged.AwardeeStreetAddress = api.AwardeeStreetAddress
 	merged.AwardeeCity = api.AwardeeCity

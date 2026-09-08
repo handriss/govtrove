@@ -177,8 +177,8 @@ var _ = Describe("FromAPI", func() {
 		})
 	})
 
-	Context("CSV FromCSV awardee stays in Awardee field", func() {
-		It("CSV Awardee maps to Awardee (not AwardeeName)", func() {
+	Context("CSV FromCSV awardee", func() {
+		It("keeps the raw blob in Awardee and parses the name into AwardeeName", func() {
 			raw := map[string]string{
 				"NoticeId": "CSV-001",
 				"Awardee":  "ACME CORP Springfield IL 62701 USA",
@@ -187,6 +187,17 @@ var _ = Describe("FromAPI", func() {
 
 			Expect(issues).To(BeEmpty())
 			Expect(opp.Awardee).To(Equal("ACME CORP Springfield IL 62701 USA"))
+			Expect(opp.AwardeeName).To(Equal("ACME CORP"))
+		})
+
+		It("leaves AwardeeName empty when the name has no legal suffix", func() {
+			raw := map[string]string{
+				"NoticeId": "CSV-002",
+				"Awardee":  "OREGON STATE UNIVERSITY Corvallis OR 97331 USA",
+			}
+			opp, _ := reconcile.FromCSV(raw)
+
+			Expect(opp.Awardee).To(Equal("OREGON STATE UNIVERSITY Corvallis OR 97331 USA"))
 			Expect(opp.AwardeeName).To(BeEmpty())
 		})
 	})
@@ -288,12 +299,31 @@ var _ = Describe("FromAPI", func() {
 			Expect(base.ContentHash()).NotTo(Equal(withCode.ContentHash()))
 		})
 
-		It("changes when AwardeeName changes", func() {
-			base := reconcile.Opportunity{NoticeID: "HASH-004"}
+		It("does not change when only the derived AwardeeName differs", func() {
+			// AwardeeName is parsed out of Awardee, not sourced independently.
+			// Hashing it would re-version every award notice the moment the parser
+			// changes, recording a change the feed never made.
+			base := reconcile.Opportunity{NoticeID: "HASH-004", Awardee: "ACME Corp Reston VA USA"}
 			withName := base
 			withName.AwardeeName = "ACME Corp"
 
-			Expect(base.ContentHash()).NotTo(Equal(withName.ContentHash()))
+			Expect(base.ContentHash()).To(Equal(withName.ContentHash()))
+		})
+
+		It("still changes when the underlying Awardee changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-006", Awardee: "ACME Corp Reston VA USA"}
+			other := base
+			other.Awardee = "OTHER Corp Reston VA USA"
+
+			Expect(base.ContentHash()).NotTo(Equal(other.ContentHash()))
+		})
+
+		It("still changes when the awardee UEI changes", func() {
+			base := reconcile.Opportunity{NoticeID: "HASH-007"}
+			withUEI := base
+			withUEI.AwardeeUeiSAM = "ABC123DEF456"
+
+			Expect(base.ContentHash()).NotTo(Equal(withUEI.ContentHash()))
 		})
 
 		It("does not change when only Active flag differs", func() {
