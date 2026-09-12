@@ -10,7 +10,9 @@
 // This applies parse.AwardeeNameOrBlob to existing rows. It is idempotent: a row
 // whose awardee_name is already a clean name is left alone. Rows whose name has
 // no recognisable legal suffix are skipped rather than guessed at, so a rerun
-// after the parser improves will pick them up.
+// after the parser improves will pick them up. A row whose stored name is itself
+// an address with nothing to cut at is cleared, since an empty field is the
+// intended outcome there and leaving the address in place is not.
 //
 // awardee_name is excluded from Opportunity.ContentHash, so this does not
 // re-version the notices it touches.
@@ -58,7 +60,7 @@ func main() {
 	defer pool.Close()
 
 	start := time.Now()
-	var scanned, updated, skipped, unchanged int
+	var scanned, updated, skipped, unchanged, cleared int
 	var printed int
 	var lastID int64
 
@@ -79,6 +81,13 @@ func main() {
 
 			derived := parse.AwardeeNameOrBlob(r.name, r.awardee)
 			switch {
+			case derived == "" && r.name != "":
+				// The stored name is unusable — an address with no legal suffix to
+				// cut at — and nothing better can be derived. Clearing it is the
+				// point: an empty field beats one holding a street address.
+				cleared++
+				ids = append(ids, r.id)
+				names = append(names, "")
 			case derived == "":
 				skipped++ // no recognisable legal suffix — leave empty rather than guess
 			case derived == r.name:
@@ -109,7 +118,7 @@ func main() {
 			break
 		}
 		if scanned%50000 < batchSize {
-			log.Printf("progress: scanned=%d updated=%d skipped=%d", scanned, updated, skipped)
+			log.Printf("progress: scanned=%d updated=%d cleared=%d skipped=%d", scanned, updated, cleared, skipped)
 		}
 	}
 
@@ -117,8 +126,8 @@ func main() {
 	if *apply {
 		mode = "APPLIED"
 	}
-	fmt.Printf("\n%s\n  scanned   %d\n  updated   %d\n  unchanged %d\n  skipped   %d (no legal suffix)\n  elapsed   %s\n",
-		mode, scanned, updated, unchanged, skipped, time.Since(start).Round(time.Millisecond))
+	fmt.Printf("\n%s\n  scanned   %d\n  updated   %d\n  cleared   %d (stored value was an address)\n  unchanged %d\n  skipped   %d (no legal suffix)\n  elapsed   %s\n",
+		mode, scanned, updated, cleared, unchanged, skipped, time.Since(start).Round(time.Millisecond))
 }
 
 // fetch pages by id so a long run stays stable while the pipeline writes.
