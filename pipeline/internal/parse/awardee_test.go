@@ -109,4 +109,43 @@ var _ = Describe("AwardeeNameOrBlob", func() {
 	It("returns empty when neither side yields a name", func() {
 		Expect(parse.AwardeeNameOrBlob("", "")).To(Equal(""))
 	})
+
+	It("strips an address that starts with a single-digit street number", func() {
+		blob := "MACROSOFT INC 2 SYLVAN WAY PARSIPPANY NJ USA 07054-3809"
+		Expect(parse.AwardeeNameOrBlob(blob, blob)).To(Equal("MACROSOFT INC"))
+	})
+
+	It("strips an address whose street number is followed by an ordinal", func() {
+		blob := "HCA ASSET MANAGEMENT, LLC 5214 4TH AVENUE CIR E BRADENTON FL USA 34208-5621"
+		Expect(parse.AwardeeNameOrBlob(blob, blob)).To(Equal("HCA ASSET MANAGEMENT, LLC"))
+	})
+
+	It("strips an address that opens with a non-numeric street token", func() {
+		blob := "MULTI AIR SERVICES ENGINEERS, CORP. CARR.955 KM 29.3 RIO GRANDE PR USA 00745"
+		Expect(parse.AwardeeNameOrBlob(blob, blob)).To(Equal("MULTI AIR SERVICES ENGINEERS, CORP."))
+	})
+
+	It("keeps a name whose own tail follows the legal suffix", func() {
+		// "INC" leads the name here; cutting at it would leave "INC" alone. The
+		// tail has no digits, so this is a name, not a name plus an address.
+		Expect(parse.AwardeeNameOrBlob("INC RESEARCH LLC", "")).To(Equal("INC RESEARCH LLC"))
+	})
+
+	It("cuts correctly when the blob has leading whitespace", func() {
+		// Token offsets index the trimmed string; slicing the raw blob shifted them.
+		Expect(parse.AwardeeName("   ATVARIS LLC 880 HARRISON ST LEESBURG VA USA 20175")).
+			To(Equal("ATVARIS LLC"))
+	})
+
+	It("leaves the field empty when an addressed name has no legal suffix", func() {
+		// Nothing to cut at, so storing the API value whole would put the street
+		// address in the name. Empty is the documented preference over a guess.
+		blob := "ASPEN ENVIRONMENTAL GROUP 5020 CHESEBRO RD AGOURA HILLS CA USA 91301-4316"
+		Expect(parse.AwardeeNameOrBlob(blob, blob)).To(Equal(""))
+	})
+
+	It("keeps a suffix-less name that ends in the country", func() {
+		// "USA" alone must not read as an address, or this name is discarded.
+		Expect(parse.AwardeeNameOrBlob("SIEMENS USA", "")).To(Equal("SIEMENS USA"))
+	})
 })

@@ -1,6 +1,9 @@
 package parse
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // SAM.gov gives the awardee two different ways and neither is reliably a bare
 // company name. The bulk CSV has a single `Awardee` column holding the name and
@@ -110,7 +113,10 @@ func isSuffix(t token) bool { return strongSuffixes[t.norm] || weakSuffixes[t.no
 // intended outcome for names like "OREGON STATE UNIVERSITY" — better an empty
 // field than a guess at where the name stops.
 func AwardeeName(blob string) string {
-	toks := tokenize(strings.TrimSpace(blob))
+	// Offsets in the tokens index this trimmed string, so the cut below has to
+	// slice the same one — slicing the raw blob would shift by the leading space.
+	s := strings.TrimSpace(blob)
+	toks := tokenize(s)
 	if len(toks) == 0 {
 		return ""
 	}
@@ -148,16 +154,18 @@ func AwardeeName(blob string) string {
 		break
 	}
 
-	return strings.TrimSpace(blob[:toks[cut].end])
+	return strings.TrimSpace(s[:toks[cut].end])
 }
 
 // AwardeeNameOrBlob prefers a name the API already supplied, falling back to
 // parsing. The API's value is used as-is only when it looks like a bare name;
-// when it carries the address too it goes through the same parser as the CSV.
+// when it carries the address too it goes through the same parser as the CSV,
+// and when it carries an address the parser cannot cut, the field is left empty
+// rather than filled with the address.
 func AwardeeNameOrBlob(apiName, csvBlob string) string {
 	apiName = strings.TrimSpace(apiName)
 	if apiName != "" {
-		if !looksConcatenated(apiName) {
+		if !carriesAddress(apiName) {
 			return apiName
 		}
 		if parsed := AwardeeName(apiName); parsed != "" {
@@ -167,30 +175,35 @@ func AwardeeNameOrBlob(apiName, csvBlob string) string {
 	return AwardeeName(csvBlob)
 }
 
-// looksConcatenated reports whether a supposed company name has an address stuck
-// to it. A street number — two or more digits followed by a word — is the signal;
-// bare digits inside a name ("M-80 Systems, Inc.", "3DB LABS INC") are not.
-func looksConcatenated(s string) bool {
-	toks := tokenize(s)
-	for i, t := range toks {
-		if i+1 >= len(toks) || len(t.norm) < 2 {
-			continue
-		}
-		allDigits := true
-		for _, r := range t.norm {
-			if r < '0' || r > '9' {
-				allDigits = false
-				break
-			}
-		}
-		if !allDigits {
-			continue
-		}
-		next := toks[i+1].norm
-		if next == "" {
-			continue
-		}
-		if c := next[0]; (c >= 'A' && c <= 'Z') && !isSuffix(toks[i+1]) {
+// addressTail matches a trailing US ZIP, which is how SAM.gov's concatenated
+// awardee string ends. Deliberately not "USA": a name may legitimately end in
+// the country ("SIEMENS USA") and would then be thrown away for lack of a suffix.
+var addressTail = regexp.MustCompile(`\b\d{5}(-\d{4})?\s*$`)
+
+// carriesAddress reports whether a supposed company name has an address stuck to
+// it, by two independent signals. The first is a trailing ZIP. The second asks
+// what would be left behind if the name were cut at its legal suffix: a tail
+// carrying digits is a street number, whereas a tail of plain words is still part
+// of the name — "INC RESEARCH LLC" cuts to "INC" and must not be treated as
+// concatenated.
+//
+// The earlier version looked for a street number directly and missed three
+// shapes: a single-digit number ("2 SYLVAN WAY"), a number followed by an ordinal
+// ("5214 4TH AVENUE"), and a company with no legal suffix at all
+// ("ASPEN ENVIRONMENTAL GROUP 5020 CHESEBRO RD ..."), which was stored whole.
+// Together those left 340 names carrying a full address.
+func carriesAddress(s string) bool {
+	s = strings.TrimSpace(s)
+	if addressTail.MatchString(s) {
+		return true
+	}
+	cut := AwardeeName(s)
+	return cut != "" && len(cut) < len(s) && hasDigit(s[len(cut):])
+}
+
+func hasDigit(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
 			return true
 		}
 	}
