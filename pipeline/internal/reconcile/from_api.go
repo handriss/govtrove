@@ -138,7 +138,9 @@ func FromAPI(d samgov.OpportunityData) (Opportunity, []DataQualityIssue) {
 		opp.AwardNumber = d.Award.Number
 		opp.AwardDate = parseDateField(d.Award.Date, "AwardDate", &issues)
 		opp.AwardAmount = parse.Amount(d.Award.Amount)
-		opp.AwardeeName = d.Award.Awardee.Name
+		// Around 9% of API responses put the full address in the name field, the
+		// same shape the CSV's Awardee column has. Normalise both the same way.
+		opp.AwardeeName = parse.AwardeeNameOrBlob(d.Award.Awardee.Name, "")
 		opp.AwardeeUeiSAM = d.Award.Awardee.UeiSAM
 
 		if loc := d.Award.Awardee.Location; loc != nil {
