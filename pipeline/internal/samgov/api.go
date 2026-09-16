@@ -5,11 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 )
 
@@ -147,6 +149,42 @@ func NewAPIClient(apiKey string, logger *slog.Logger, recorder RequestRecorder) 
 	}
 }
 
+// apiKeyParam matches the api_key query parameter wherever a request URL ends up
+// embedded in a string.
+var apiKeyParam = regexp.MustCompile(`([?&]api_key=)[^&\s"]*`)
+
+// redactAPIKey strips the SAM.gov credential out of s.
+func redactAPIKey(s string) string {
+	return apiKeyParam.ReplaceAllString(s, "${1}REDACTED")
+}
+
+// redactedError hides the credential that net/http embeds in transport errors.
+// *url.Error carries the full request URL, api_key and all, so an unredacted wrap
+// put the live production key into Sentry issue titles and into
+// pipeline.samgov_requests.error_message in the clear. Unwrap is preserved so
+// errors.Is/As still reach the underlying error.
+type redactedError struct{ err error }
+
+func (e *redactedError) Error() string { return redactAPIKey(e.err.Error()) }
+func (e *redactedError) Unwrap() error { return e.err }
+
+// redactErr wraps err so neither its message nor the *url.Error it may carry can
+// pass the api_key on to a log sink, an error tracker, or the database.
+func redactErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	// Scrub the structured field too: anything that digs the *url.Error back out
+	// with errors.As would otherwise read the raw URL straight off it.
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		scrubbed := *ue
+		scrubbed.URL = redactAPIKey(ue.URL)
+		return &redactedError{err: &scrubbed}
+	}
+	return &redactedError{err: err}
+}
+
 // FetchPage fetches a single page from the SAM.gov opportunities search API,
 // requesting the full default set of procurement types.
 func (c *APIClient) FetchPage(ctx context.Context, offset, limit int, postedFrom, postedTo string) (*SearchResponse, []json.RawMessage, error) {
@@ -172,13 +210,14 @@ func (c *APIClient) FetchPagePtype(ctx context.Context, offset, limit int, poste
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create request: %w", err)
+		return nil, nil, fmt.Errorf("create request: %w", redactErr(err))
 	}
 
 	resp, err := c.http.Do(req)
 	elapsed := int(time.Since(start).Milliseconds())
 
 	if err != nil {
+		err = redactErr(err)
 		c.logRequest(ctx, elapsed, nil, 0, err)
 		return nil, nil, fmt.Errorf("execute request: %w", err)
 	}
@@ -186,6 +225,7 @@ func (c *APIClient) FetchPagePtype(ctx context.Context, offset, limit int, poste
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		err = redactErr(err)
 		c.logRequest(ctx, elapsed, &resp.StatusCode, 0, err)
 		return nil, nil, fmt.Errorf("read response body: %w", err)
 	}
@@ -279,7 +319,9 @@ func (c *APIClient) logRequest(ctx context.Context, elapsedMs int, statusCode *i
 		req.ResponseSizeBytes = &responseSize
 	}
 	if reqErr != nil {
-		errMsg := reqErr.Error()
+		// Belt and braces: callers hand over a redacted error, but this row is
+		// persisted, so never rely on that.
+		errMsg := redactAPIKey(reqErr.Error())
 		req.ErrorMessage = &errMsg
 	}
 
