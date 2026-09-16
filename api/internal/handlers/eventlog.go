@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/handriss/govtrove/api/internal/botfilter"
 	"github.com/handriss/govtrove/api/internal/models"
 	"github.com/handriss/govtrove/api/internal/repository"
 )
+
+// eventWriteTimeout bounds the detached analytics insert: the caller is a live
+// request handler, so this must not become an unbounded wait.
+const eventWriteTimeout = 5 * time.Second
 
 type EventLogger struct {
 	repo   *repository.EventRepository
@@ -49,7 +55,13 @@ func (l *EventLogger) Log(r *http.Request, userID *int, event *models.SearchEven
 		return
 	}
 
-	if err := l.repo.Create(r.Context(), event); err != nil {
+	// Analytics outlive the request that produced them. Inheriting the request
+	// context cancelled the insert whenever the visitor navigated away mid-flight,
+	// which silently dropped the event and under-counted every search figure.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), eventWriteTimeout)
+	defer cancel()
+
+	if err := l.repo.Create(ctx, event); err != nil {
 		l.logger.Error("failed to log event", "event_type", event.EventType, "error", err)
 	}
 }
