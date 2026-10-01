@@ -100,3 +100,29 @@ pages. 1,021/1,030 PSC leaves and 612/612 NAICS leaves are linked from their par
 - Monitoring gaps: no "pipeline hasn't run" alarm (CloudWatch `notBreaching` hides a
   stopped scheduler), no uptime monitor on `govtrove.com` or `mcp.govtrove.com`,
   BetterStack notification routing unverified.
+
+---
+
+## Wave 3 recheck — done 2026-10-01 (GSC data through 2026-09-28)
+
+**Verdict: early gain, then confounded by a sitewide impression drop. Not attributable either way.**
+
+Pages earning impressions, equal 28-day windows (PSC + NAICS):
+
+| Window | PSC | NAICS | Total |
+|---|---|---|---|
+| Jul 21 – Aug 17 (pre-wave 3) | 703 | 498 | 1,201 |
+| Aug 18 – Sep 14 | 920 | 442 | 1,362 |
+| Sep 1 – Sep 28 | 813 | 359 | 1,172 |
+
+**Step change on 2026-09-18:** weekday impressions fell from ~1,200/day to ~600/day
+(424 on Sep 28) with average position flat at ~8. A drop at constant position is lost
+search demand or SERP real estate, not lost ranking. Half of it is one page
+(`sam-gov-data-services-csv-api-explained.html` 459 → 204 impr/day at pos 7.9 → 8.0).
+Clicks did not fall: 4.00 → 4.45/day, CTR 0.31% → 0.54%.
+
+**Code finders moved:** `/psc-code-finder/` pos 12.2 → 7.2 (89 → 164 impr/day),
+`/naics-code-finder/` 38.6 → 27.7. Section clicks 0.35 → 0.82/day. Likely the 2026-09-16
+NAICS hub fix and PSC jump nav; recheck ~2026-10-28 as planned.
+
+Weekday blocks used: B = Aug 17 – Sep 11 (20 days), C = Sep 14 – Sep 28 (11 days).
