@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +33,7 @@ type OpportunityHandler struct {
 	userRepo *repository.UserRepository
 	geoRepo  *repository.GeoSynonymRepository
 	rescue   *searchrescue.Service // nil unless SEARCH_RESCUE_ENABLED
+	facets   *facetCache
 }
 
 // SetRescueService enables the zero-result search rescue endpoint.
@@ -40,7 +42,7 @@ func (h *OpportunityHandler) SetRescueService(svc *searchrescue.Service) {
 }
 
 func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository, geoRepo *repository.GeoSynonymRepository) *OpportunityHandler {
-	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo, geoRepo: geoRepo}
+	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo, geoRepo: geoRepo, facets: newFacetCache()}
 }
 
 func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
@@ -146,7 +148,9 @@ func (h *OpportunityHandler) Search(w http.ResponseWriter, r *http.Request) {
 func (h *OpportunityHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
 	params := h.parseSearchParams(r)
 	h.expandGeoSynonyms(r, &params)
-	result, err := h.repo.GetFacetCounts(r.Context(), params)
+	result, err := h.facets.get(r.Context(), r.URL.Query().Encode(), func(ctx context.Context) (*models.FacetResult, error) {
+		return h.repo.GetFacetCounts(ctx, params)
+	})
 	if err != nil {
 		h.logger.Error("get facets failed", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
