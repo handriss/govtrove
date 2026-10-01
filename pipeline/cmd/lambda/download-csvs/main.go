@@ -28,7 +28,6 @@ const (
 )
 
 var (
-	db       *database.DB
 	s3Client *s3.Client
 	cfg      config.Config
 	logger   *slog.Logger
@@ -79,12 +78,6 @@ func init() {
 
 	cfg.DatabaseURL = *result.SecretString
 
-	db, err = database.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		logger.Error("failed to connect to database", "error", err)
-		os.Exit(1)
-	}
-
 	s3Client = s3.NewFromConfig(awsCfg)
 	logger.Info("cold start complete", "bucket", cfg.S3Bucket)
 }
@@ -106,10 +99,55 @@ type Output struct {
 
 // Handler holds dependencies for the download-csvs Lambda.
 type Handler struct {
-	Store  database.Store
-	S3     bulkcsv.S3Client
-	Cfg    *config.Config
-	Logger *slog.Logger
+	Store      database.Store
+	Connect    func(context.Context) (database.Store, error)
+	S3         bulkcsv.S3Client
+	Validators bulkcsv.ValidatorObjects
+	Cfg        *config.Config
+	Logger     *slog.Logger
+}
+
+func (h *Handler) store(ctx context.Context) (database.Store, error) {
+	if h.Store == nil && h.Connect != nil {
+		s, err := h.Connect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		h.Store = s
+	}
+	return h.Store, nil
+}
+
+// unchangedSinceLastDownload lets ~35 of the ~36 daily polls finish without
+// opening a Neon connection, so the compute can scale to zero between them.
+// It skips bulkcsv's "archived S3 file still exists" check; a missing archive
+// is re-fetched on the next real upstream change instead.
+func (h *Handler) unchangedSinceLastDownload(ctx context.Context) bool {
+	if h.Validators == nil || len(bulkcsv.Sources) == 0 {
+		return false
+	}
+	for _, src := range bulkcsv.Sources {
+		v, ok := bulkcsv.LoadValidators(ctx, h.Validators, h.Cfg.S3Bucket, src.Key)
+		if !ok || !bulkcsv.NotModified(ctx, src, v) {
+			return false
+		}
+	}
+	return true
+}
+
+func (h *Handler) mirrorValidators(ctx context.Context, store database.Store) {
+	if h.Validators == nil {
+		return
+	}
+	for _, src := range bulkcsv.Sources {
+		etag, lastModified, err := store.GetLatestBulkCSVHeaders(ctx, src.Key)
+		if err != nil || (etag == "" && lastModified == "") {
+			continue
+		}
+		if err := bulkcsv.SaveValidators(ctx, h.Validators, h.Cfg.S3Bucket, src.Key, bulkcsv.Validators{ETag: etag, LastModified: lastModified}); err != nil {
+			h.Logger.Warn("failed to mirror CSV validators to S3", "source", src.Key, "error", err)
+		}
+	}
 }
 
 func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output, retErr error) {
@@ -140,8 +178,18 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		executionID = uuid.New()
 	}
 
+	if h.unchangedSinceLastDownload(ctx) {
+		h.Logger.Info("no new files (304 against S3-mirrored validators), skipped DB", "execution_id", executionID.String())
+		return &Output{ExecutionID: executionID.String()}, nil
+	}
+
+	store, err := h.store(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("connect database: %w", err)
+	}
+
 	// Idempotency: if this execution already completed, return cached output
-	existing, err := h.Store.GetPipelineRun(ctx, executionID)
+	existing, err := store.GetPipelineRun(ctx, executionID)
 	if err != nil {
 		h.Logger.Warn("failed to check existing pipeline run", "error", err)
 	}
@@ -150,10 +198,11 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		return h.buildCachedOutput(existing), nil
 	}
 
-	results, err := bulkcsv.Run(ctx, h.Cfg, h.Store, h.S3, h.Logger)
+	results, err := bulkcsv.Run(ctx, h.Cfg, store, h.S3, h.Logger)
 	if err != nil {
 		return nil, fmt.Errorf("bulk csv run: %w", err)
 	}
+	h.mirrorValidators(ctx, store)
 
 	var failed []string
 	for _, r := range results {
@@ -181,7 +230,7 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 	// Only write DB rows when there are new files to process
 	if len(files) > 0 {
 		// Pipeline step tracking
-		stepID, stepErr := h.Store.CreatePipelineStep(ctx, executionID, "download-csvs")
+		stepID, stepErr := store.CreatePipelineStep(ctx, executionID, "download-csvs")
 		if stepErr != nil {
 			h.Logger.Warn("failed to create pipeline step", "error", stepErr)
 		}
@@ -193,17 +242,17 @@ func (h *Handler) Handle(ctx context.Context, event json.RawMessage) (_ *Output,
 		}
 
 		if stepErr == nil {
-			if err := h.Store.CompletePipelineStep(ctx, stepID, stats, dur); err != nil {
+			if err := store.CompletePipelineStep(ctx, stepID, stats, dur); err != nil {
 				h.Logger.Warn("failed to complete pipeline step", "error", err)
 			}
 		}
 
 		// Backward compat: still create pipeline_run for ingestion_run FK
-		runID, err := h.Store.CreatePipelineRun(ctx, executionID, "download-csvs", nil)
+		runID, err := store.CreatePipelineRun(ctx, executionID, "download-csvs", nil)
 		if err != nil {
 			h.Logger.Warn("failed to create pipeline run (compat)", "error", err)
 		} else {
-			if err := h.Store.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
+			if err := store.CompletePipelineRun(ctx, runID, stats, dur); err != nil {
 				h.Logger.Warn("failed to complete pipeline run (compat)", "error", err)
 			}
 		}
@@ -236,6 +285,14 @@ func (h *Handler) buildCachedOutput(run *database.PipelineRun) *Output {
 }
 
 func main() {
-	h := &Handler{Store: db, S3: s3Client, Cfg: &cfg, Logger: logger}
+	h := &Handler{
+		Connect: func(ctx context.Context) (database.Store, error) {
+			return database.New(ctx, cfg.DatabaseURL)
+		},
+		S3:         s3Client,
+		Validators: s3Client,
+		Cfg:        &cfg,
+		Logger:     logger,
+	}
 	lambda.Start(h.Handle)
 }
