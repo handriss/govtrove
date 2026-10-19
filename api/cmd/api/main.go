@@ -215,6 +215,7 @@ func main() {
 
 	eventLog := handlers.NewEventLogger(eventRepo, logger)
 	oppHandler := handlers.NewOpportunityHandler(oppRepo, ogRenderer, logger, eventLog, userRepo, geoSynonymRepo)
+	oppHandler.WarmDefaultFacets()
 
 	if cfg.SearchRescueEnabled {
 		var rescueLLM *searchrescue.LLMClient

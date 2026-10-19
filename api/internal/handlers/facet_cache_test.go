@@ -121,3 +121,157 @@ func TestFacetCacheEvictsLeastRecentlyUsedFirst(t *testing.T) {
 		t.Fatal("k1 evicted although only one slot was needed")
 	}
 }
+
+type facetCacheClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *facetCacheClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *facetCacheClock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+func newFacetCacheWithClock() (*facetCache, *facetCacheClock) {
+	clock := &facetCacheClock{now: time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)}
+	c := newFacetCache()
+	c.now = clock.Now
+	return c, clock
+}
+
+func waitForLoads(t *testing.T, loads *int32, want int32) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for atomic.LoadInt32(loads) < want {
+		if time.Now().After(deadline) {
+			t.Fatalf("loads = %d, want %d", atomic.LoadInt32(loads), want)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestFacetCacheServesExpiredEntryImmediatelyAndRefreshesInBackground(t *testing.T) {
+	c, clock := newFacetCacheWithClock()
+	var loads int32
+	release := make(chan struct{})
+	load := func(context.Context) (*models.FacetResult, error) {
+		n := atomic.AddInt32(&loads, 1)
+		if n > 1 {
+			<-release
+		}
+		return &models.FacetResult{Total: int(n)}, nil
+	}
+	c.get(context.Background(), "", load)
+	clock.Advance(facetFreshFor + time.Minute)
+
+	for i := 0; i < 3; i++ {
+		got, err := c.get(context.Background(), "", load)
+		if err != nil || got.Total != 1 {
+			t.Fatalf("stale get = %v, %v; want the old result without waiting", got, err)
+		}
+	}
+	waitForLoads(t, &loads, 2)
+	close(release)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		got, _ := c.get(context.Background(), "", load)
+		if got.Total == 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("background refresh never replaced the stale entry")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if loads != 2 {
+		t.Fatalf("loads = %d, want 2 (one refresh shared by every stale hit)", loads)
+	}
+}
+
+func TestFacetCacheKeepsServingStaleEntryWhenBackgroundRefreshFails(t *testing.T) {
+	c, clock := newFacetCacheWithClock()
+	var loads int32
+	refreshFailed := make(chan error, 1)
+	c.onRefreshError = func(_ string, err error) { refreshFailed <- err }
+	load := func(context.Context) (*models.FacetResult, error) {
+		if atomic.AddInt32(&loads, 1) > 1 {
+			return nil, errors.New("timeout")
+		}
+		return &models.FacetResult{Total: 1}, nil
+	}
+	c.get(context.Background(), "", load)
+	clock.Advance(facetFreshFor + time.Minute)
+	c.get(context.Background(), "", load)
+
+	select {
+	case <-refreshFailed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("refresh failure was not reported")
+	}
+	if got, err := c.get(context.Background(), "", load); err != nil || got.Total != 1 {
+		t.Fatalf("after failed refresh get = %v, %v; want the stale result", got, err)
+	}
+}
+
+func TestFacetCacheReloadsInForegroundOncePastTheStaleWindow(t *testing.T) {
+	c, clock := newFacetCacheWithClock()
+	var loads int32
+	load := func(context.Context) (*models.FacetResult, error) {
+		return &models.FacetResult{Total: int(atomic.AddInt32(&loads, 1))}, nil
+	}
+	c.get(context.Background(), "", load)
+	clock.Advance(facetServeStaleFor + time.Minute)
+	if got, _ := c.get(context.Background(), "", load); got.Total != 2 {
+		t.Fatalf("get past stale window = %d, want a fresh load", got.Total)
+	}
+}
+
+func TestFacetCacheFreshEntryDoesNotTriggerRefresh(t *testing.T) {
+	c, clock := newFacetCacheWithClock()
+	var loads int32
+	load := func(context.Context) (*models.FacetResult, error) {
+		atomic.AddInt32(&loads, 1)
+		return &models.FacetResult{}, nil
+	}
+	c.get(context.Background(), "", load)
+	clock.Advance(facetFreshFor - time.Minute)
+	c.get(context.Background(), "", load)
+	time.Sleep(20 * time.Millisecond)
+	if loads != 1 {
+		t.Fatalf("loads = %d, want 1", loads)
+	}
+}
+
+func TestFacetCacheWaitsBeforeRetryingAFailedBackgroundRefresh(t *testing.T) {
+	c, clock := newFacetCacheWithClock()
+	var loads int32
+	refreshFailed := make(chan error, 4)
+	c.onRefreshError = func(_ string, err error) { refreshFailed <- err }
+	load := func(context.Context) (*models.FacetResult, error) {
+		if atomic.AddInt32(&loads, 1) > 1 {
+			return nil, errors.New("timeout")
+		}
+		return &models.FacetResult{}, nil
+	}
+	c.get(context.Background(), "", load)
+	clock.Advance(facetFreshFor + time.Minute)
+	c.get(context.Background(), "", load)
+	<-refreshFailed
+
+	c.get(context.Background(), "", load)
+	time.Sleep(20 * time.Millisecond)
+	if loads != 2 {
+		t.Fatalf("loads = %d, want 2 (no retry inside the backoff)", loads)
+	}
+	clock.Advance(facetRetryRefreshAfter + time.Minute)
+	c.get(context.Background(), "", load)
+	waitForLoads(t, &loads, 3)
+}

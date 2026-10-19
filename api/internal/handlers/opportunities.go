@@ -42,7 +42,21 @@ func (h *OpportunityHandler) SetRescueService(svc *searchrescue.Service) {
 }
 
 func NewOpportunityHandler(repo *repository.OpportunityRepository, renderer *ogimage.Renderer, logger *slog.Logger, eventLog *EventLogger, userRepo *repository.UserRepository, geoRepo *repository.GeoSynonymRepository) *OpportunityHandler {
-	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo, geoRepo: geoRepo, facets: newFacetCache()}
+	facets := newFacetCache()
+	facets.onRefreshError = func(key string, err error) {
+		logger.Error("background facet refresh failed", "key", key, "error", err)
+	}
+	return &OpportunityHandler{repo: repo, logger: logger, renderer: renderer, eventLog: eventLog, userRepo: userRepo, geoRepo: geoRepo, facets: facets}
+}
+
+// WarmDefaultFacets loads the unfiltered view (most facet traffic) so the first
+// visitor after a deploy doesn't wait on the cold scan.
+func (h *OpportunityHandler) WarmDefaultFacets() {
+	unfiltered, _ := http.NewRequest(http.MethodGet, "/", nil)
+	params := h.parseSearchParams(unfiltered)
+	h.facets.refreshInBackground(unfiltered.URL.Query().Encode(), func(ctx context.Context) (*models.FacetResult, error) {
+		return h.repo.GetFacetCounts(ctx, params)
+	})
 }
 
 func (h *OpportunityHandler) resolveOptionalUserID(r *http.Request) *int {
