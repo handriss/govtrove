@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"container/list"
 	"context"
 	"sync"
 	"time"
@@ -19,26 +20,35 @@ const (
 )
 
 type facetCacheEntry struct {
+	key       string
 	result    *models.FacetResult
 	expiresAt time.Time
 }
 
+// Least-recently-used eviction: crawlers send thousands of one-off queries, and
+// the old wipe-everything-when-full policy threw away the hot default-view entry
+// along with them, so every visitor paid the full scan again.
 type facetCache struct {
 	mu      sync.Mutex
-	entries map[string]facetCacheEntry
+	entries map[string]*list.Element
+	recency *list.List
 	group   singleflight.Group
 }
 
 func newFacetCache() *facetCache {
-	return &facetCache{entries: make(map[string]facetCacheEntry)}
+	return &facetCache{entries: make(map[string]*list.Element), recency: list.New()}
 }
 
 func (c *facetCache) get(ctx context.Context, key string, load func(context.Context) (*models.FacetResult, error)) (*models.FacetResult, error) {
 	now := time.Now()
 	c.mu.Lock()
-	if e, ok := c.entries[key]; ok && now.Before(e.expiresAt) {
-		c.mu.Unlock()
-		return e.result, nil
+	if el, ok := c.entries[key]; ok {
+		e := el.Value.(*facetCacheEntry)
+		if now.Before(e.expiresAt) {
+			c.recency.MoveToFront(el)
+			c.mu.Unlock()
+			return e.result, nil
+		}
 	}
 	c.mu.Unlock()
 
@@ -60,18 +70,18 @@ func (c *facetCache) get(ctx context.Context, key string, load func(context.Cont
 }
 
 func (c *facetCache) store(key string, result *models.FacetResult) {
-	now := time.Now()
+	entry := &facetCacheEntry{key: key, result: result, expiresAt: time.Now().Add(facetCacheTTL)}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.entries) >= facetCacheMaxEntries {
-		for k, e := range c.entries {
-			if !now.Before(e.expiresAt) {
-				delete(c.entries, k)
-			}
-		}
-		if len(c.entries) >= facetCacheMaxEntries {
-			c.entries = make(map[string]facetCacheEntry)
-		}
+	if el, ok := c.entries[key]; ok {
+		el.Value = entry
+		c.recency.MoveToFront(el)
+		return
 	}
-	c.entries[key] = facetCacheEntry{result: result, expiresAt: now.Add(facetCacheTTL)}
+	c.entries[key] = c.recency.PushFront(entry)
+	for c.recency.Len() > facetCacheMaxEntries {
+		oldest := c.recency.Back()
+		c.recency.Remove(oldest)
+		delete(c.entries, oldest.Value.(*facetCacheEntry).key)
+	}
 }

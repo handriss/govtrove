@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -80,5 +81,43 @@ func TestFacetCacheLoadSurvivesCallerCancellation(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("load saw caller cancellation: %v", err)
+	}
+}
+
+func TestFacetCacheKeepsHotEntryWhileOneOffQueriesOverflowIt(t *testing.T) {
+	c := newFacetCache()
+	var hotLoads int32
+	hot := func(context.Context) (*models.FacetResult, error) {
+		atomic.AddInt32(&hotLoads, 1)
+		return &models.FacetResult{Total: 1}, nil
+	}
+	oneOff := func(context.Context) (*models.FacetResult, error) { return &models.FacetResult{}, nil }
+
+	c.get(context.Background(), "default-view", hot)
+	for i := 0; i < facetCacheMaxEntries*4; i++ {
+		c.get(context.Background(), fmt.Sprintf("q=SOL%d", i), oneOff)
+		if i%10 == 0 {
+			c.get(context.Background(), "default-view", hot)
+		}
+	}
+	if hotLoads != 1 {
+		t.Fatalf("hot entry loaded %d times, want 1", hotLoads)
+	}
+	if len(c.entries) != facetCacheMaxEntries || c.recency.Len() != facetCacheMaxEntries {
+		t.Fatalf("size = %d/%d, want %d", len(c.entries), c.recency.Len(), facetCacheMaxEntries)
+	}
+}
+
+func TestFacetCacheEvictsLeastRecentlyUsedFirst(t *testing.T) {
+	c := newFacetCache()
+	load := func(context.Context) (*models.FacetResult, error) { return &models.FacetResult{}, nil }
+	for i := 0; i <= facetCacheMaxEntries; i++ {
+		c.get(context.Background(), fmt.Sprintf("k%d", i), load)
+	}
+	if _, ok := c.entries["k0"]; ok {
+		t.Fatal("oldest entry k0 survived overflow")
+	}
+	if _, ok := c.entries["k1"]; !ok {
+		t.Fatal("k1 evicted although only one slot was needed")
 	}
 }
