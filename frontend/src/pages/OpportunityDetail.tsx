@@ -287,18 +287,16 @@ export default function OpportunityDetail() {
       {/* Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-dark-900/30 via-transparent to-dark-950/50 pointer-events-none" />
 
-      {/* Header */}
-      <header className="relative z-20 border-b border-dark-800/50 bg-dark-950/80 backdrop-blur-md sticky top-0">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-5">
-          <Link
-            to="/"
-            className="p-2 -ml-2 text-dark-400 hover:text-dark-100 rounded-lg hover:bg-dark-800/50 transition-all duration-200"
+      {/* Mobile back bar */}
+      <header className="sticky top-0 z-20 border-b border-dark-800/50 bg-dark-950/80 backdrop-blur-md md:hidden">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => window.history.back()}
+            className="p-1.5 -ml-1 text-dark-400 hover:text-dark-100 rounded-lg hover:bg-dark-800/50 transition-all duration-200"
           >
             <ArrowLeft size={20} strokeWidth={1.5} />
-          </Link>
-          <Link to="/" className="text-xl font-semibold tracking-tight text-dark-50">
-            GovTrove
-          </Link>
+          </button>
+          <span className="text-sm font-medium text-dark-300">Opportunity Detail</span>
         </div>
       </header>
 

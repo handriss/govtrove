@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Clock, Bookmark, X } from 'lucide-react';
 import SearchInput from '../components/SearchInput';
 import QuickFilterChips from '../components/QuickFilterChips';
-import AuthButton from '../components/AuthButton';
 import { FilterBar, SearchResults } from '../components/search';
 import SearchMobileFilters from '../components/search/SearchMobileFilters';
 import { useFilterState } from '../hooks/useFilterState';
@@ -13,6 +12,7 @@ import { useSavedSearches } from '../hooks/useSavedSearches';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSearch } from '../hooks/useSearch';
 import { useAppAuth } from '../contexts/AuthContext';
+import { useSearchLayout } from '../contexts/SearchLayoutContext';
 import { preloadWhatsNew } from '../services/whatsNewCache';
 
 const PAGE_SIZE_KEY = 'govtrove_page_size';
@@ -24,6 +24,7 @@ export default function SimpleSearchPage() {
   const saved = useSavedOpportunities();
   const { isAuthenticated } = useAppAuth();
   const { savedSearches, saveCurrentSearch, deleteSearch } = useSavedSearches();
+  const { setHeroMode } = useSearchLayout();
   const [hasSearched, setHasSearched] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
@@ -144,6 +145,10 @@ export default function SimpleSearchPage() {
 
   const showResults = hasSearched || results.length > 0;
 
+  useEffect(() => {
+    setHeroMode(!showResults);
+  }, [showResults, setHeroMode]);
+
   return (
     <div className="min-h-screen flex flex-col relative">
       <a href="#search-results" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg">Skip to search results</a>
@@ -153,13 +158,9 @@ export default function SimpleSearchPage() {
       {/* Subtle radial glow */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-accent/[0.02] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="absolute top-4 right-6 z-20">
-        <AuthButton />
-      </div>
-
       <div className={`relative z-10 flex flex-col items-center transition-all duration-500 ease-out ${showResults ? 'pt-10' : 'pt-[25vh]'}`}>
         {/* Logo */}
-        <Link to="/" className={`mb-8 transition-all duration-500 ${showResults ? 'mb-6' : 'mb-10'}`}>
+        <Link to="/" className={`mb-8 transition-all duration-500 ${showResults ? 'mb-6 md:hidden' : 'mb-10'}`}>
           <h1 className={`text-center font-semibold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-dark-50 to-dark-200 transition-all duration-500 ${showResults ? 'text-2xl' : 'text-5xl'}`}>
             GovTrove
           </h1>

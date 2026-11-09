@@ -48,6 +48,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

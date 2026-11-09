@@ -7,7 +7,6 @@ import { useSavedSearches } from '../hooks/useSavedSearches';
 import { getOpportunity } from '../services/api';
 import OpportunityCard from '../components/search/OpportunityCard';
 import type { OpportunityListItem } from '../types/api';
-import AuthButton from '../components/AuthButton';
 
 function filterSummary(filters: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -100,13 +99,9 @@ export default function SavedPage() {
     <div className="min-h-screen flex flex-col relative">
       <div className="fixed inset-0 bg-gradient-to-b from-dark-900/20 via-transparent to-dark-950/40 pointer-events-none" />
 
-      <div className="absolute top-4 right-6 z-20">
-        <AuthButton />
-      </div>
-
-      <div className="relative z-10 max-w-4xl w-full mx-auto px-6 pt-10 pb-10">
+      <div className="relative z-10 max-w-4xl w-full mx-auto px-6 pt-6 pb-10">
         <div className="flex items-center gap-4 mb-8">
-          <Link to="/" className="text-dark-400 hover:text-dark-200 transition-colors">
+          <Link to="/" className="text-dark-400 hover:text-dark-200 transition-colors md:hidden">
             <ArrowLeft size={20} />
           </Link>
           <h1 className="text-2xl font-semibold text-dark-100">Saved</h1>

@@ -9,8 +9,8 @@ export default function PreviewBanner() {
   return (
     <div className="bg-accent/10 border-b border-accent/20 px-4 py-2 text-center text-sm text-dark-300 relative">
       <span>
-        <strong className="text-dark-100 font-semibold">Preview</strong>
-        {' '}&mdash; GovTrove is in early preview. Features and data may change.
+        <strong className="text-dark-100 font-semibold">Under Development</strong>
+        {' '}&mdash; GovTrove is actively being built. Data is incomplete and search may not return all results.
       </span>
       <button
         onClick={() => setDismissed(true)}
